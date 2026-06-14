@@ -43,14 +43,14 @@
 ### 3.4. The Agentic Story Engine
 *   **Function:** Generates the story text, moral, and discussion prompts.
 *   **Architecture:** 2-Step Agentic Workflow (Outline -> Story).
-*   **Model:** DeepSeek V4 Pro (or equivalent high-tier MoE model).
+*   **Model:** Xiaomi Mimo-V2.5 Pro (or equivalent high-tier MoE model).
 *   **Output Payload:**
     1.  Story Title
     2.  Full Story Text (approx. 1,500 words / 10 mins reading time)
     3.  The Moral
     4.  Pillow Talk Prompt (Parent discussion question)
     5.  Sleepy Affirmation (Short, positive recitation for the child)
-    6.  Cover Image (Generated asynchronously via GPT Image 1 Mini in "watercolor children's book" style).
+    6.  Cover Image (Generated asynchronously via gemini-3.1-flash-image in "watercolor children's book" style).
 
 ### 3.5. Text-Based Story Vault
 *   **Function:** A library of previously generated stories.

@@ -31,6 +31,12 @@
       "skillPath": "skills/mimo-v2-5-tts/SKILL.md",
       "computedHash": "696dae25ba1ca805bafe7f2099fe9c6b9428797dd736d017fc0568b431f04756"
     },
+    "supabase": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/supabase/SKILL.md",
+      "computedHash": "d414d598b9428b3e851c4ce61898649906b19e55aa7415bb42a286bd9ca2ab32"
+    },
     "upgrading-expo": {
       "source": "expo/skills",
       "sourceType": "github",
