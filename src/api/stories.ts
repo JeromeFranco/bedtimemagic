@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { Story, Challenge, Protagonist, StoryRating } from '@/types';
+import type { Story, ChallengeTrigger, Protagonist, StoryRating } from '@/types';
 
 export async function getStories(childId?: string): Promise<Story[]> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -23,14 +23,13 @@ export async function getStories(childId?: string): Promise<Story[]> {
 export async function generateStory(
   childId: string,
   protagonist: Protagonist,
-  challenge: Challenge,
-  customInput?: string
+  challenge: ChallengeTrigger
 ): Promise<Story> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   const { data, error } = await supabase.functions.invoke('generate-story', {
-    body: { childId, protagonist, challenge, customInput },
+    body: { childId, protagonist, challenge },
   });
 
   if (error) throw error;

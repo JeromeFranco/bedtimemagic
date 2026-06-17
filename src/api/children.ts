@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { ChildProfile, Protagonist } from '@/types';
+import type { ChildProfile, Protagonist, DevelopmentalStage } from '@/types';
 
 export async function getChildren(): Promise<ChildProfile[]> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -17,7 +17,7 @@ export async function getChildren(): Promise<ChildProfile[]> {
 
 export async function createChild(
   name: string,
-  age: number,
+  developmentalStage: DevelopmentalStage,
   protagonist: Protagonist
 ): Promise<ChildProfile> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -25,7 +25,7 @@ export async function createChild(
 
   const { data, error } = await supabase
     .from('children')
-    .insert({ user_id: user.id, name, age, protagonist })
+    .insert({ user_id: user.id, name, developmental_stage: developmentalStage, protagonist })
     .select()
     .single();
 
