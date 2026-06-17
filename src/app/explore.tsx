@@ -7,7 +7,7 @@ import { ExternalLink } from '@/components/external-link';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Collapsible } from '@/components/ui/collapsible';
-import { WebBadge } from '@/components/web-badge';
+
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -25,10 +25,6 @@ export default function TabTwoScreen() {
       paddingLeft: insets.left,
       paddingRight: insets.right,
       paddingBottom: insets.bottom,
-    },
-    web: {
-      paddingTop: Spacing.six,
-      paddingBottom: Spacing.four,
     },
   });
 
@@ -73,17 +69,11 @@ export default function TabTwoScreen() {
             </ExternalLink>
           </Collapsible>
 
-          <Collapsible title="Android, iOS, and web support">
+          <Collapsible title="Android and iOS support">
             <ThemedView type="backgroundElement" style={styles.collapsibleContent}>
               <ThemedText type="small">
-                You can open this project on Android, iOS, and the web. To open the web version,
-                press <ThemedText type="smallBold">w</ThemedText> in the terminal running this
-                project.
+                You can open this project on Android and iOS.
               </ThemedText>
-              <Image
-                source={require('@/assets/images/tutorial-web.png')}
-                style={styles.imageTutorial}
-              />
             </ThemedView>
           </Collapsible>
 
@@ -119,7 +109,6 @@ export default function TabTwoScreen() {
             </ThemedText>
           </Collapsible>
         </ThemedView>
-        {Platform.OS === 'web' && <WebBadge />}
       </ThemedView>
     </ScrollView>
   );
@@ -166,12 +155,7 @@ const styles = StyleSheet.create({
   collapsibleContent: {
     alignItems: 'center',
   },
-  imageTutorial: {
-    width: '100%',
-    aspectRatio: 296 / 171,
-    borderRadius: Spacing.three,
-    marginTop: Spacing.two,
-  },
+
   imageReact: {
     width: 100,
     height: 100,

@@ -2,8 +2,6 @@
  * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
  */
 
-import '@/global.css';
-
 import { Platform } from 'react-native';
 
 export const Colors = {
@@ -41,12 +39,6 @@ export const Fonts = Platform.select({
     serif: 'serif',
     rounded: 'normal',
     mono: 'monospace',
-  },
-  web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
-    rounded: 'var(--font-rounded)',
-    mono: 'var(--font-mono)',
   },
 });
 
