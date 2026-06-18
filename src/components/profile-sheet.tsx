@@ -58,7 +58,7 @@ export function ProfileSheet({ visible, onClose }: ProfileSheetProps) {
             </Pressable>
           ))}
 
-          <Pressable style={styles.addProfileRow} onPress={onClose}>
+          <Pressable style={[styles.addProfileRow, styles.addProfileRowDisabled]} disabled>
             <ThemedText type="default" themeColor="textSecondary">
               + Add Profile
             </ThemedText>
@@ -128,5 +128,8 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  addProfileRowDisabled: {
+    opacity: 0.5,
   },
 });
