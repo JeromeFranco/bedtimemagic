@@ -1,57 +1,33 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
+import { ProfileSelector } from '@/components/profile-selector';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-
-function getDevMenuHint() {
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
 
 export default function HomeScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
+        <ProfileSelector />
+
+        <ThemedView style={styles.centerContent}>
           <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
+            Bedtime Magic
+          </ThemedText>
+          <ThemedText type="default" themeColor="textSecondary" style={styles.subtitle}>
+            Create a personalized story for tonight
           </ThemedText>
         </ThemedView>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
+        <ThemedView style={styles.bottomSection}>
+          <Pressable style={styles.generateButton}>
+            <ThemedText type="default" style={styles.generateButtonText}>
+              Generate Tonight&apos;s Story
+            </ThemedText>
+          </Pressable>
         </ThemedView>
-
       </SafeAreaView>
     </ThemedView>
   );
@@ -60,35 +36,40 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
   },
   safeArea: {
     flex: 1,
     paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.three,
     maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    width: '100%',
   },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  centerContent: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: Spacing.two,
   },
   title: {
     textAlign: 'center',
   },
-  code: {
-    textTransform: 'uppercase',
+  subtitle: {
+    textAlign: 'center',
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  bottomSection: {
+    paddingBottom: Spacing.two,
+  },
+  generateButton: {
+    backgroundColor: 'rgba(99, 102, 241, 0.9)',
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.four,
+    borderRadius: Spacing.three,
+    alignItems: 'center',
+  },
+  generateButtonText: {
+    color: '#ffffff',
+    fontWeight: 600,
+    fontSize: 18,
   },
 });
