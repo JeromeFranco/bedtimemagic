@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import Animated, {
-  FadeIn,
   FadeInDown,
   FadeInUp,
   FadeOut,
