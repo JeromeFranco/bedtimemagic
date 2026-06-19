@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import Animated, {
   FadeInDown,
@@ -47,14 +47,14 @@ function CategoryCard({ emoji, label, isSelected, categoryId, onPress }: Categor
   const colors = CATEGORY_COLORS[categoryId];
   const scale = useSharedValue(1);
 
-  const prevSelected = useSharedValue(false);
-  if (isSelected && !prevSelected.value) {
-    scale.value = withSequence(
-      withTiming(1.02, { duration: 100 }),
-      withTiming(1, { duration: 100 })
-    );
-  }
-  prevSelected.value = isSelected;
+  useEffect(() => {
+    if (isSelected) {
+      scale.value = withSequence(
+        withTiming(1.02, { duration: 100 }),
+        withTiming(1, { duration: 100 })
+      );
+    }
+  }, [isSelected]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -92,14 +92,14 @@ function TriggerChip({ label, isSelected, categoryId, onPress }: TriggerChipProp
   const colors = CATEGORY_COLORS[categoryId];
   const scale = useSharedValue(1);
 
-  const prevSelected = useSharedValue(false);
-  if (isSelected && !prevSelected.value) {
-    scale.value = withSequence(
-      withTiming(1.03, { duration: 75 }),
-      withTiming(1, { duration: 75 })
-    );
-  }
-  prevSelected.value = isSelected;
+  useEffect(() => {
+    if (isSelected) {
+      scale.value = withSequence(
+        withTiming(1.03, { duration: 75 }),
+        withTiming(1, { duration: 75 })
+      );
+    }
+  }, [isSelected]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
