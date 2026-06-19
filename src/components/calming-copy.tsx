@@ -31,7 +31,7 @@ export function CalmingCopy() {
       exiting={FadeOut.duration(800)}
       style={styles.container}
     >
-      <ThemedText style={styles.text}>{MESSAGES[index]}</ThemedText>
+      <ThemedText themeColor="textSecondary" style={styles.text}>{MESSAGES[index]}</ThemedText>
     </Animated.View>
   );
 }
@@ -41,8 +41,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   text: {
-    color: 'rgba(176, 180, 186, 0.8)',
     fontSize: 16,
     textAlign: 'center',
+    opacity: 0.8,
   },
 });
