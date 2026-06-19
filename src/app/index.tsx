@@ -7,8 +7,8 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 
 export default function HomeScreen() {
-  const handleGenerate = (_category: string, _trigger: string) => {
-    // TODO: Navigate to loading screen (US-1.3) and trigger story generation (US-2.1)
+  const handleGenerate = (category: string, trigger: string) => {
+    console.log('Generate:', category, trigger);
   };
 
   return (
