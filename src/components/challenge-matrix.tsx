@@ -113,19 +113,25 @@ function TriggerChip({ label, isSelected, categoryId, onPress }: TriggerChipProp
         styles.triggerChip,
         animatedStyle,
         {
-          backgroundColor: isSelected ? colors.tintStrong : colors.tint,
+          backgroundColor: isSelected ? `${colors.primary}40` : colors.tint,
           borderColor: isSelected ? colors.borderSubtle : 'transparent',
         },
       ]}
     >
-      <ThemedText
-        style={[
-          styles.triggerLabel,
-          { color: isSelected ? '#ffffff' : colors.primary },
-        ]}
+      <GlassView
+        glassEffectStyle="regular"
+        tintColor={isSelected ? `${colors.primary}40` : colors.tint}
+        style={styles.triggerChipGlass}
       >
-        {label}
-      </ThemedText>
+        <ThemedText
+          style={[
+            styles.triggerLabel,
+            { color: isSelected ? '#ffffff' : `${colors.primary}B3` },
+          ]}
+        >
+          {label}
+        </ThemedText>
+      </GlassView>
     </AnimatedPressable>
   );
 }
@@ -270,14 +276,18 @@ const styles = StyleSheet.create({
   },
   triggerChip: {
     borderRadius: 20,
+    borderWidth: 1,
+  },
+  triggerChipGlass: {
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.two + Spacing.one,
-    borderWidth: 1,
+    borderRadius: 20,
   },
   triggerLabel: {
     fontWeight: '500',
   },
   generateButton: {
+    alignSelf: 'stretch',
     paddingVertical: Spacing.three,
     paddingHorizontal: Spacing.four,
     borderRadius: 16,
@@ -286,7 +296,7 @@ const styles = StyleSheet.create({
   },
   generateButtonText: {
     color: '#ffffff',
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 18,
   },
 });
