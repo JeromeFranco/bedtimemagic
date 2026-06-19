@@ -10,3 +10,8 @@
 - **Audio:** expo-audio (background playback)
 - **Monetization:** RevenueCat (V1.1 for consumables)
 - **Animations:** react-native-reanimated
+
+## Rules
+
+- Use conventional commit for commit message
+- Use expo-ui skill when working with expo ui components and prefer universal components over jetpack-compose and swiftui
