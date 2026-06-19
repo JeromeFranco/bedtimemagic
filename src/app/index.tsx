@@ -1,5 +1,6 @@
 import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 
 import { ChallengeMatrix } from '@/components/challenge-matrix';
 import { ChallengeCategory, ChallengeTrigger } from '@/types';
@@ -9,7 +10,7 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 
 export default function HomeScreen() {
   const handleGenerate = (category: ChallengeCategory, trigger: ChallengeTrigger) => {
-    console.log('Generate:', category, trigger);
+    router.push({ pathname: '/generate', params: { category, trigger } });
   };
 
   return (

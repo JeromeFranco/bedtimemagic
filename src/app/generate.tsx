@@ -28,7 +28,7 @@ export default function GenerateScreen() {
         trigger!
       ),
     onSuccess: () => {
-      router.replace('/story' as any);
+      router.replace('/story');
     },
   });
 
