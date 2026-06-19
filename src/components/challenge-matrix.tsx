@@ -1,10 +1,17 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
-import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  FadeOut,
+  Layout,
+} from 'react-native-reanimated';
+import { GlassView } from 'expo-glass-effect';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { CATEGORY_COLORS, Spacing } from '@/constants/theme';
 import {
   CHALLENGE_CATEGORIES,
   CHALLENGE_TRIGGERS,
@@ -21,6 +28,7 @@ interface ChallengeMatrixProps {
 interface CategoryCardProps {
   emoji: string;
   label: string;
+  categoryId: ChallengeCategory;
   isSelected: boolean;
   onPress: () => void;
 }
@@ -28,33 +36,59 @@ interface CategoryCardProps {
 interface TriggerChipProps {
   label: string;
   isSelected: boolean;
+  categoryId: ChallengeCategory;
   onPress: () => void;
 }
 
-function CategoryCard({ emoji, label, isSelected, onPress }: CategoryCardProps) {
+function CategoryCard({ emoji, label, isSelected, categoryId, onPress }: CategoryCardProps) {
+  const colors = CATEGORY_COLORS[categoryId];
+
   return (
     <AnimatedPressable
       onPress={onPress}
-      style={[styles.categoryCard, isSelected && styles.categoryCardSelected]}
+      style={[
+        styles.categoryCard,
+        isSelected && {
+          backgroundColor: colors.tintStrong,
+          borderColor: colors.border,
+        },
+      ]}
     >
-      <ThemedText style={styles.categoryEmoji}>{emoji}</ThemedText>
-      <ThemedText
-        style={[styles.categoryLabel, isSelected && styles.categoryLabelSelected]}
+      <GlassView
+        glassEffectStyle="regular"
+        tintColor={isSelected ? colors.tint : undefined}
+        style={styles.categoryCardGlass}
       >
-        {label}
-      </ThemedText>
+        <ThemedText style={styles.categoryEmoji}>{emoji}</ThemedText>
+        <ThemedText
+          style={[styles.categoryLabel, isSelected && { color: '#ffffff' }]}
+        >
+          {label}
+        </ThemedText>
+      </GlassView>
     </AnimatedPressable>
   );
 }
 
-function TriggerChip({ label, isSelected, onPress }: TriggerChipProps) {
+function TriggerChip({ label, isSelected, categoryId, onPress }: TriggerChipProps) {
+  const colors = CATEGORY_COLORS[categoryId];
+
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.triggerChip, isSelected && styles.triggerChipSelected]}
+      style={[
+        styles.triggerChip,
+        {
+          backgroundColor: isSelected ? colors.tintStrong : colors.tint,
+          borderColor: isSelected ? colors.borderSubtle : 'transparent',
+        },
+      ]}
     >
       <ThemedText
-        style={[styles.triggerLabel, isSelected && styles.triggerLabelSelected]}
+        style={[
+          styles.triggerLabel,
+          { color: isSelected ? '#ffffff' : colors.primary },
+        ]}
       >
         {label}
       </ThemedText>
@@ -98,7 +132,7 @@ export function ChallengeMatrix({ onGenerate }: ChallengeMatrixProps) {
 
   return (
     <ThemedView style={styles.container}>
-      <ThemedText style={styles.heading}>What's on your mind tonight?</ThemedText>
+      <ThemedText style={styles.heading}>What&apos;s on your mind tonight?</ThemedText>
 
       <ThemedView style={styles.tier1Grid}>
         {CHALLENGE_CATEGORIES.map((category) => (
@@ -106,6 +140,7 @@ export function ChallengeMatrix({ onGenerate }: ChallengeMatrixProps) {
             key={category.id}
             emoji={category.emoji}
             label={category.label}
+            categoryId={category.id}
             isSelected={selectedCategory === category.id}
             onPress={() => handleCategoryPress(category.id)}
           />
@@ -114,29 +149,38 @@ export function ChallengeMatrix({ onGenerate }: ChallengeMatrixProps) {
 
       {selectedCategory && (
         <Animated.View
-          entering={FadeIn}
-          exiting={FadeOut}
+          key={selectedCategory}
+          entering={FadeInDown.duration(300)}
+          exiting={FadeOut.duration(200)}
           layout={Layout.springify()}
           style={styles.tier2Container}
         >
           <ThemedView style={styles.tier2Row}>
-            {triggersForCategory.map((trigger) => (
-              <TriggerChip
+            {triggersForCategory.map((trigger, index) => (
+              <Animated.View
                 key={trigger.id}
-                label={trigger.label}
-                isSelected={selectedTrigger === trigger.id}
-                onPress={() => handleTriggerPress(trigger.id)}
-              />
+                entering={FadeInDown.delay(index * 80).duration(300)}
+              >
+                <TriggerChip
+                  label={trigger.label}
+                  isSelected={selectedTrigger === trigger.id}
+                  categoryId={selectedCategory}
+                  onPress={() => handleTriggerPress(trigger.id)}
+                />
+              </Animated.View>
             ))}
           </ThemedView>
         </Animated.View>
       )}
 
-      {canGenerate && (
-        <Animated.View entering={FadeIn}>
+      {canGenerate && selectedCategory && (
+        <Animated.View entering={FadeInUp.duration(250)}>
           <Pressable
             onPress={handleGenerate}
-            style={styles.generateButton}
+            style={[
+              styles.generateButton,
+              { backgroundColor: CATEGORY_COLORS[selectedCategory].primary },
+            ]}
           >
             <ThemedText style={styles.generateButtonText}>Generate</ThemedText>
           </Pressable>
@@ -157,32 +201,28 @@ const styles = StyleSheet.create({
   tier1Grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.two,
+    gap: Spacing.two + 4,
     justifyContent: 'center',
   },
   categoryCard: {
     width: '47%',
-    backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 16,
-    padding: Spacing.three,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    overflow: 'hidden',
+  },
+  categoryCardGlass: {
+    padding: Spacing.three + 4,
     alignItems: 'center',
     gap: Spacing.two,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  categoryCardSelected: {
-    backgroundColor: 'rgba(99,102,241,0.2)',
-    borderColor: 'rgba(99,102,241,0.6)',
+    borderRadius: 16,
   },
   categoryEmoji: {
-    fontSize: 32,
+    fontSize: 40,
   },
   categoryLabel: {
     textAlign: 'center',
     color: 'rgba(255,255,255,0.8)',
-  },
-  categoryLabelSelected: {
-    color: '#ffffff',
   },
   tier2Container: {
     marginTop: Spacing.two,
@@ -194,25 +234,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   triggerChip: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 16,
-    paddingVertical: Spacing.one + 4,
+    borderRadius: 20,
+    paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,
     borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  triggerChipSelected: {
-    backgroundColor: 'rgba(99,102,241,0.25)',
-    borderColor: 'rgba(99,102,241,0.5)',
   },
   triggerLabel: {
-    color: 'rgba(255,255,255,0.7)',
-  },
-  triggerLabelSelected: {
-    color: '#ffffff',
+    fontWeight: '500',
   },
   generateButton: {
-    backgroundColor: 'rgba(99,102,241,0.9)',
     paddingVertical: Spacing.three,
     paddingHorizontal: Spacing.four,
     borderRadius: 16,
