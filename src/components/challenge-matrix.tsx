@@ -113,14 +113,14 @@ function TriggerChip({ label, isSelected, categoryId, onPress }: TriggerChipProp
         styles.triggerChip,
         animatedStyle,
         {
-          backgroundColor: isSelected ? `${colors.primary}40` : colors.tint,
+          backgroundColor: isSelected ? `${colors.primary}40` : colors.tintLight,
           borderColor: isSelected ? colors.borderSubtle : 'transparent',
         },
       ]}
     >
       <GlassView
         glassEffectStyle="regular"
-        tintColor={isSelected ? `${colors.primary}40` : colors.tint}
+        tintColor={isSelected ? colors.tintStrong : colors.tintLight}
         style={styles.triggerChipGlass}
       >
         <ThemedText

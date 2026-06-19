@@ -60,6 +60,7 @@ export const CATEGORY_COLORS = {
   screentime: {
     primary: '#60A5FA',
     tint: 'rgba(96,165,250,0.15)',
+    tintLight: 'rgba(96,165,250,0.08)',
     tintStrong: 'rgba(96,165,250,0.20)',
     border: 'rgba(96,165,250,0.40)',
     borderSubtle: 'rgba(96,165,250,0.30)',
@@ -67,6 +68,7 @@ export const CATEGORY_COLORS = {
   emotions: {
     primary: '#F59E0B',
     tint: 'rgba(245,158,11,0.15)',
+    tintLight: 'rgba(245,158,11,0.08)',
     tintStrong: 'rgba(245,158,11,0.20)',
     border: 'rgba(245,158,11,0.40)',
     borderSubtle: 'rgba(245,158,11,0.30)',
@@ -74,6 +76,7 @@ export const CATEGORY_COLORS = {
   bedtime: {
     primary: '#8B5CF6',
     tint: 'rgba(139,92,246,0.15)',
+    tintLight: 'rgba(139,92,246,0.08)',
     tintStrong: 'rgba(139,92,246,0.20)',
     border: 'rgba(139,92,246,0.40)',
     borderSubtle: 'rgba(139,92,246,0.30)',
@@ -81,6 +84,7 @@ export const CATEGORY_COLORS = {
   social: {
     primary: '#34D399',
     tint: 'rgba(52,211,153,0.15)',
+    tintLight: 'rgba(52,211,153,0.08)',
     tintStrong: 'rgba(52,211,153,0.20)',
     border: 'rgba(52,211,153,0.40)',
     borderSubtle: 'rgba(52,211,153,0.30)',
