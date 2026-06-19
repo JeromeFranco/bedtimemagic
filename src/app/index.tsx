@@ -2,12 +2,13 @@ import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ChallengeMatrix } from '@/components/challenge-matrix';
+import { ChallengeCategory, ChallengeTrigger } from '@/types';
 import { ProfileSelector } from '@/components/profile-selector';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 
 export default function HomeScreen() {
-  const handleGenerate = (category: string, trigger: string) => {
+  const handleGenerate = (category: ChallengeCategory, trigger: ChallengeTrigger) => {
     console.log('Generate:', category, trigger);
   };
 
