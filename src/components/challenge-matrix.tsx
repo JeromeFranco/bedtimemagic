@@ -6,6 +6,10 @@ import Animated, {
   FadeInUp,
   FadeOut,
   Layout,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
 } from 'react-native-reanimated';
 import { GlassView } from 'expo-glass-effect';
 
@@ -42,12 +46,27 @@ interface TriggerChipProps {
 
 function CategoryCard({ emoji, label, isSelected, categoryId, onPress }: CategoryCardProps) {
   const colors = CATEGORY_COLORS[categoryId];
+  const scale = useSharedValue(1);
+
+  const prevSelected = useSharedValue(false);
+  if (isSelected && !prevSelected.value) {
+    scale.value = withSequence(
+      withTiming(1.02, { duration: 100 }),
+      withTiming(1, { duration: 100 })
+    );
+  }
+  prevSelected.value = isSelected;
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
 
   return (
     <AnimatedPressable
       onPress={onPress}
       style={[
         styles.categoryCard,
+        animatedStyle,
         isSelected && {
           backgroundColor: colors.tintStrong,
           borderColor: colors.border,
@@ -72,12 +91,27 @@ function CategoryCard({ emoji, label, isSelected, categoryId, onPress }: Categor
 
 function TriggerChip({ label, isSelected, categoryId, onPress }: TriggerChipProps) {
   const colors = CATEGORY_COLORS[categoryId];
+  const scale = useSharedValue(1);
+
+  const prevSelected = useSharedValue(false);
+  if (isSelected && !prevSelected.value) {
+    scale.value = withSequence(
+      withTiming(1.03, { duration: 75 }),
+      withTiming(1, { duration: 75 })
+    );
+  }
+  prevSelected.value = isSelected;
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
 
   return (
-    <Pressable
+    <AnimatedPressable
       onPress={onPress}
       style={[
         styles.triggerChip,
+        animatedStyle,
         {
           backgroundColor: isSelected ? colors.tintStrong : colors.tint,
           borderColor: isSelected ? colors.borderSubtle : 'transparent',
@@ -92,7 +126,7 @@ function TriggerChip({ label, isSelected, categoryId, onPress }: TriggerChipProp
       >
         {label}
       </ThemedText>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -177,9 +211,10 @@ export function ChallengeMatrix({ onGenerate }: ChallengeMatrixProps) {
         <Animated.View entering={FadeInUp.duration(250)}>
           <Pressable
             onPress={handleGenerate}
-            style={[
+            style={({ pressed }) => [
               styles.generateButton,
               { backgroundColor: CATEGORY_COLORS[selectedCategory].primary },
+              pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
             ]}
           >
             <ThemedText style={styles.generateButtonText}>Generate</ThemedText>
@@ -236,7 +271,7 @@ const styles = StyleSheet.create({
   triggerChip: {
     borderRadius: 20,
     paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.two + Spacing.one,
     borderWidth: 1,
   },
   triggerLabel: {
