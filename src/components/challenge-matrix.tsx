@@ -54,7 +54,7 @@ function CategoryCard({ emoji, label, isSelected, categoryId, onPress }: Categor
         withTiming(1, { duration: 100 })
       );
     }
-  }, [isSelected]);
+  }, [isSelected, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -99,7 +99,7 @@ function TriggerChip({ label, isSelected, categoryId, onPress }: TriggerChipProp
         withTiming(1, { duration: 75 })
       );
     }
-  }, [isSelected]);
+  }, [isSelected, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -112,7 +112,7 @@ function TriggerChip({ label, isSelected, categoryId, onPress }: TriggerChipProp
         styles.triggerChip,
         animatedStyle,
         {
-          backgroundColor: isSelected ? `${colors.primary}40` : colors.tintLight,
+          backgroundColor: isSelected ? colors.tintSelected : colors.tintLight,
           borderColor: isSelected ? colors.borderSubtle : 'transparent',
         },
       ]}
@@ -125,7 +125,7 @@ function TriggerChip({ label, isSelected, categoryId, onPress }: TriggerChipProp
         <ThemedText
           style={[
             styles.triggerLabel,
-            { color: isSelected ? '#ffffff' : `${colors.primary}B3` },
+            { color: isSelected ? '#ffffff' : colors.textMuted },
           ]}
         >
           {label}
