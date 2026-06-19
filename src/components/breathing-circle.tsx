@@ -1,5 +1,6 @@
 import { StyleSheet } from 'react-native';
 import Animated, {
+  cancelAnimation,
   useSharedValue,
   useAnimatedStyle,
   withRepeat,
@@ -27,6 +28,11 @@ export function BreathingCircle() {
       -1,
       true
     );
+
+    return () => {
+      cancelAnimation(scale);
+      cancelAnimation(opacity);
+    };
   }, [scale, opacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
