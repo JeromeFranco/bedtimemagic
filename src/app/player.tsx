@@ -63,7 +63,9 @@ export default function PlayerScreen() {
         playStory(story);
       }
     }
-    resetHideTimer();
+    hideTimerRef.current = setTimeout(() => {
+      setControlsVisible(false);
+    }, CONTROL_HIDE_DELAY);
     return () => {
       if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
       stopStory();
