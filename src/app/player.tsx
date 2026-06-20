@@ -54,6 +54,7 @@ export default function PlayerScreen() {
     }, CONTROL_HIDE_DELAY);
   }, []);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only effect, guarded by hasAutoPlayed ref
   useEffect(() => {
     if (story && !hasAutoPlayed.current) {
       hasAutoPlayed.current = true;
