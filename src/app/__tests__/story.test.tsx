@@ -43,43 +43,43 @@ describe('StoryScreen', () => {
     });
   });
 
-  it('renders story title', () => {
-    const { getByText } = render(<StoryScreen />);
+  it('renders story title', async () => {
+    const { getByText } = await render(<StoryScreen />);
     expect(getByText('The Toothbrush Adventure')).toBeTruthy();
   });
 
-  it('renders moral summary', () => {
-    const { getByText } = render(<StoryScreen />);
+  it('renders moral summary', async () => {
+    const { getByText } = await render(<StoryScreen />);
     expect(getByText('Brushing teeth keeps your smile bright.')).toBeTruthy();
   });
 
-  it('renders protagonist name and emoji', () => {
-    const { getByText } = render(<StoryScreen />);
+  it('renders protagonist name and emoji', async () => {
+    const { getByText } = await render(<StoryScreen />);
     expect(getByText(/Barnaby/)).toBeTruthy();
   });
 
-  it('renders Play Story button', () => {
-    const { getByText } = render(<StoryScreen />);
+  it('renders Play Story button', async () => {
+    const { getByText } = await render(<StoryScreen />);
     expect(getByText('Play Story')).toBeTruthy();
   });
 
-  it('calls playStory when Play is tapped', () => {
-    const { getByText } = render(<StoryScreen />);
+  it('calls playStory when Play is tapped', async () => {
+    const { getByText } = await render(<StoryScreen />);
     fireEvent.press(getByText('Play Story'));
     expect(mockPlayStory).toHaveBeenCalledWith(MOCK_STORY);
   });
 
-  it('shows placeholder when cover_image_url is null', () => {
+  it('shows placeholder when cover_image_url is null', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       story: JSON.stringify({ ...MOCK_STORY, cover_image_url: null }),
     });
-    const { getByText } = render(<StoryScreen />);
+    const { getByText } = await render(<StoryScreen />);
     expect(getByText('Cover art is being painted...')).toBeTruthy();
   });
 
-  it('shows error state when no story param', () => {
+  it('shows error state when no story param', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({});
-    const { getByText } = render(<StoryScreen />);
+    const { getByText } = await render(<StoryScreen />);
     expect(getByText('No story data')).toBeTruthy();
   });
 });
