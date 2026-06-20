@@ -6,14 +6,12 @@ import { GlassView } from 'expo-glass-effect';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { usePlayer } from '@/contexts/PlayerContext';
 import { Colors, Spacing } from '@/constants/theme';
 import { PROTAGONISTS } from '@/types';
 import type { Story } from '@/types';
 
 export default function StoryScreen() {
   const { story: storyJson } = useLocalSearchParams<{ story: string }>();
-  const { playStory } = usePlayer();
   const [imageError, setImageError] = useState(false);
 
   let story: Story;
@@ -34,7 +32,7 @@ export default function StoryScreen() {
   const showPlaceholder = !story.cover_image_url || imageError;
 
   const handlePlay = () => {
-    playStory(story);
+    router.push({ pathname: '/player', params: { story: storyJson } });
   };
 
   return (

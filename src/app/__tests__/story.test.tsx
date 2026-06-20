@@ -1,14 +1,14 @@
 import { render, fireEvent } from '@testing-library/react-native';
 
-const mockPlayStory = jest.fn();
-jest.mock('@/contexts/PlayerContext', () => ({
-  usePlayer: () => ({ playStory: mockPlayStory }),
-}));
-
-jest.mock('expo-router', () => ({
-  useLocalSearchParams: jest.fn(),
-  router: { back: jest.fn() },
-}));
+jest.mock('expo-router', () => {
+  const mockPush = jest.fn();
+  return {
+    __esModule: true,
+    useLocalSearchParams: jest.fn(),
+    router: { back: jest.fn(), push: mockPush },
+    _mockPush: mockPush,
+  };
+});
 
 jest.mock('expo-glass-effect', () => {
   const React = require('react');
@@ -19,6 +19,8 @@ jest.mock('expo-glass-effect', () => {
 
 import StoryScreen from '../story';
 import { useLocalSearchParams } from 'expo-router';
+
+const { _mockPush: mockPush } = require('expo-router') as any;
 
 const MOCK_STORY = {
   id: 'story-1',
@@ -63,10 +65,13 @@ describe('StoryScreen', () => {
     expect(getByText('Play Story')).toBeTruthy();
   });
 
-  it('calls playStory when Play is tapped', async () => {
+  it('navigates to /player when Play is tapped', async () => {
     const { getByText } = await render(<StoryScreen />);
     fireEvent.press(getByText('Play Story'));
-    expect(mockPlayStory).toHaveBeenCalledWith(MOCK_STORY);
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/player',
+      params: { story: JSON.stringify(MOCK_STORY) },
+    });
   });
 
   it('shows placeholder when cover_image_url is null', async () => {
