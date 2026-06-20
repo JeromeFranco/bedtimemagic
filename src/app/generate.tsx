@@ -27,8 +27,11 @@ export default function GenerateScreen() {
         selectedProfile!.protagonist,
         trigger!
       ),
-    onSuccess: () => {
-      router.replace('/story');
+    onSuccess: (story) => {
+      router.replace({
+        pathname: '/story',
+        params: { story: JSON.stringify(story) },
+      });
     },
   });
 
