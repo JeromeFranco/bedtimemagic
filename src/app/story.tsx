@@ -16,7 +16,10 @@ export default function StoryScreen() {
   const { playStory } = usePlayer();
   const [imageError, setImageError] = useState(false);
 
-  if (!storyJson) {
+  let story: Story;
+  try {
+    story = JSON.parse(storyJson!);
+  } catch {
     return (
       <ThemedView style={styles.container}>
         <ThemedText style={styles.errorText}>No story data</ThemedText>
@@ -27,7 +30,6 @@ export default function StoryScreen() {
     );
   }
 
-  const story: Story = JSON.parse(storyJson);
   const protagonist = PROTAGONISTS.find((p) => p.id === story.protagonist);
   const showPlaceholder = !story.cover_image_url || imageError;
 
@@ -60,7 +62,7 @@ export default function StoryScreen() {
 
       <ThemedView style={styles.content}>
         <ThemedText style={styles.protagonist}>
-          {protagonist?.emoji} {protagonist?.name}
+          {protagonist?.emoji ?? '📖'} {protagonist?.name ?? 'Friend'}
         </ThemedText>
         <ThemedText style={styles.title}>{story.title}</ThemedText>
         <ThemedText style={styles.moral}>{story.moral}</ThemedText>
