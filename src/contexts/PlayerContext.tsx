@@ -78,6 +78,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         cleanupPlayer();
         setCurrentStory(null);
         setIsPlaying(false);
+        setIsBuffering(false);
         setPosition(0);
         setDuration(0);
       }
@@ -115,6 +116,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     cleanupPlayer();
     setCurrentStory(null);
     setIsPlaying(false);
+    setIsBuffering(false);
     setPosition(0);
     setDuration(0);
   }, [cleanupPlayer]);
