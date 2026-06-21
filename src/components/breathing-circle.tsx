@@ -9,10 +9,21 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useEffect } from 'react';
 
-const SIZE = 120;
+const DEFAULT_SIZE = 120;
+const DEFAULT_COLOR = 'rgba(139, 92, 246, 0.2)';
 const DURATION = 4000;
 
-export function BreathingCircle() {
+interface BreathingCircleProps {
+  size?: number;
+  color?: string;
+  testID?: string;
+}
+
+export function BreathingCircle({
+  size = DEFAULT_SIZE,
+  color = DEFAULT_COLOR,
+  testID,
+}: BreathingCircleProps) {
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0.3);
 
@@ -40,17 +51,23 @@ export function BreathingCircle() {
     opacity: opacity.value,
   }));
 
+  const dynamicStyles = {
+    width: size,
+    height: size,
+    borderRadius: size / 2,
+    backgroundColor: color,
+  };
+
   return (
-    <Animated.View style={[styles.circle, animatedStyle]} />
+    <Animated.View
+      testID={testID}
+      style={[styles.circle, dynamicStyles, animatedStyle]}
+    />
   );
 }
 
 const styles = StyleSheet.create({
   circle: {
-    width: SIZE,
-    height: SIZE,
-    borderRadius: SIZE / 2,
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
     shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
