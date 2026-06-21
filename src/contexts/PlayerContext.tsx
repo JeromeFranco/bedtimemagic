@@ -3,6 +3,8 @@ import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { getAudioSource } from '@/lib/audio-utils';
 import type { Story } from '@/types';
 
+export type PostStoryPhase = 'idle' | 'fading' | 'pillow_talk' | 'affirmation' | 'done';
+
 interface PlayerContextValue {
   currentStory: Story | null;
   isPlaying: boolean;
@@ -10,12 +12,15 @@ interface PlayerContextValue {
   isSleepMode: boolean;
   position: number;
   duration: number;
+  postStoryPhase: PostStoryPhase;
   playStory: (story: Story) => void;
   pause: () => void;
   resume: () => void;
   seekTo: (seconds: number) => void;
   stopStory: () => void;
   toggleSleepMode: () => void;
+  skipPillowTalk: () => void;
+  confirmAffirmation: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextValue>({
@@ -25,13 +30,19 @@ const PlayerContext = createContext<PlayerContextValue>({
   isSleepMode: false,
   position: 0,
   duration: 0,
+  postStoryPhase: 'idle',
   playStory: () => {},
   pause: () => {},
   resume: () => {},
   seekTo: () => {},
   stopStory: () => {},
   toggleSleepMode: () => {},
+  skipPillowTalk: () => {},
+  confirmAffirmation: () => {},
 });
+
+const FADE_DURATION = 3000;
+const FADE_INTERVAL = 50;
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [currentStory, setCurrentStory] = useState<Story | null>(null);
@@ -40,9 +51,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [isSleepMode, setIsSleepMode] = useState(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [postStoryPhase, setPostStoryPhase] = useState<PostStoryPhase>('idle');
 
   const playerRef = useRef<ReturnType<typeof createAudioPlayer> | null>(null);
   const listenerRef = useRef<{ remove: () => void } | null>(null);
+  const fadeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const activeStoryRef = useRef<Story | null>(null);
 
   const cleanupPlayer = useCallback(() => {
     if (listenerRef.current) {
@@ -53,10 +67,59 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       playerRef.current.remove();
       playerRef.current = null;
     }
+    if (fadeIntervalRef.current) {
+      clearInterval(fadeIntervalRef.current);
+      fadeIntervalRef.current = null;
+    }
+  }, []);
+
+  const startFade = useCallback(() => {
+    const player = playerRef.current;
+    const hasPrompt = !!activeStoryRef.current?.pillow_talk_prompt;
+    const hasAffirmation = !!activeStoryRef.current?.sleepy_affirmation;
+    if (!player) {
+      if (hasPrompt) {
+        setPostStoryPhase('pillow_talk');
+      } else if (hasAffirmation) {
+        setPostStoryPhase('affirmation');
+      } else {
+        setPostStoryPhase('done');
+      }
+      return;
+    }
+
+    const steps = FADE_DURATION / FADE_INTERVAL;
+    let step = 0;
+
+    fadeIntervalRef.current = setInterval(() => {
+      step++;
+      const volume = Math.max(0, 1 - step / steps);
+      player.volume = volume;
+
+      if (step >= steps) {
+        if (fadeIntervalRef.current) {
+          clearInterval(fadeIntervalRef.current);
+          fadeIntervalRef.current = null;
+        }
+        if (playerRef.current) {
+          playerRef.current.remove();
+          playerRef.current = null;
+        }
+        if (hasPrompt) {
+          setPostStoryPhase('pillow_talk');
+        } else if (hasAffirmation) {
+          setPostStoryPhase('affirmation');
+        } else {
+          setPostStoryPhase('done');
+        }
+      }
+    }, FADE_INTERVAL);
   }, []);
 
   const playStory = useCallback(async (story: Story) => {
     cleanupPlayer();
+    setPostStoryPhase('idle');
+    activeStoryRef.current = story;
 
     await setAudioModeAsync({
       playsInSilentMode: true,
@@ -75,12 +138,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setIsPlaying(status.playing);
 
       if (status.didJustFinish) {
-        cleanupPlayer();
-        setCurrentStory(null);
+        if (listenerRef.current) {
+          listenerRef.current.remove();
+          listenerRef.current = null;
+        }
         setIsPlaying(false);
         setIsBuffering(false);
-        setPosition(0);
-        setDuration(0);
+        setPostStoryPhase('fading');
+        startFade();
       }
     });
     listenerRef.current = listener;
@@ -91,7 +156,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setPosition(0);
     setDuration(0);
     player.play();
-  }, [cleanupPlayer]);
+  }, [cleanupPlayer, startFade]);
 
   const pause = useCallback(() => {
     if (playerRef.current) {
@@ -121,11 +186,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setIsSleepMode(false);
     setPosition(0);
     setDuration(0);
+    setPostStoryPhase('idle');
   }, [cleanupPlayer]);
 
   const toggleSleepMode = useCallback(() => {
     setIsSleepMode((prev) => !prev);
   }, []);
+
+  const skipPillowTalk = useCallback(() => {
+    setPostStoryPhase('affirmation');
+  }, []);
+
+  const confirmAffirmation = useCallback(() => {
+    cleanupPlayer();
+    setCurrentStory(null);
+    setIsPlaying(false);
+    setIsBuffering(false);
+    setPosition(0);
+    setDuration(0);
+    setPostStoryPhase('done');
+  }, [cleanupPlayer]);
 
   useEffect(() => {
     return () => cleanupPlayer();
@@ -140,12 +220,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         isSleepMode,
         position,
         duration,
+        postStoryPhase,
         playStory,
         pause,
         resume,
         seekTo,
         stopStory,
         toggleSleepMode,
+        skipPillowTalk,
+        confirmAffirmation,
       }}
     >
       {children}

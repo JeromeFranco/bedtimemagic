@@ -51,6 +51,20 @@ const MOCK_STORY_2: Story = {
   title: 'Another Story',
 };
 
+const MOCK_STORY_NO_PROMPT: Story = {
+  ...MOCK_STORY,
+  id: 'story-no-prompt',
+  pillow_talk_prompt: '',
+  sleepy_affirmation: 'I am calm.',
+};
+
+const MOCK_STORY_NO_PROMPT_NO_AFFIRMATION: Story = {
+  ...MOCK_STORY,
+  id: 'story-no-prompt-no-affirmation',
+  pillow_talk_prompt: '',
+  sleepy_affirmation: '',
+};
+
 function TestComponent() {
   const {
     currentStory,
@@ -59,12 +73,15 @@ function TestComponent() {
     isSleepMode,
     position,
     duration,
+    postStoryPhase,
     playStory,
     pause,
     resume,
     seekTo,
     stopStory,
     toggleSleepMode,
+    skipPillowTalk,
+    confirmAffirmation,
   } = usePlayer();
 
   return (
@@ -75,6 +92,7 @@ function TestComponent() {
       <Text testID="isSleepMode">{String(isSleepMode)}</Text>
       <Text testID="position">{String(position)}</Text>
       <Text testID="duration">{String(duration)}</Text>
+      <Text testID="postStoryPhase">{postStoryPhase}</Text>
       <Pressable testID="play" onPress={() => playStory(MOCK_STORY)} />
       <Pressable testID="play2" onPress={() => playStory(MOCK_STORY_2)} />
       <Pressable testID="pause" onPress={pause} />
@@ -82,6 +100,10 @@ function TestComponent() {
       <Pressable testID="seek" onPress={() => seekTo(30)} />
       <Pressable testID="stop" onPress={stopStory} />
       <Pressable testID="toggleSleep" onPress={toggleSleepMode} />
+      <Pressable testID="skipPillowTalk" onPress={skipPillowTalk} />
+      <Pressable testID="confirmAffirmation" onPress={confirmAffirmation} />
+      <Pressable testID="playNoPrompt" onPress={() => playStory(MOCK_STORY_NO_PROMPT)} />
+      <Pressable testID="playNoPromptNoAffirmation" onPress={() => playStory(MOCK_STORY_NO_PROMPT_NO_AFFIRMATION)} />
     </View>
   );
 }
@@ -209,12 +231,113 @@ describe('PlayerContext', () => {
     expect(getByTestId('isSleepMode').props.children).toBe('false');
   });
 
-  it('didJustFinish clears playback state', async () => {
+  it('didJustFinish transitions to fading without clearing story', async () => {
     const { getByTestId } = await renderProvider();
     await act(async () => fireEvent.press(getByTestId('play')));
     await act(async () => statusCallback({ currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true }));
     expect(getByTestId('isPlaying').props.children).toBe('false');
-    expect(getByTestId('currentStory').props.children).toBe('none');
+    expect(getByTestId('currentStory').props.children).toBe('Test Story');
+    expect(getByTestId('postStoryPhase').props.children).toBe('fading');
+  });
+
+  it('initializes postStoryPhase as idle', async () => {
+    const { getByTestId } = await renderProvider();
+    expect(getByTestId('postStoryPhase').props.children).toBe('idle');
+  });
+
+  it('transitions to fading when didJustFinish fires', async () => {
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+    await act(async () => statusCallback({
+      currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
+    }));
+    expect(getByTestId('postStoryPhase').props.children).toBe('fading');
+    expect(getByTestId('currentStory').props.children).toBe('Test Story');
+  });
+
+  it('skipPillowTalk transitions from pillow_talk to affirmation', async () => {
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+    await act(async () => statusCallback({
+      currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
+    }));
+    await act(async () => statusCallback({
+      currentTime: 0, duration: 0, playing: false, isBuffering: false, didJustFinish: false,
+      _postStoryPhase: 'pillow_talk',
+    }));
+    await act(async () => fireEvent.press(getByTestId('skipPillowTalk')));
+    expect(getByTestId('postStoryPhase').props.children).toBe('affirmation');
+  });
+
+  it('confirmAffirmation transitions to done', async () => {
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+    await act(async () => statusCallback({
+      currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
+    }));
+    await act(async () => fireEvent.press(getByTestId('confirmAffirmation')));
+    expect(getByTestId('postStoryPhase').props.children).toBe('done');
+  });
+
+  it('stopStory resets postStoryPhase to idle', async () => {
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+    await act(async () => statusCallback({
+      currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
+    }));
+    expect(getByTestId('postStoryPhase').props.children).toBe('fading');
+    await act(async () => fireEvent.press(getByTestId('stop')));
+    expect(getByTestId('postStoryPhase').props.children).toBe('idle');
+  });
+
+  it('skips pillow talk when prompt is empty', async () => {
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('playNoPrompt')));
+    await act(async () => statusCallback({
+      currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
+    }));
+    expect(getByTestId('postStoryPhase').props.children).toBe('fading');
+  });
+
+  it('fade completes to affirmation when no prompt but has affirmation', async () => {
+    jest.useFakeTimers();
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('playNoPrompt')));
+    await act(async () => statusCallback({
+      currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
+    }));
+    expect(getByTestId('postStoryPhase').props.children).toBe('fading');
+    await act(async () => jest.advanceTimersByTime(3000));
+    expect(getByTestId('postStoryPhase').props.children).toBe('affirmation');
     expect(mockRemove).toHaveBeenCalled();
+    jest.useRealTimers();
+  });
+
+  it('fade completes to done when no prompt and no affirmation', async () => {
+    jest.useFakeTimers();
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('playNoPromptNoAffirmation')));
+    await act(async () => statusCallback({
+      currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
+    }));
+    expect(getByTestId('postStoryPhase').props.children).toBe('fading');
+    await act(async () => jest.advanceTimersByTime(3000));
+    expect(getByTestId('postStoryPhase').props.children).toBe('done');
+    expect(mockRemove).toHaveBeenCalled();
+    jest.useRealTimers();
+  });
+
+  it('fade completes to pillow_talk when has prompt', async () => {
+    jest.useFakeTimers();
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+    await act(async () => statusCallback({
+      currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
+    }));
+    expect(getByTestId('postStoryPhase').props.children).toBe('fading');
+    await act(async () => jest.advanceTimersByTime(3000));
+    expect(getByTestId('postStoryPhase').props.children).toBe('pillow_talk');
+    expect(mockRemove).toHaveBeenCalled();
+    jest.useRealTimers();
   });
 });
