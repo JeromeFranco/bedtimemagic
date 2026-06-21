@@ -3,7 +3,16 @@ import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { GlassView } from 'expo-glass-effect';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 
+import { BreathingCircle } from '@/components/breathing-circle';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { usePlayer } from '@/contexts/PlayerContext';
@@ -32,12 +41,15 @@ export default function PlayerScreen() {
     isSleepMode,
     position,
     duration,
+    postStoryPhase,
     playStory,
     pause,
     resume,
     seekTo,
     stopStory,
     toggleSleepMode,
+    skipPillowTalk,
+    confirmAffirmation,
   } = usePlayer();
 
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -108,6 +120,12 @@ export default function PlayerScreen() {
     resetHideTimer();
   };
 
+  useEffect(() => {
+    if (postStoryPhase === 'done') {
+      router.back();
+    }
+  }, [postStoryPhase]);
+
   if (parseError || !story) {
     return (
       <SafeAreaView style={styles.container}>
@@ -124,6 +142,51 @@ export default function PlayerScreen() {
   const protagonist = PROTAGONISTS.find((p) => p.id === story.protagonist);
   const showPlaceholder = !story.cover_image_url || imageError;
   const progress = duration > 0 ? position / duration : 0;
+
+  if (postStoryPhase === 'pillow_talk') {
+    return (
+      <PillowTalkBridge
+        story={story}
+        protagonistEmoji={protagonist?.emoji ?? '📖'}
+        showPlaceholder={showPlaceholder}
+        onSkip={skipPillowTalk}
+        onScreenTap={handleScreenTap}
+        onImageError={() => setImageError(true)}
+      />
+    );
+  }
+
+  if (postStoryPhase === 'affirmation') {
+    return (
+      <View style={styles.container}>
+        <View style={styles.affirmationBackground} />
+
+        <SafeAreaView style={styles.bridgeContainer} pointerEvents="box-none">
+          <Animated.View
+            style={styles.bridgeContent}
+            entering={FadeIn.duration(800)}
+          >
+            <BreathingCircle size={200} testID="breathing-circle" />
+            <ThemedText style={styles.affirmationText}>
+              {story.sleepy_affirmation}
+            </ThemedText>
+          </Animated.View>
+
+          <View style={styles.bridgeButtons}>
+            <Pressable
+              onPress={confirmAffirmation}
+              style={({ pressed }) => [
+                styles.primaryButton,
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <ThemedText style={styles.primaryButtonText}>Goodnight</ThemedText>
+            </Pressable>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   return (
     <Pressable style={styles.container} onPress={handleScreenTap}>
@@ -354,4 +417,198 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: Spacing.two,
   },
+  bridgeDimmingOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  affirmationBackground: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: '#0A0E27',
+  },
+  breathingCircleBehind: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 0,
+  },
+  bridgeContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  bridgeContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: Spacing.four,
+    paddingHorizontal: Spacing.five,
+  },
+  pillowTalkText: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 24,
+    fontWeight: '300',
+    lineHeight: 36,
+    textAlign: 'center',
+  },
+  affirmationText: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 28,
+    fontWeight: '300',
+    lineHeight: 40,
+    textAlign: 'center',
+  },
+  bridgeButtons: {
+    width: '100%',
+    paddingHorizontal: Spacing.five,
+    paddingBottom: Spacing.three,
+    gap: Spacing.two,
+    alignItems: 'center',
+  },
+  primaryButton: {
+    backgroundColor: '#8B5CF6',
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.six,
+    borderRadius: 28,
+    width: '100%',
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '500',
+  },
+  ghostButton: {
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.5)',
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.five,
+    borderRadius: 28,
+    width: '100%',
+    alignItems: 'center',
+  },
+  ghostButtonText: {
+    color: 'rgba(139, 92, 246, 0.7)',
+    fontSize: 18,
+    fontWeight: '500',
+  },
 });
+
+const BRIDGE_HIDE_DELAY = 15000;
+
+function PillowTalkBridge({
+  story,
+  protagonistEmoji,
+  showPlaceholder,
+  onSkip,
+  onScreenTap,
+  onImageError,
+}: {
+  story: Story;
+  protagonistEmoji: string;
+  showPlaceholder: boolean;
+  onSkip: () => void;
+  onScreenTap: () => void;
+  onImageError: () => void;
+}) {
+  const [bridgeControlsVisible, setBridgeControlsVisible] = useState(true);
+  const bridgeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const overlayOpacity = useSharedValue(0.9);
+  const overlayAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: overlayOpacity.value,
+  }));
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
+    overlayOpacity.value = withTiming(0.7, { duration: 1000, easing: Easing.out(Easing.ease) });
+    bridgeHideTimerRef.current = setTimeout(() => {
+      setBridgeControlsVisible(false);
+    }, BRIDGE_HIDE_DELAY);
+    return () => {
+      if (bridgeHideTimerRef.current) clearTimeout(bridgeHideTimerRef.current);
+    };
+  }, []);
+
+  const handleBridgeTap = () => {
+    onScreenTap();
+    if (bridgeControlsVisible) {
+      setBridgeControlsVisible(false);
+      if (bridgeHideTimerRef.current) clearTimeout(bridgeHideTimerRef.current);
+    } else {
+      setBridgeControlsVisible(true);
+      if (bridgeHideTimerRef.current) clearTimeout(bridgeHideTimerRef.current);
+      bridgeHideTimerRef.current = setTimeout(() => {
+        setBridgeControlsVisible(false);
+      }, BRIDGE_HIDE_DELAY);
+    }
+  };
+
+  return (
+    <Pressable style={styles.container} onPress={handleBridgeTap}>
+      <View style={styles.backgroundContainer}>
+        {showPlaceholder ? (
+          <View style={styles.placeholder}>
+            <ThemedText style={styles.placeholderEmoji}>
+              {protagonistEmoji}
+            </ThemedText>
+          </View>
+        ) : (
+          <Image
+            source={{ uri: story.cover_image_url! }}
+            style={styles.backgroundImage}
+            resizeMode="cover"
+            onError={onImageError}
+          />
+        )}
+        <Animated.View
+          style={[styles.bridgeDimmingOverlay, overlayAnimatedStyle]}
+        />
+      </View>
+
+      <SafeAreaView style={styles.bridgeContainer} pointerEvents="box-none">
+        <Animated.View
+          style={[styles.bridgeContent, { position: 'relative' }]}
+          entering={FadeIn.duration(800)}
+        >
+          <View style={styles.breathingCircleBehind}>
+            <BreathingCircle size={120} testID="breathing-circle" />
+          </View>
+          <ThemedText style={styles.pillowTalkText}>
+            {story.pillow_talk_prompt}
+          </ThemedText>
+        </Animated.View>
+
+        {bridgeControlsVisible && (
+          <Animated.View
+            style={styles.bridgeButtons}
+            entering={FadeIn.duration(400)}
+            exiting={FadeOut.duration(400)}
+          >
+            <Pressable
+              onPress={onSkip}
+              style={({ pressed }) => [
+                styles.primaryButton,
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <ThemedText style={styles.primaryButtonText}>Next</ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={onSkip}
+              style={({ pressed }) => [
+                styles.ghostButton,
+                pressed && { opacity: 0.7 },
+              ]}
+            >
+              <ThemedText style={styles.ghostButtonText}>Skip for tonight</ThemedText>
+            </Pressable>
+          </Animated.View>
+        )}
+      </SafeAreaView>
+    </Pressable>
+  );
+}
