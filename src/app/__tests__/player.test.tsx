@@ -123,6 +123,31 @@ describe('post-story bridge', () => {
     expect(getByText('What was your favorite part?')).toBeTruthy();
   });
 
+  it('renders brightness ramp container during pillow_talk', async () => {
+    usePlayer.mockReturnValue({
+      currentStory: null,
+      isPlaying: false,
+      isBuffering: false,
+      isSleepMode: false,
+      position: 0,
+      duration: 0,
+      postStoryPhase: 'pillow_talk',
+      playStory: mockPlayStory,
+      pause: mockPause,
+      resume: mockResume,
+      seekTo: mockSeekTo,
+      stopStory: mockStopStory,
+      toggleSleepMode: mockToggleSleepMode,
+      skipPillowTalk: mockSkipPillowTalk,
+      confirmAffirmation: mockConfirmAffirmation,
+    });
+
+    const { getByText } = await render(<PlayerScreen />);
+    expect(getByText('What was your favorite part?')).toBeTruthy();
+    expect(getByText('Next')).toBeTruthy();
+    expect(getByText('Skip for tonight')).toBeTruthy();
+  });
+
   it('renders Next and Skip buttons during pillow_talk', async () => {
     usePlayer.mockReturnValue({
       currentStory: null,

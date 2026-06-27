@@ -522,9 +522,16 @@ function PillowTalkBridge({
     opacity: overlayOpacity.value,
   }));
 
+  const screenBrightness = useSharedValue(0.3);
+  const screenBrightnessStyle = useAnimatedStyle(() => ({
+    opacity: screenBrightness.value,
+  }));
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
     overlayOpacity.value = withTiming(0.7, { duration: 1000, easing: Easing.out(Easing.ease) });
+    // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
+    screenBrightness.value = withTiming(1, { duration: 2000, easing: Easing.out(Easing.ease) });
     bridgeHideTimerRef.current = setTimeout(() => {
       setBridgeControlsVisible(false);
     }, BRIDGE_HIDE_DELAY);
@@ -549,7 +556,7 @@ function PillowTalkBridge({
 
   return (
     <Pressable style={styles.container} onPress={handleBridgeTap}>
-      <View style={styles.backgroundContainer}>
+      <Animated.View style={[styles.backgroundContainer, screenBrightnessStyle]}>
         {showPlaceholder ? (
           <View style={styles.placeholder}>
             <ThemedText style={styles.placeholderEmoji}>
@@ -567,7 +574,7 @@ function PillowTalkBridge({
         <Animated.View
           style={[styles.bridgeDimmingOverlay, overlayAnimatedStyle]}
         />
-      </View>
+      </Animated.View>
 
       <SafeAreaView style={styles.bridgeContainer} pointerEvents="box-none">
         <Animated.View
