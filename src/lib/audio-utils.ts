@@ -7,6 +7,6 @@ export function getAudioSource(story: Story): { uri: string } {
   return { uri: SAMPLE_AUDIO };
 }
 
-export function getAmbientAudioSource() {
-  return AMBIENT_RAIN;
+export function getAmbientAudioSource(): { uri: string } {
+  return { uri: AMBIENT_RAIN };
 }
