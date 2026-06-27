@@ -16,6 +16,18 @@ const mockPlayer = {
   addListener: mockAddListener,
 };
 
+const mockAmbientPlay = jest.fn();
+const mockAmbientRemove = jest.fn();
+const mockAmbientPlayer = {
+  play: mockAmbientPlay,
+  pause: jest.fn(),
+  seekTo: jest.fn(),
+  remove: mockAmbientRemove,
+  addListener: jest.fn(),
+  volume: 0,
+  loop: false,
+};
+
 jest.mock('expo-audio', () => ({
   createAudioPlayer: jest.fn(() => mockPlayer),
   setAudioModeAsync: jest.fn(() => Promise.resolve()),
@@ -23,11 +35,12 @@ jest.mock('expo-audio', () => ({
 
 jest.mock('@/lib/audio-utils', () => ({
   getAudioSource: jest.fn(() => ({ uri: 42 })),
+  getAmbientAudioSource: jest.fn(() => ({ uri: 'ambient-rain' })),
 }));
 
 import { PlayerProvider, usePlayer } from '../PlayerContext';
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
-import { getAudioSource } from '@/lib/audio-utils';
+import { getAudioSource, getAmbientAudioSource } from '@/lib/audio-utils';
 import type { Story } from '@/types';
 
 const MOCK_STORY: Story = {
@@ -338,6 +351,47 @@ describe('PlayerContext', () => {
     await act(async () => jest.advanceTimersByTime(3000));
     expect(getByTestId('postStoryPhase').props.children).toBe('pillow_talk');
     expect(mockRemove).toHaveBeenCalled();
+    jest.useRealTimers();
+  });
+
+  it('starts ambient audio after fade completes for pillow_talk phase', async () => {
+    jest.useFakeTimers();
+    (createAudioPlayer as jest.Mock).mockImplementation(() => mockPlayer);
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+    await act(async () => statusCallback({
+      currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
+    }));
+
+    (createAudioPlayer as jest.Mock).mockImplementation(() => mockAmbientPlayer);
+
+    await act(async () => jest.advanceTimersByTime(3000));
+    expect(getByTestId('postStoryPhase').props.children).toBe('pillow_talk');
+    expect(getAmbientAudioSource).toHaveBeenCalled();
+    expect(createAudioPlayer).toHaveBeenCalledWith({ uri: 'ambient-rain' });
+    expect(mockAmbientPlayer.volume).toBe(0.15);
+    expect(mockAmbientPlayer.loop).toBe(true);
+    expect(mockAmbientPlay).toHaveBeenCalled();
+    jest.useRealTimers();
+  });
+
+  it('skipPillowTalk stops ambient player before transitioning', async () => {
+    jest.useFakeTimers();
+    (createAudioPlayer as jest.Mock).mockImplementation(() => mockPlayer);
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+    await act(async () => statusCallback({
+      currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
+    }));
+
+    (createAudioPlayer as jest.Mock).mockImplementation(() => mockAmbientPlayer);
+
+    await act(async () => jest.advanceTimersByTime(3000));
+    expect(getByTestId('postStoryPhase').props.children).toBe('pillow_talk');
+
+    await act(async () => fireEvent.press(getByTestId('skipPillowTalk')));
+    expect(mockAmbientRemove).toHaveBeenCalled();
+    expect(getByTestId('postStoryPhase').props.children).toBe('affirmation');
     jest.useRealTimers();
   });
 });

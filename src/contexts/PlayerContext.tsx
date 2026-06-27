@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
-import { getAudioSource } from '@/lib/audio-utils';
+import { getAudioSource, getAmbientAudioSource } from '@/lib/audio-utils';
 import type { Story } from '@/types';
 
 export type PostStoryPhase = 'idle' | 'fading' | 'pillow_talk' | 'affirmation' | 'done';
@@ -54,9 +54,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [postStoryPhase, setPostStoryPhase] = useState<PostStoryPhase>('idle');
 
   const playerRef = useRef<ReturnType<typeof createAudioPlayer> | null>(null);
+  const ambientPlayerRef = useRef<ReturnType<typeof createAudioPlayer> | null>(null);
   const listenerRef = useRef<{ remove: () => void } | null>(null);
   const fadeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const activeStoryRef = useRef<Story | null>(null);
+
+  const cleanupAmbient = useCallback(() => {
+    if (ambientPlayerRef.current) {
+      ambientPlayerRef.current.remove();
+      ambientPlayerRef.current = null;
+    }
+  }, []);
 
   const cleanupPlayer = useCallback(() => {
     if (listenerRef.current) {
@@ -71,7 +79,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       clearInterval(fadeIntervalRef.current);
       fadeIntervalRef.current = null;
     }
-  }, []);
+    cleanupAmbient();
+  }, [cleanupAmbient]);
+
+  const startAmbient = useCallback(() => {
+    cleanupAmbient();
+    const source = getAmbientAudioSource();
+    const ambientPlayer = createAudioPlayer(source);
+    ambientPlayer.volume = 0.15;
+    ambientPlayer.loop = true;
+    ambientPlayer.play();
+    ambientPlayerRef.current = ambientPlayer;
+  }, [cleanupAmbient]);
 
   const startFade = useCallback(() => {
     const player = playerRef.current;
@@ -79,6 +98,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const hasAffirmation = !!activeStoryRef.current?.sleepy_affirmation;
     if (!player) {
       if (hasPrompt) {
+        startAmbient();
         setPostStoryPhase('pillow_talk');
       } else if (hasAffirmation) {
         setPostStoryPhase('affirmation');
@@ -106,6 +126,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           playerRef.current = null;
         }
         if (hasPrompt) {
+          startAmbient();
           setPostStoryPhase('pillow_talk');
         } else if (hasAffirmation) {
           setPostStoryPhase('affirmation');
@@ -114,7 +135,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }
       }
     }, FADE_INTERVAL);
-  }, []);
+  }, [startAmbient]);
 
   const playStory = useCallback(async (story: Story) => {
     cleanupPlayer();
@@ -194,8 +215,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const skipPillowTalk = useCallback(() => {
+    cleanupAmbient();
     setPostStoryPhase('affirmation');
-  }, []);
+  }, [cleanupAmbient]);
 
   const confirmAffirmation = useCallback(() => {
     cleanupPlayer();
