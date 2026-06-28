@@ -71,7 +71,8 @@
     "test:debug": "jest -o --watch --coverage=false",
     "test:ci": "jest",
     "typecheck": "tsc --noEmit",
-    "typecheck:functions": "tsc --noEmit -p supabase/functions/tsconfig.json"
+    "typecheck:functions": "tsc --noEmit -p supabase/functions/tsconfig.json",
+    "typecheck:functions:deno": "deno check supabase/functions/generate-story-audio/index.ts"
   },
   "private": true
 }
