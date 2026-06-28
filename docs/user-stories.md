@@ -176,18 +176,18 @@
 
 ---
 
-### US-1.8: Post-Story Bridge — Sleepy Affirmation & Timer
+### US-1.8: Post-Story Bridge — Sleepy Affirmation
 
 **As a** parent,
-**I want** a comforting closing phrase and a sleep timer,
-**So that** my child falls asleep with a positive thought and white noise.
+**I want** a comforting closing phrase,
+**So that** my child falls asleep with a positive thought.
 
 **Acceptance Criteria:**
-- [ ] Sleepy Affirmation displayed (short comforting phrase from story output)
-- [ ] "Goodnight" button to confirm
-- [ ] 15-minute white noise sleep timer starts
-- [ ] App locks (prevents accidental interaction)
-- [ ] Timer can be cancelled if needed
+- [x] Sleepy Affirmation displayed (short comforting phrase from story output)
+- [x] "Goodnight" button to confirm
+- [ ] ~~15-minute white noise sleep timer starts~~ (descoped from MVP)
+- [ ] ~~App locks (prevents accidental interaction)~~ (descoped from MVP)
+- [ ] ~~Timer can be cancelled if needed~~ (descoped from MVP)
 
 ---
 
