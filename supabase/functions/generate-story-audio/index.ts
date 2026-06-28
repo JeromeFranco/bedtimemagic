@@ -1,11 +1,15 @@
-const MIMO_TTS_URL = "https://api.xiaomimimo.com/v1/audio/speech";
+import OpenAI from "@openai/openai";
+
 const MODEL = "mimo-v2.5-tts";
 const VOICE = "Chloe";
-const CONTEXT = "gentle bedtime story narration, warm and soothing, slow pace";
+const STYLE = "gentle bedtime story narration, warm and soothing, slow pace";
 const CHUNK_SIZE = 32 * 1024;
 const MAX_WORDS = 5000;
 const MAX_CONCURRENT_TTS = 10;
 const TTS_TIMEOUT_MS = 30_000;
+export const SAMPLE_RATE = 24000;
+export const BITS_PER_SAMPLE = 16;
+export const CHANNELS = 1;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,52 +17,94 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-function splitSentences(text: string): string[] {
+export class TTSError extends Error {
+  constructor(
+    public sentenceIndex: number,
+    public override cause: unknown
+  ) {
+    super(`TTS failed for sentence ${sentenceIndex}`);
+    this.name = "TTSError";
+  }
+}
+
+export function splitSentences(text: string): string[] {
   return text
     .split(/[.!?]+\s+/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 }
 
-async function generateSentenceAudio(
-  sentence: string,
-  apiKey: string
-): Promise<Uint8Array> {
-  const response = await fetch(MIMO_TTS_URL, {
-    method: "POST",
-    headers: {
-      "api-key": apiKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      voice: VOICE,
-      input: sentence,
-      response_format: "mp3",
-      context: CONTEXT,
-    }),
-    signal: AbortSignal.timeout(TTS_TIMEOUT_MS),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`TTS API returned ${response.status}: ${errorText}`);
-  }
-
-  return new Uint8Array(await response.arrayBuffer());
+export function createWavHeader(dataLength: number): Uint8Array {
+  const header = new ArrayBuffer(44);
+  const v = new DataView(header);
+  v.setUint8(0, 0x52); // R
+  v.setUint8(1, 0x49); // I
+  v.setUint8(2, 0x46); // F
+  v.setUint8(3, 0x46); // F
+  v.setUint32(4, 36 + dataLength, true);
+  v.setUint8(8, 0x57);  // W
+  v.setUint8(9, 0x41);  // A
+  v.setUint8(10, 0x56); // V
+  v.setUint8(11, 0x45); // E
+  v.setUint8(12, 0x66); // f
+  v.setUint8(13, 0x6D); // m
+  v.setUint8(14, 0x74); // t
+  v.setUint8(15, 0x20); // space
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);
+  v.setUint16(22, CHANNELS, true);
+  v.setUint32(24, SAMPLE_RATE, true);
+  v.setUint32(28, SAMPLE_RATE * CHANNELS * BITS_PER_SAMPLE / 8, true);
+  v.setUint16(32, CHANNELS * BITS_PER_SAMPLE / 8, true);
+  v.setUint16(34, BITS_PER_SAMPLE, true);
+  v.setUint8(36, 0x64); // d
+  v.setUint8(37, 0x61); // a
+  v.setUint8(38, 0x74); // t
+  v.setUint8(39, 0x61); // a
+  v.setUint32(40, dataLength, true);
+  return new Uint8Array(header);
 }
 
-async function generateAllAudio(
+export async function generateSentenceAudio(
+  sentence: string,
+  client: OpenAI
+): Promise<Uint8Array> {
+  const completion = await client.chat.completions.create(
+    {
+      model: MODEL,
+      messages: [
+        { role: "user", content: STYLE },
+        { role: "assistant", content: sentence },
+      ],
+      audio: { format: "pcm16", voice: VOICE },
+    },
+    { timeout: TTS_TIMEOUT_MS }
+  );
+
+  const audioBase64 = completion.choices[0].message.audio?.data;
+  if (!audioBase64) {
+    throw new Error("No audio data in response");
+  }
+
+  const binary = atob(audioBase64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+export async function generateAllAudio(
   sentences: string[],
-  apiKey: string
+  client: OpenAI
 ): Promise<Uint8Array[]> {
   const results: Uint8Array[] = [];
   for (let i = 0; i < sentences.length; i += MAX_CONCURRENT_TTS) {
     const batch = sentences.slice(i, i + MAX_CONCURRENT_TTS);
     const batchResults = await Promise.all(
       batch.map((sentence, j) =>
-        generateSentenceAudio(sentence, apiKey).catch((err) => {
-          throw { sentenceIndex: i + j, error: err };
+        generateSentenceAudio(sentence, client).catch((err) => {
+          throw new TTSError(i + j, err);
         })
       )
     );
@@ -67,7 +113,51 @@ async function generateAllAudio(
   return results;
 }
 
-function uint8ToBase64(bytes: Uint8Array): string {
+export async function* streamSentences(
+  sentences: string[],
+  client: OpenAI,
+  maxSentences?: number
+): AsyncGenerator<{ event: string; data: Record<string, unknown> }> {
+  const toProcess = maxSentences ? sentences.slice(0, maxSentences) : sentences;
+  const total = toProcess.length;
+
+  for (let i = 0; i < toProcess.length; i += MAX_CONCURRENT_TTS) {
+    const batch = toProcess.slice(i, i + MAX_CONCURRENT_TTS);
+    const results = await Promise.allSettled(
+      batch.map((sentence) => generateSentenceAudio(sentence, client))
+    );
+
+    for (let j = 0; j < results.length; j++) {
+      const result = results[j];
+      const index = i + j;
+
+      if (result.status === "fulfilled") {
+        const pcm = result.value;
+        const header = createWavHeader(pcm.length);
+        const wav = new Uint8Array(header.length + pcm.length);
+        wav.set(header, 0);
+        wav.set(pcm, header.length);
+
+        yield {
+          event: "sentence",
+          data: { index, total, audio: uint8ToBase64(wav) },
+        };
+      } else {
+        yield {
+          event: "sentence-error",
+          data: { index, message: String(result.reason) },
+        };
+      }
+    }
+  }
+
+  yield {
+    event: "done",
+    data: { total_sentences: total, total_bytes: 0 },
+  };
+}
+
+export function uint8ToBase64(bytes: Uint8Array): string {
   let binary = "";
   for (let i = 0; i < bytes.length; i++) {
     binary += String.fromCharCode(bytes[i]);
@@ -75,11 +165,11 @@ function uint8ToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-function sseEvent(event: string, data: string): Uint8Array {
+export function sseEvent(event: string, data: string): Uint8Array {
   return new TextEncoder().encode(`event: ${event}\ndata: ${data}\n\n`);
 }
 
-Deno.serve(async (req: Request): Promise<Response> => {
+export async function handleRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -93,9 +183,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   let storyText: string;
+  let maxSentences: number | undefined;
   try {
     const body = await req.json();
     storyText = body.story_text;
+    maxSentences = body.max_sentences;
   } catch {
     return new Response(
       JSON.stringify({ error: "Invalid JSON body" }),
@@ -126,62 +218,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
     );
   }
 
+  const client = new OpenAI({
+    apiKey,
+    baseURL: "https://api.xiaomimimo.com/v1",
+  });
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        const audioBuffers = await generateAllAudio(sentences, apiKey);
-
-        let totalBytes = 0;
-        for (const buf of audioBuffers) {
-          totalBytes += buf.length;
+        for await (const event of streamSentences(sentences, client, maxSentences)) {
+          controller.enqueue(sseEvent(event.event, JSON.stringify(event.data)));
         }
-
-        const combined = new Uint8Array(totalBytes);
-        let offset = 0;
-        for (const buf of audioBuffers) {
-          combined.set(buf, offset);
-          offset += buf.length;
-        }
-
-        const totalChunks = Math.ceil(combined.length / CHUNK_SIZE);
-        for (let i = 0; i < totalChunks; i++) {
-          const start = i * CHUNK_SIZE;
-          const end = Math.min(start + CHUNK_SIZE, combined.length);
-          const chunk = combined.slice(start, end);
-          const base64 = uint8ToBase64(chunk);
-
-          controller.enqueue(
-            sseEvent(
-              "chunk",
-              JSON.stringify({ index: i, total: totalChunks, audio: base64 })
-            )
-          );
-        }
-
-        controller.enqueue(
-          sseEvent(
-            "done",
-            JSON.stringify({ total_chunks: totalChunks, total_bytes: totalBytes })
-          )
-        );
       } catch (err: unknown) {
-        const sentenceIndex =
-          typeof err === "object" && err !== null && "sentenceIndex" in err
-            ? (err as { sentenceIndex: number }).sentenceIndex
-            : -1;
-        const message =
-          typeof err === "object" && err !== null && "error" in err
-            ? String((err as { error: Error }).error)
-            : String(err);
-
+        const message = err instanceof TTSError ? String(err.cause) : String(err);
         controller.enqueue(
-          sseEvent(
-            "error",
-            JSON.stringify({
-              message: `TTS failed for sentence ${sentenceIndex}: ${message}`,
-              sentence_index: sentenceIndex,
-            })
-          )
+          sseEvent("error", JSON.stringify({ message }))
         );
       } finally {
         controller.close();
@@ -196,4 +247,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       "Cache-Control": "no-cache",
     },
   });
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}
