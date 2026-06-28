@@ -4,6 +4,8 @@ const VOICE = "Chloe";
 const CONTEXT = "gentle bedtime story narration, warm and soothing, slow pace";
 const CHUNK_SIZE = 32 * 1024;
 const MAX_WORDS = 5000;
+const MAX_CONCURRENT_TTS = 10;
+const TTS_TIMEOUT_MS = 30_000;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -35,6 +37,7 @@ async function generateSentenceAudio(
       response_format: "mp3",
       context: CONTEXT,
     }),
+    signal: AbortSignal.timeout(TTS_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -43,6 +46,25 @@ async function generateSentenceAudio(
   }
 
   return new Uint8Array(await response.arrayBuffer());
+}
+
+async function generateAllAudio(
+  sentences: string[],
+  apiKey: string
+): Promise<Uint8Array[]> {
+  const results: Uint8Array[] = [];
+  for (let i = 0; i < sentences.length; i += MAX_CONCURRENT_TTS) {
+    const batch = sentences.slice(i, i + MAX_CONCURRENT_TTS);
+    const batchResults = await Promise.all(
+      batch.map((sentence, j) =>
+        generateSentenceAudio(sentence, apiKey).catch((err) => {
+          throw { sentenceIndex: i + j, error: err };
+        })
+      )
+    );
+    results.push(...batchResults);
+  }
+  return results;
 }
 
 function uint8ToBase64(bytes: Uint8Array): string {
@@ -107,13 +129,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        const audioBuffers = await Promise.all(
-          sentences.map((sentence, i) =>
-            generateSentenceAudio(sentence, apiKey).catch((err) => {
-              throw { sentenceIndex: i, error: err };
-            })
-          )
-        );
+        const audioBuffers = await generateAllAudio(sentences, apiKey);
 
         let totalBytes = 0;
         for (const buf of audioBuffers) {
@@ -178,7 +194,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
       ...corsHeaders,
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
-      Connection: "keep-alive",
     },
   });
 });
