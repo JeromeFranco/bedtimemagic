@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
-import { getAudioSource, getAmbientAudioSource } from '@/lib/audio-utils';
+import { getAudioSource, getAmbientAudioSource, getSampleAudioSource } from '@/lib/audio-utils';
 import type { Story } from '@/types';
 
 export type PostStoryPhase = 'idle' | 'fading' | 'pillow_talk' | 'affirmation' | 'done';
@@ -148,7 +148,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       interruptionMode: 'doNotMix',
     });
 
-    const source = await getAudioSource(story);
+    setIsBuffering(true);
+    let source: { uri: string };
+    try {
+      source = await getAudioSource(story);
+    } catch {
+      source = getSampleAudioSource();
+    } finally {
+      setIsBuffering(false);
+    }
     const player = createAudioPlayer(source);
     playerRef.current = player;
 

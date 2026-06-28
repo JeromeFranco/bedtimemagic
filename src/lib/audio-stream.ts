@@ -1,11 +1,13 @@
-import { writeAudioChunk, finalizeAudioCache, enforceFifoEviction } from './audio-cache';
+import { writeAudioChunk, finalizeAudioCache, enforceFifoEviction, discardPendingChunks } from './audio-cache';
 import { supabase } from './supabase';
 
 export async function streamStoryAudio(storyId: string, storyText: string): Promise<string> {
-  const { supabaseUrl, supabaseKey } = supabase as unknown as {
-    supabaseUrl: string;
-    supabaseKey: string;
-  };
+  const supabaseAny = supabase as unknown as Record<string, unknown>;
+  const supabaseUrl = supabaseAny.supabaseUrl as string;
+  const supabaseKey = supabaseAny.supabaseKey as string;
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Supabase URL or key not available');
+  }
 
   const response = await fetch(`${supabaseUrl}/functions/v1/generate-story-audio`, {
     method: 'POST',
@@ -60,6 +62,9 @@ export async function streamStoryAudio(storyId: string, storyText: string): Prom
         }
       }
     }
+  } catch (error) {
+    discardPendingChunks(storyId);
+    throw error;
   } finally {
     reader.releaseLock();
   }

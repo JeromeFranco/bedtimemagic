@@ -33,6 +33,10 @@ export async function writeAudioChunk(storyId: string, chunkBase64: string): Pro
   pendingChunks.set(storyId, chunks);
 }
 
+export function discardPendingChunks(storyId: string): void {
+  pendingChunks.delete(storyId);
+}
+
 export async function finalizeAudioCache(storyId: string): Promise<string> {
   const path = audioPath(storyId);
   const chunks = pendingChunks.get(storyId);

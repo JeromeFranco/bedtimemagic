@@ -2,6 +2,7 @@ jest.mock('../audio-cache', () => ({
   writeAudioChunk: jest.fn(),
   finalizeAudioCache: jest.fn(),
   enforceFifoEviction: jest.fn(),
+  discardPendingChunks: jest.fn(),
 }));
 
 jest.mock('../supabase', () => ({
