@@ -34,7 +34,7 @@ jest.mock('expo-audio', () => ({
 }));
 
 jest.mock('@/lib/audio-utils', () => ({
-  getAudioSource: jest.fn(() => ({ uri: 42 })),
+  getAudioSource: jest.fn(async () => ({ uri: 42 })),
   getAmbientAudioSource: jest.fn(() => ({ uri: 'ambient-rain' })),
 }));
 

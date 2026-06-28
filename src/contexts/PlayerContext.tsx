@@ -13,7 +13,7 @@ interface PlayerContextValue {
   position: number;
   duration: number;
   postStoryPhase: PostStoryPhase;
-  playStory: (story: Story) => void;
+  playStory: (story: Story) => Promise<void>;
   pause: () => void;
   resume: () => void;
   seekTo: (seconds: number) => void;
@@ -31,7 +31,7 @@ const PlayerContext = createContext<PlayerContextValue>({
   position: 0,
   duration: 0,
   postStoryPhase: 'idle',
-  playStory: () => {},
+  playStory: async () => {},
   pause: () => {},
   resume: () => {},
   seekTo: () => {},
