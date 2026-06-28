@@ -120,32 +120,49 @@ export async function* streamSentences(
 ): AsyncGenerator<{ event: string; data: Record<string, unknown> }> {
   const toProcess = maxSentences ? sentences.slice(0, maxSentences) : sentences;
   const total = toProcess.length;
+  let totalBytes = 0;
 
   for (let i = 0; i < toProcess.length; i += MAX_CONCURRENT_TTS) {
     const batch = toProcess.slice(i, i + MAX_CONCURRENT_TTS);
-    const results = await Promise.allSettled(
-      batch.map((sentence) => generateSentenceAudio(sentence, client))
+    const batchOffset = i;
+
+    const promises = batch.map((sentence, j) =>
+      generateSentenceAudio(sentence, client)
+        .then((pcm) => ({ index: batchOffset + j, pcm, error: null as null }))
+        .catch((err) => ({
+          index: batchOffset + j,
+          pcm: null as Uint8Array | null,
+          error: err,
+        }))
     );
 
-    for (let j = 0; j < results.length; j++) {
-      const result = results[j];
-      const index = i + j;
+    const pending = new Set(promises.map((_, j) => j));
 
-      if (result.status === "fulfilled") {
-        const pcm = result.value;
+    while (pending.size > 0) {
+      const result = await Promise.race(
+        [...pending].map((j) =>
+          promises[j].then((r) => ({ ...r, promiseIndex: j }))
+        )
+      );
+
+      pending.delete(result.promiseIndex);
+
+      if (result.pcm) {
+        const pcm = result.pcm;
         const header = createWavHeader(pcm.length);
         const wav = new Uint8Array(header.length + pcm.length);
         wav.set(header, 0);
         wav.set(pcm, header.length);
+        totalBytes += wav.length;
 
         yield {
           event: "sentence",
-          data: { index, total, audio: uint8ToBase64(wav) },
+          data: { index: result.index, total, audio: uint8ToBase64(wav) },
         };
       } else {
         yield {
           event: "sentence-error",
-          data: { index, message: String(result.reason) },
+          data: { index: result.index, message: String(result.error) },
         };
       }
     }
@@ -153,7 +170,7 @@ export async function* streamSentences(
 
   yield {
     event: "done",
-    data: { total_sentences: total, total_bytes: 0 },
+    data: { total_sentences: total, total_bytes: totalBytes },
   };
 }
 
