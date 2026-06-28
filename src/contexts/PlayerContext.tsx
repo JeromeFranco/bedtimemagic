@@ -148,7 +148,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       interruptionMode: 'doNotMix',
     });
 
-    const source = getAudioSource(story);
+    const source = await getAudioSource(story);
     const player = createAudioPlayer(source);
     playerRef.current = player;
 
