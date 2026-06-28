@@ -5,14 +5,51 @@ export interface ProtagonistInfo {
   name: string;
   species: string;
   emoji: string;
+  personality: string;
+  voiceNotes: string;
 }
 
 export const PROTAGONISTS: ProtagonistInfo[] = [
-  { id: 'barnaby', name: 'Barnaby', species: 'Bear', emoji: '🐻' },
-  { id: 'nova', name: 'Captain Nova', species: 'Star Pilot', emoji: '🚀' },
-  { id: 'pip', name: 'Pip', species: 'Penguin', emoji: '🐧' },
-  { id: 'luna', name: 'Luna', species: 'Owl', emoji: '🦉' },
-  { id: 'rex', name: 'Rex', species: 'Dragon', emoji: '🐉' },
+  {
+    id: 'barnaby',
+    name: 'Barnaby',
+    species: 'Bear',
+    emoji: '🐻',
+    personality: 'Gentle, patient bear who loves warm hugs and honey. Always speaks slowly and kindly, making everyone feel safe.',
+    voiceNotes: 'Warm baritone, slow and comforting, like a cozy blanket',
+  },
+  {
+    id: 'nova',
+    name: 'Captain Nova',
+    species: 'Star Pilot',
+    emoji: '🚀',
+    personality: 'Brave space explorer who is curious about every star. Speaks with wonder and excitement but calms down at bedtime.',
+    voiceNotes: 'Energetic but softening, like a campfire winding down',
+  },
+  {
+    id: 'pip',
+    name: 'Pip',
+    species: 'Penguin',
+    emoji: '🐧',
+    personality: 'Playful penguin who waddles everywhere and loves sliding on ice. Always giggling and making others laugh.',
+    voiceNotes: 'Cheerful and slightly squeaky, like a happy child',
+  },
+  {
+    id: 'luna',
+    name: 'Luna',
+    species: 'Owl',
+    emoji: '🦉',
+    personality: 'Wise owl who sees everything from her tree. Speaks softly with ancient knowledge, making the world feel magical.',
+    voiceNotes: 'Whispery and mysterious, like rustling leaves at night',
+  },
+  {
+    id: 'rex',
+    name: 'Rex',
+    species: 'Dragon',
+    emoji: '🐉',
+    personality: 'Friendly dragon who breathes warm air and guards his friends fiercely. Despite his size, he is incredibly gentle.',
+    voiceNotes: 'Deep and rumbly but kind, like distant thunder fading',
+  },
 ];
 
 export type ChallengeCategory = 'screentime' | 'emotions' | 'bedtime' | 'social';
