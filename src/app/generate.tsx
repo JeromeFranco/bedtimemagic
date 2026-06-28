@@ -25,6 +25,9 @@ export default function GenerateScreen() {
       generateStory(
         selectedProfile!.id,
         selectedProfile!.protagonist,
+        selectedProfile!.name,
+        selectedProfile!.developmental_stage,
+        category!,
         trigger!
       ),
     onSuccess: (story) => {
