@@ -1,14 +1,13 @@
-jest.mock('expo-file-system', () => ({
+jest.mock('expo-file-system/legacy', () => ({
   cacheDirectory: '/mock/cache/',
   getInfoAsync: jest.fn(),
   writeAsStringAsync: jest.fn(),
-  readAsStringAsync: jest.fn(),
   deleteAsync: jest.fn(),
   readDirectoryAsync: jest.fn(),
   EncodingType: { Base64: 'base64' },
 }));
 
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import {
   getCachedAudioPath,
   writeAudioChunk,
@@ -20,7 +19,6 @@ import {
 
 const mockedGetInfo = FileSystem.getInfoAsync as jest.Mock;
 const mockedWrite = FileSystem.writeAsStringAsync as jest.Mock;
-const mockedReadFile = FileSystem.readAsStringAsync as jest.Mock;
 const mockedDelete = FileSystem.deleteAsync as jest.Mock;
 const mockedReadDir = FileSystem.readDirectoryAsync as jest.Mock;
 
@@ -43,42 +41,26 @@ describe('getCachedAudioPath', () => {
   });
 });
 
-describe('writeAudioChunk', () => {
-  it('creates file on first chunk', async () => {
-    mockedGetInfo.mockResolvedValue({ exists: false });
-    mockedWrite.mockResolvedValue(undefined);
-
+describe('writeAudioChunk + finalizeAudioCache', () => {
+  it('accumulates chunks in memory and writes on finalize', async () => {
     await writeAudioChunk('story-1', 'aGVsbG8=');
+    await writeAudioChunk('story-1', 'd29ybGQ=');
 
+    const result = await finalizeAudioCache('story-1');
+
+    expect(result).toBe('/mock/cache/audio_story-1.mp3');
+    expect(mockedWrite).toHaveBeenCalledTimes(1);
     expect(mockedWrite).toHaveBeenCalledWith(
       '/mock/cache/audio_story-1.mp3',
-      'aGVsbG8=',
+      'aGVsbG8=d29ybGQ=',
       { encoding: 'base64' }
     );
   });
 
-  it('appends on subsequent chunks', async () => {
-    mockedGetInfo.mockResolvedValue({ exists: true });
-    mockedReadFile.mockResolvedValue('ZXhpc3Rpbmc=');
-    mockedWrite.mockResolvedValue(undefined);
-
-    await writeAudioChunk('story-1', 'YXBwZW5k');
-
-    expect(mockedReadFile).toHaveBeenCalledWith('/mock/cache/audio_story-1.mp3', {
-      encoding: 'base64',
-    });
-    expect(mockedWrite).toHaveBeenCalledWith(
-      '/mock/cache/audio_story-1.mp3',
-      'ZXhpc3Rpbmc=YXBwZW5k',
-      { encoding: 'base64' }
-    );
-  });
-});
-
-describe('finalizeAudioCache', () => {
-  it('returns the cached file path', async () => {
+  it('does not write if no chunks were added', async () => {
     const result = await finalizeAudioCache('story-1');
     expect(result).toBe('/mock/cache/audio_story-1.mp3');
+    expect(mockedWrite).not.toHaveBeenCalled();
   });
 });
 
