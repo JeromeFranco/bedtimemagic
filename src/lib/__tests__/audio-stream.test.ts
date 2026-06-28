@@ -18,6 +18,8 @@ const mockedWriteAudioChunk = writeAudioChunk as jest.Mock;
 const mockedFinalizeAudioCache = finalizeAudioCache as jest.Mock;
 const mockedEnforceFifoEviction = enforceFifoEviction as jest.Mock;
 
+const originalFetch = globalThis.fetch;
+
 function createMockSSEResponse(events: string[]): Response {
   const body = events.join('\n') + '\n';
   const encoder = new TextEncoder();
@@ -35,7 +37,11 @@ function createMockSSEResponse(events: string[]): Response {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  global.fetch = jest.fn();
+  globalThis.fetch = jest.fn() as typeof fetch;
+});
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
 });
 
 describe('streamStoryAudio', () => {
@@ -52,12 +58,12 @@ describe('streamStoryAudio', () => {
       '',
     ];
 
-    (global.fetch as jest.Mock).mockResolvedValue(createMockSSEResponse(sseEvents));
+    (globalThis.fetch as jest.Mock).mockResolvedValue(createMockSSEResponse(sseEvents));
     mockedFinalizeAudioCache.mockResolvedValue('/cache/audio_story-1.mp3');
 
     const result = await streamStoryAudio('story-1', 'Hello world');
 
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(globalThis.fetch).toHaveBeenCalledWith(
       'https://test.supabase.co/functions/v1/generate-story-audio',
       expect.objectContaining({
         method: 'POST',
@@ -83,13 +89,13 @@ describe('streamStoryAudio', () => {
       '',
     ];
 
-    (global.fetch as jest.Mock).mockResolvedValue(createMockSSEResponse(sseEvents));
+    (globalThis.fetch as jest.Mock).mockResolvedValue(createMockSSEResponse(sseEvents));
 
     await expect(streamStoryAudio('story-1', 'Hello')).rejects.toThrow('TTS failed');
   });
 
   it('throws on non-ok response', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(
+    (globalThis.fetch as jest.Mock).mockResolvedValue(
       new Response('Internal Server Error', { status: 500 })
     );
 
@@ -105,7 +111,7 @@ describe('streamStoryAudio', () => {
       '',
     ];
 
-    (global.fetch as jest.Mock).mockResolvedValue(createMockSSEResponse(sseEvents));
+    (globalThis.fetch as jest.Mock).mockResolvedValue(createMockSSEResponse(sseEvents));
 
     await expect(streamStoryAudio('story-1', 'Hello')).rejects.toThrow(
       'Stream ended without done event'
