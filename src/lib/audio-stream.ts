@@ -13,7 +13,7 @@ export async function streamStoryAudio(storyId: string, storyText: string): Prom
       'Content-Type': 'application/json',
       Authorization: `Bearer ${supabaseKey}`,
     },
-    body: JSON.stringify({ storyId, storyText }),
+    body: JSON.stringify({ story_text: storyText }),
   });
 
   if (!response.ok) {
@@ -24,7 +24,6 @@ export async function streamStoryAudio(storyId: string, storyText: string): Prom
   const decoder = new TextDecoder();
   let eventType = '';
   let data = '';
-  let gotDone = false;
   let buffer = '';
 
   while (true) {
@@ -45,7 +44,6 @@ export async function streamStoryAudio(storyId: string, storyText: string): Prom
           const parsed = JSON.parse(data);
           await writeAudioChunk(storyId, parsed.audio);
         } else if (eventType === 'done') {
-          gotDone = true;
           await enforceFifoEviction();
           return finalizeAudioCache(storyId);
         } else if (eventType === 'error') {
@@ -58,9 +56,5 @@ export async function streamStoryAudio(storyId: string, storyText: string): Prom
     }
   }
 
-  if (!gotDone) {
-    throw new Error('Stream ended without done event');
-  }
-
-  return finalizeAudioCache(storyId);
+  throw new Error('Stream ended without done event');
 }

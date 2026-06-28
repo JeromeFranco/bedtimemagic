@@ -65,7 +65,7 @@ describe('streamStoryAudio', () => {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer test-anon-key',
         },
-        body: JSON.stringify({ storyId: 'story-1', storyText: 'Hello world' }),
+        body: JSON.stringify({ story_text: 'Hello world' }),
       })
     );
     expect(mockedWriteAudioChunk).toHaveBeenCalledTimes(2);
