@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "strict": true
+  },
+  "imports": {
+    "openai": "npm:openai@6.42.0"
+  }
+}
