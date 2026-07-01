@@ -57,6 +57,24 @@ describe('getAudioSource', () => {
     expect(mockedGetCachedAudioPath).toHaveBeenCalledWith('story-1');
     expect(mockedStreamStoryAudio).toHaveBeenCalledWith('story-1', 'Once upon a time...');
   });
+
+  it('waits for inflight pre-fetch instead of starting a new stream', async () => {
+    let resolveStream!: (value: string) => void;
+    mockedStreamStoryAudio.mockImplementation(
+      () => new Promise<string>((resolve) => { resolveStream = resolve; })
+    );
+
+    const preFetchPromise = preFetchAudio('story-1', MOCK_STORY.story_text);
+    const sourcePromise = getAudioSource(MOCK_STORY);
+
+    resolveStream('/cache/audio_story-1.wav');
+
+    const source = await sourcePromise;
+    expect(source).toEqual({ uri: '/cache/audio_story-1.wav' });
+    expect(mockedStreamStoryAudio).toHaveBeenCalledTimes(1);
+
+    await preFetchPromise;
+  });
 });
 
 describe('getAmbientAudioSource', () => {
@@ -81,5 +99,32 @@ describe('preFetchAudio', () => {
     await preFetchAudio('story-1', 'Hello world');
 
     expect(mockedStreamStoryAudio).toHaveBeenCalledWith('story-1', 'Hello world', 2);
+  });
+
+  it('deduplicates concurrent calls for the same storyId', async () => {
+    let resolveStream!: (value: string) => void;
+    mockedStreamStoryAudio.mockImplementation(
+      () => new Promise<string>((resolve) => { resolveStream = resolve; })
+    );
+
+    const promise1 = preFetchAudio('story-1', 'Hello world');
+    const promise2 = preFetchAudio('story-1', 'Hello world');
+
+    expect(mockedStreamStoryAudio).toHaveBeenCalledTimes(1);
+
+    resolveStream('/cache/audio_story-1.wav');
+
+    const [result1, result2] = await Promise.all([promise1, promise2]);
+    expect(result1).toBe('/cache/audio_story-1.wav');
+    expect(result2).toBe('/cache/audio_story-1.wav');
+  });
+
+  it('allows new preFetch after previous completes', async () => {
+    mockedStreamStoryAudio.mockResolvedValue('/cache/audio_story-1.wav');
+
+    await preFetchAudio('story-1', 'Hello world');
+    await preFetchAudio('story-1', 'Hello world');
+
+    expect(mockedStreamStoryAudio).toHaveBeenCalledTimes(2);
   });
 });

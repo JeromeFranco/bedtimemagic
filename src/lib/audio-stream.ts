@@ -1,4 +1,4 @@
-import { writeAudioChunk, writeSentenceToCache, finalizeAudioCache, enforceFifoEviction, discardPendingChunks } from './audio-cache';
+import { writeSentenceToCache, finalizeAudioCache, enforceFifoEviction } from './audio-cache';
 import { supabase } from './supabase';
 
 export async function streamStoryAudio(storyId: string, storyText: string, maxSentences?: number): Promise<string> {
@@ -56,10 +56,8 @@ export async function streamStoryAudio(storyId: string, storyText: string, maxSe
             const parsed = JSON.parse(data);
             await writeSentenceToCache(storyId, parsed.index, parsed.audio);
           } else if (eventType === 'sentence-error') {
-            console.warn('Sentence TTS error:', JSON.parse(data));
-          } else if (eventType === 'chunk') {
             const parsed = JSON.parse(data);
-            await writeAudioChunk(storyId, parsed.audio);
+            console.warn(`Sentence ${parsed.index} TTS failed: ${parsed.message}`);
           } else if (eventType === 'done') {
             await enforceFifoEviction();
             return await finalizeAudioCache(storyId);
@@ -73,7 +71,6 @@ export async function streamStoryAudio(storyId: string, storyText: string, maxSe
       }
     }
   } catch (error) {
-    discardPendingChunks(storyId);
     throw error;
   } finally {
     reader.releaseLock();

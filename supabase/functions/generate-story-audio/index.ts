@@ -28,7 +28,7 @@ export class TTSError extends Error {
 
 export function splitSentences(text: string): string[] {
   return text
-    .split(/[.!?]+\s+/)
+    .split(/(?<=[.!?])\s+/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 }
@@ -93,23 +93,16 @@ export async function generateSentenceAudio(
   return bytes;
 }
 
-export async function generateAllAudio(
-  sentences: string[],
-  client: OpenAI
-): Promise<Uint8Array[]> {
-  const results: Uint8Array[] = [];
-  for (let i = 0; i < sentences.length; i += MAX_CONCURRENT_TTS) {
-    const batch = sentences.slice(i, i + MAX_CONCURRENT_TTS);
-    const batchResults = await Promise.all(
-      batch.map((sentence, j) =>
-        generateSentenceAudio(sentence, client).catch((err) => {
-          throw new TTSError(i + j, err);
-        })
-      )
-    );
-    results.push(...batchResults);
+async function withRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt === retries) throw err;
+      await new Promise(r => setTimeout(r, 1000 * 2 ** attempt));
+    }
   }
-  return results;
+  throw new Error("unreachable");
 }
 
 export async function* streamSentences(
@@ -126,7 +119,7 @@ export async function* streamSentences(
     const batchOffset = i;
 
     const promises = batch.map((sentence, j) =>
-      generateSentenceAudio(sentence, client)
+      withRetry(() => generateSentenceAudio(sentence, client))
         .then((pcm) => ({ index: batchOffset + j, pcm, error: null as null }))
         .catch((err) => ({
           index: batchOffset + j,
@@ -214,6 +207,13 @@ export async function handleRequest(req: Request): Promise<Response> {
   if (!storyText || typeof storyText !== "string" || storyText.trim().length === 0) {
     return new Response(
       JSON.stringify({ error: "story_text is required and must be non-empty" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  if (maxSentences !== undefined && (!Number.isInteger(maxSentences) || maxSentences < 1)) {
+    return new Response(
+      JSON.stringify({ error: "max_sentences must be a positive integer" }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

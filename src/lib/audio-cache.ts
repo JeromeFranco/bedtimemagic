@@ -13,8 +13,6 @@ const COVER_CACHE_PREFIX = 'cover_';
 const MAX_CACHED_STORIES = 5;
 const WAV_HEADER_SIZE = 44;
 
-const pendingChunks = new Map<string, string[]>();
-
 function audioPath(storyId: string): string {
   return `${cacheDirectory}${AUDIO_CACHE_PREFIX}${storyId}.wav`;
 }
@@ -27,16 +25,6 @@ export async function getCachedAudioPath(storyId: string): Promise<string | null
   const path = audioPath(storyId);
   const info = await getInfoAsync(path);
   return info.exists ? path : null;
-}
-
-export async function writeAudioChunk(storyId: string, chunkBase64: string): Promise<void> {
-  const chunks = pendingChunks.get(storyId) ?? [];
-  chunks.push(chunkBase64);
-  pendingChunks.set(storyId, chunks);
-}
-
-export function discardPendingChunks(storyId: string): void {
-  pendingChunks.delete(storyId);
 }
 
 export async function writeSentenceToCache(
@@ -60,15 +48,7 @@ export async function writeSentenceToCache(
 }
 
 export async function finalizeAudioCache(storyId: string): Promise<string> {
-  const path = audioPath(storyId);
-  const chunks = pendingChunks.get(storyId);
-  if (chunks && chunks.length > 0) {
-    await writeAsStringAsync(path, chunks.join(''), {
-      encoding: EncodingType.Base64,
-    });
-    pendingChunks.delete(storyId);
-  }
-  return path;
+  return audioPath(storyId);
 }
 
 export async function evictStory(storyId: string): Promise<void> {

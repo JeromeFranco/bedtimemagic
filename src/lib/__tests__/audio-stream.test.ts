@@ -1,9 +1,7 @@
 jest.mock('../audio-cache', () => ({
-  writeAudioChunk: jest.fn(),
   writeSentenceToCache: jest.fn(),
   finalizeAudioCache: jest.fn(),
   enforceFifoEviction: jest.fn(),
-  discardPendingChunks: jest.fn(),
 }));
 
 jest.mock('../supabase', () => ({
@@ -13,10 +11,9 @@ jest.mock('../supabase', () => ({
   },
 }));
 
-import { writeAudioChunk, writeSentenceToCache, finalizeAudioCache, enforceFifoEviction } from '../audio-cache';
+import { writeSentenceToCache, finalizeAudioCache, enforceFifoEviction } from '../audio-cache';
 import { streamStoryAudio } from '../audio-stream';
 
-const mockedWriteAudioChunk = writeAudioChunk as jest.Mock;
 const mockedWriteSentenceToCache = writeSentenceToCache as jest.Mock;
 const mockedFinalizeAudioCache = finalizeAudioCache as jest.Mock;
 const mockedEnforceFifoEviction = enforceFifoEviction as jest.Mock;
@@ -48,16 +45,13 @@ afterEach(() => {
 });
 
 describe('streamStoryAudio', () => {
-  it('processes SSE chunks and writes to cache', async () => {
+  it('processes sentence events via SSE and writes to cache', async () => {
     const sseEvents = [
-      'event: chunk',
-      'data: {"audio":"aGVsbG8="}',
-      '',
-      'event: chunk',
-      'data: {"audio":"d29ybGQ="}',
+      'event: sentence',
+      'data: {"index":0,"total":1,"audio":"aGVsbG8="}',
       '',
       'event: done',
-      'data: {}',
+      'data: {"total_sentences":1}',
       '',
     ];
 
@@ -77,9 +71,8 @@ describe('streamStoryAudio', () => {
         body: JSON.stringify({ story_text: 'Hello world' }),
       })
     );
-    expect(mockedWriteAudioChunk).toHaveBeenCalledTimes(2);
-    expect(mockedWriteAudioChunk).toHaveBeenCalledWith('story-1', 'aGVsbG8=');
-    expect(mockedWriteAudioChunk).toHaveBeenCalledWith('story-1', 'd29ybGQ=');
+    expect(mockedWriteSentenceToCache).toHaveBeenCalledTimes(1);
+    expect(mockedWriteSentenceToCache).toHaveBeenCalledWith('story-1', 0, 'aGVsbG8=');
     expect(mockedEnforceFifoEviction).toHaveBeenCalledTimes(1);
     expect(mockedFinalizeAudioCache).toHaveBeenCalledWith('story-1');
     expect(result).toBe('/cache/audio_story-1.wav');

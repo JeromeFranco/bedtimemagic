@@ -6,7 +6,6 @@ import {
   sseEvent,
   TTSError,
   generateSentenceAudio,
-  generateAllAudio,
   streamSentences,
   SAMPLE_RATE,
   BITS_PER_SAMPLE,
@@ -15,32 +14,32 @@ import {
 
 Deno.test("splitSentences - splits on period followed by space", () => {
   const result = splitSentences("Hello world. How are you.");
-  assertEquals(result, ["Hello world", "How are you."]);
+  assertEquals(result, ["Hello world.", "How are you."]);
 });
 
 Deno.test("splitSentences - splits on exclamation followed by space", () => {
   const result = splitSentences("Hello! How are you!");
-  assertEquals(result, ["Hello", "How are you!"]);
+  assertEquals(result, ["Hello!", "How are you!"]);
 });
 
 Deno.test("splitSentences - splits on question mark followed by space", () => {
   const result = splitSentences("Hello? How are you?");
-  assertEquals(result, ["Hello", "How are you?"]);
+  assertEquals(result, ["Hello?", "How are you?"]);
 });
 
 Deno.test("splitSentences - splits on mixed punctuation with spaces", () => {
   const result = splitSentences("Hello! How are you? Fine.");
-  assertEquals(result, ["Hello", "How are you", "Fine."]);
+  assertEquals(result, ["Hello!", "How are you?", "Fine."]);
 });
 
 Deno.test("splitSentences - trims whitespace", () => {
   const result = splitSentences("  Hello world.   How are you.  ");
-  assertEquals(result, ["Hello world", "How are you"]);
+  assertEquals(result, ["Hello world.", "How are you."]);
 });
 
 Deno.test("splitSentences - filters empty strings", () => {
   const result = splitSentences("Hello. . World.");
-  assertEquals(result, ["Hello", "World."]);
+  assertEquals(result, ["Hello.", ".", "World."]);
 });
 
 Deno.test("splitSentences - single sentence", () => {
@@ -234,50 +233,6 @@ Deno.test("generateSentenceAudio - throws on missing audio", async () => {
     throw new Error("Should have thrown");
   } catch (e) {
     assertEquals((e as Error).message, "No audio data in response");
-  }
-});
-
-Deno.test("generateAllAudio - processes all sentences", async () => {
-  const mockClient = {
-    chat: {
-      completions: {
-        create: (params: any) => {
-          const sentence = params.messages[1].content;
-          const bytes = new Uint8Array([sentence.charCodeAt(0)]);
-          let binary = "";
-          for (const byte of bytes) {
-            binary += String.fromCharCode(byte);
-          }
-          return Promise.resolve({
-            choices: [{ message: { audio: { data: btoa(binary) } } }],
-          });
-        },
-      },
-    },
-  };
-
-  const result = await generateAllAudio(["A", "B", "C"], mockClient as any);
-  assertEquals(result.length, 3);
-  assertEquals(Array.from(result[0]), [65]); // 'A'
-  assertEquals(Array.from(result[1]), [66]); // 'B'
-  assertEquals(Array.from(result[2]), [67]); // 'C'
-});
-
-Deno.test("generateAllAudio - wraps errors in TTSError", async () => {
-  const mockClient = {
-    chat: {
-      completions: {
-        create: () => Promise.reject(new Error("API failure")),
-      },
-    },
-  };
-
-  try {
-    await generateAllAudio(["Hello"], mockClient as any);
-    throw new Error("Should have thrown");
-  } catch (e) {
-    assertEquals(e instanceof TTSError, true);
-    assertEquals((e as TTSError).sentenceIndex, 0);
   }
 });
 

@@ -11,7 +11,6 @@ jest.mock('expo-file-system/legacy', () => ({
 import * as FileSystem from 'expo-file-system/legacy';
 import {
   getCachedAudioPath,
-  writeAudioChunk,
   finalizeAudioCache,
   evictStory,
   enforceFifoEviction,
@@ -44,26 +43,10 @@ describe('getCachedAudioPath', () => {
   });
 });
 
-describe('writeAudioChunk + finalizeAudioCache', () => {
-  it('accumulates chunks in memory and writes on finalize', async () => {
-    await writeAudioChunk('story-1', 'aGVsbG8=');
-    await writeAudioChunk('story-1', 'd29ybGQ=');
-
-    const result = await finalizeAudioCache('story-1');
-
-    expect(result).toBe('/mock/cache/audio_story-1.wav');
-    expect(mockedWrite).toHaveBeenCalledTimes(1);
-    expect(mockedWrite).toHaveBeenCalledWith(
-      '/mock/cache/audio_story-1.wav',
-      'aGVsbG8=d29ybGQ=',
-      { encoding: 'base64' }
-    );
-  });
-
-  it('does not write if no chunks were added', async () => {
+describe('finalizeAudioCache', () => {
+  it('returns the audio path', async () => {
     const result = await finalizeAudioCache('story-1');
     expect(result).toBe('/mock/cache/audio_story-1.wav');
-    expect(mockedWrite).not.toHaveBeenCalled();
   });
 });
 
