@@ -2,6 +2,7 @@ import {
   cacheDirectory,
   getInfoAsync,
   writeAsStringAsync,
+  readAsStringAsync,
   deleteAsync,
   readDirectoryAsync,
   EncodingType,
@@ -10,11 +11,12 @@ import {
 export const AUDIO_CACHE_PREFIX = 'audio_';
 const COVER_CACHE_PREFIX = 'cover_';
 const MAX_CACHED_STORIES = 5;
+const WAV_HEADER_SIZE = 44;
 
 const pendingChunks = new Map<string, string[]>();
 
 function audioPath(storyId: string): string {
-  return `${cacheDirectory}${AUDIO_CACHE_PREFIX}${storyId}.mp3`;
+  return `${cacheDirectory}${AUDIO_CACHE_PREFIX}${storyId}.wav`;
 }
 
 function coverPath(storyId: string): string {
@@ -35,6 +37,26 @@ export async function writeAudioChunk(storyId: string, chunkBase64: string): Pro
 
 export function discardPendingChunks(storyId: string): void {
   pendingChunks.delete(storyId);
+}
+
+export async function writeSentenceToCache(
+  storyId: string,
+  index: number,
+  audioBase64: string
+): Promise<void> {
+  const path = audioPath(storyId);
+
+  if (index === 0) {
+    await writeAsStringAsync(path, audioBase64, {
+      encoding: EncodingType.Base64,
+    });
+  } else {
+    const pcmBase64 = audioBase64.slice(Math.ceil(WAV_HEADER_SIZE * 4 / 3));
+    const existing = await readAsStringAsync(path, { encoding: EncodingType.Base64 });
+    await writeAsStringAsync(path, existing + pcmBase64, {
+      encoding: EncodingType.Base64,
+    });
+  }
 }
 
 export async function finalizeAudioCache(storyId: string): Promise<string> {
@@ -68,7 +90,7 @@ export async function enforceFifoEviction(): Promise<void> {
   if (!cacheDirectory) return;
 
   const files = await readDirectoryAsync(cacheDirectory);
-  const audioFiles = files.filter((f) => f.startsWith(AUDIO_CACHE_PREFIX) && f.endsWith('.mp3'));
+  const audioFiles = files.filter((f) => f.startsWith(AUDIO_CACHE_PREFIX) && f.endsWith('.wav'));
 
   if (audioFiles.length <= MAX_CACHED_STORIES) return;
 
@@ -86,7 +108,7 @@ export async function enforceFifoEviction(): Promise<void> {
 
   const toEvict = withTimes.slice(0, audioFiles.length - MAX_CACHED_STORIES);
   for (const { file } of toEvict) {
-    const storyId = file.replace(AUDIO_CACHE_PREFIX, '').replace('.mp3', '');
+    const storyId = file.replace(AUDIO_CACHE_PREFIX, '').replace('.wav', '');
     await evictStory(storyId);
   }
 }
