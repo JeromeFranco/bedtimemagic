@@ -46,6 +46,21 @@ export async function generateStory(
   return data;
 }
 
+export async function generateCoverImage(
+  storyId: string,
+  title: string
+): Promise<{ coverImageUrl: string }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase.functions.invoke('generate-cover-image', {
+    body: { storyId, title },
+  });
+
+  if (error) throw error;
+  return data;
+}
+
 export async function logStoryRating(
   storyId: string,
   childId: string,
