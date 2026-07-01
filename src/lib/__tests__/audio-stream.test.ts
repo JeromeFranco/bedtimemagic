@@ -145,6 +145,31 @@ describe('streamStoryAudio', () => {
     expect(result).toBe('/cache/audio_story-1.wav');
   });
 
+  it('continues stream after sentence-error event', async () => {
+    const sseEvents = [
+      'event: sentence',
+      'data: {"index":0,"total":2,"audio":"aGVsbG8="}',
+      '',
+      'event: sentence-error',
+      'data: {"index":1,"message":"TTS timeout"}',
+      '',
+      'event: done',
+      'data: {"total_sentences":2}',
+      '',
+    ];
+
+    (globalThis.fetch as jest.Mock).mockResolvedValue(createMockSSEResponse(sseEvents));
+    mockedFinalizeAudioCache.mockResolvedValue('/cache/audio_story-1.wav');
+
+    const result = await streamStoryAudio('story-1', 'Hello world');
+
+    // First sentence was written
+    expect(mockedWriteSentenceToCache).toHaveBeenCalledTimes(1);
+    expect(mockedWriteSentenceToCache).toHaveBeenCalledWith('story-1', 0, 'aGVsbG8=');
+    // Stream completed successfully
+    expect(result).toBe('/cache/audio_story-1.wav');
+  });
+
   it('sends max_sentences parameter when provided', async () => {
     const sseEvents = [
       'event: sentence',
