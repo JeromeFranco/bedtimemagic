@@ -11,7 +11,7 @@ jest.mock('../../../assets/audio/ambient-rain.mp3', () => 'mocked-ambient.mp3', 
 
 import { getCachedAudioPath } from '../audio-cache';
 import { streamStoryAudio } from '../audio-stream';
-import { getAudioSource, getAmbientAudioSource } from '../audio-utils';
+import { getAudioSource, getAmbientAudioSource, preFetchAudio } from '../audio-utils';
 import type { Story } from '@/types';
 
 const mockedGetCachedAudioPath = getCachedAudioPath as jest.Mock;
@@ -38,22 +38,22 @@ beforeEach(() => {
 
 describe('getAudioSource', () => {
   it('returns cached path on cache hit without streaming', async () => {
-    mockedGetCachedAudioPath.mockResolvedValue('/cache/audio_story-1.mp3');
+    mockedGetCachedAudioPath.mockResolvedValue('/cache/audio_story-1.wav');
 
     const source = await getAudioSource(MOCK_STORY);
 
-    expect(source).toEqual({ uri: '/cache/audio_story-1.mp3' });
+    expect(source).toEqual({ uri: '/cache/audio_story-1.wav' });
     expect(mockedGetCachedAudioPath).toHaveBeenCalledWith('story-1');
     expect(mockedStreamStoryAudio).not.toHaveBeenCalled();
   });
 
   it('streams from server on cache miss', async () => {
     mockedGetCachedAudioPath.mockResolvedValue(null);
-    mockedStreamStoryAudio.mockResolvedValue('/cache/audio_story-1.mp3');
+    mockedStreamStoryAudio.mockResolvedValue('/cache/audio_story-1.wav');
 
     const source = await getAudioSource(MOCK_STORY);
 
-    expect(source).toEqual({ uri: '/cache/audio_story-1.mp3' });
+    expect(source).toEqual({ uri: '/cache/audio_story-1.wav' });
     expect(mockedGetCachedAudioPath).toHaveBeenCalledWith('story-1');
     expect(mockedStreamStoryAudio).toHaveBeenCalledWith('story-1', 'Once upon a time...');
   });
@@ -63,5 +63,23 @@ describe('getAmbientAudioSource', () => {
   it('returns ambient rain source', () => {
     const source = getAmbientAudioSource();
     expect(source).toEqual({ uri: 'mocked-ambient.mp3' });
+  });
+});
+
+describe('preFetchAudio', () => {
+  it('calls streamStoryAudio with max_sentences', async () => {
+    mockedStreamStoryAudio.mockResolvedValue('/cache/audio_story-1.wav');
+
+    await preFetchAudio('story-1', 'Hello world', 2);
+
+    expect(mockedStreamStoryAudio).toHaveBeenCalledWith('story-1', 'Hello world', 2);
+  });
+
+  it('defaults max_sentences to 2', async () => {
+    mockedStreamStoryAudio.mockResolvedValue('/cache/audio_story-1.wav');
+
+    await preFetchAudio('story-1', 'Hello world');
+
+    expect(mockedStreamStoryAudio).toHaveBeenCalledWith('story-1', 'Hello world', 2);
   });
 });

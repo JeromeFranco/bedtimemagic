@@ -21,3 +21,11 @@ export function getSampleAudioSource(): { uri: string } {
 export function getAmbientAudioSource(): { uri: string } {
   return { uri: AMBIENT_RAIN };
 }
+
+export async function preFetchAudio(
+  storyId: string,
+  storyText: string,
+  maxSentences: number = 2
+): Promise<string> {
+  return streamStoryAudio(storyId, storyText, maxSentences);
+}
