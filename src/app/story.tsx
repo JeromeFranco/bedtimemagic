@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing } from '@/constants/theme';
 import { PROTAGONISTS } from '@/types';
+import { preFetchAudio } from '@/lib/audio-utils';
 import type { Story } from '@/types';
 
 export default function StoryScreen() {
@@ -27,6 +28,14 @@ export default function StoryScreen() {
       </ThemedView>
     );
   }
+
+  useEffect(() => {
+    if (story?.id && story?.story_text) {
+      preFetchAudio(story.id, story.story_text).catch(() => {
+        // Silent failure — playback will fall back to full stream
+      });
+    }
+  }, [story?.id, story?.story_text]);
 
   const protagonist = PROTAGONISTS.find((p) => p.id === story.protagonist);
   const showPlaceholder = !story.cover_image_url || imageError;
