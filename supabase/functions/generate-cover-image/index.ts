@@ -126,13 +126,14 @@ export async function handleRequest(req: Request): Promise<Response> {
 
   // Generate image with Gemini
   const google = createGoogleGenerativeAI({ apiKey });
-  const model = google("gemini-2.5-flash-image-preview");
+  const model = google("gemini-3.1-flash-image-generation");
 
   let imageBytes: Uint8Array;
   try {
     const result = await generateText({
       model,
       prompt,
+      timeout: 60_000,
       providerOptions: {
         google: { responseModalities: ["image"] },
       },
