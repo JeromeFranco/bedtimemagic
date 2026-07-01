@@ -85,13 +85,15 @@ describe('writeSentenceToCache', () => {
     mockedRead.mockResolvedValue('EXISTING');
 
     // Build a real 44-byte WAV header + 10 bytes PCM, base64-encode the full buffer
-    const headerBuf = Buffer.alloc(44, 0x01);
-    const pcmBuf = Buffer.alloc(10, 0x02);
-    const fullBuf = Buffer.concat([headerBuf, pcmBuf]);
-    const wavBase64 = fullBuf.toString('base64');
+    const headerBytes = new Uint8Array(44).fill(0x01);
+    const pcmBytes = new Uint8Array(10).fill(0x02);
+    const fullBytes = new Uint8Array(54);
+    fullBytes.set(headerBytes, 0);
+    fullBytes.set(pcmBytes, 44);
+    const wavBase64 = btoa(String.fromCharCode(...fullBytes));
 
     // Verify the header occupies exactly 60 base64 chars: Math.ceil(44/3)*4 = 60
-    const headerBase64 = headerBuf.toString('base64');
+    const headerBase64 = btoa(String.fromCharCode(...headerBytes));
     expect(headerBase64).toHaveLength(60);
 
     await writeSentenceToCache('story-1', 1, wavBase64);
