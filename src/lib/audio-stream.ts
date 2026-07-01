@@ -1,12 +1,17 @@
-import { writeAudioChunk, finalizeAudioCache, enforceFifoEviction, discardPendingChunks } from './audio-cache';
+import { writeAudioChunk, writeSentenceToCache, finalizeAudioCache, enforceFifoEviction, discardPendingChunks } from './audio-cache';
 import { supabase } from './supabase';
 
-export async function streamStoryAudio(storyId: string, storyText: string): Promise<string> {
+export async function streamStoryAudio(storyId: string, storyText: string, maxSentences?: number): Promise<string> {
   const supabaseAny = supabase as unknown as Record<string, unknown>;
   const supabaseUrl = supabaseAny.supabaseUrl as string;
   const supabaseKey = supabaseAny.supabaseKey as string;
   if (!supabaseUrl || !supabaseKey) {
     throw new Error('Supabase URL or key not available');
+  }
+
+  const body: Record<string, unknown> = { story_text: storyText };
+  if (maxSentences !== undefined) {
+    body.max_sentences = maxSentences;
   }
 
   const response = await fetch(`${supabaseUrl}/functions/v1/generate-story-audio`, {
@@ -15,7 +20,7 @@ export async function streamStoryAudio(storyId: string, storyText: string): Prom
       'Content-Type': 'application/json',
       Authorization: `Bearer ${supabaseKey}`,
     },
-    body: JSON.stringify({ story_text: storyText }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
@@ -47,7 +52,12 @@ export async function streamStoryAudio(storyId: string, storyText: string): Prom
         } else if (line.startsWith('data: ')) {
           data = line.slice(6);
         } else if (line === '') {
-          if (eventType === 'chunk') {
+          if (eventType === 'sentence') {
+            const parsed = JSON.parse(data);
+            await writeSentenceToCache(storyId, parsed.index, parsed.audio);
+          } else if (eventType === 'sentence-error') {
+            console.warn('Sentence TTS error:', JSON.parse(data));
+          } else if (eventType === 'chunk') {
             const parsed = JSON.parse(data);
             await writeAudioChunk(storyId, parsed.audio);
           } else if (eventType === 'done') {

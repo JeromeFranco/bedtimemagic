@@ -1,5 +1,6 @@
 jest.mock('../audio-cache', () => ({
   writeAudioChunk: jest.fn(),
+  writeSentenceToCache: jest.fn(),
   finalizeAudioCache: jest.fn(),
   enforceFifoEviction: jest.fn(),
   discardPendingChunks: jest.fn(),
@@ -12,10 +13,11 @@ jest.mock('../supabase', () => ({
   },
 }));
 
-import { writeAudioChunk, finalizeAudioCache, enforceFifoEviction } from '../audio-cache';
+import { writeAudioChunk, writeSentenceToCache, finalizeAudioCache, enforceFifoEviction } from '../audio-cache';
 import { streamStoryAudio } from '../audio-stream';
 
 const mockedWriteAudioChunk = writeAudioChunk as jest.Mock;
+const mockedWriteSentenceToCache = writeSentenceToCache as jest.Mock;
 const mockedFinalizeAudioCache = finalizeAudioCache as jest.Mock;
 const mockedEnforceFifoEviction = enforceFifoEviction as jest.Mock;
 
@@ -60,7 +62,7 @@ describe('streamStoryAudio', () => {
     ];
 
     (globalThis.fetch as jest.Mock).mockResolvedValue(createMockSSEResponse(sseEvents));
-    mockedFinalizeAudioCache.mockResolvedValue('/cache/audio_story-1.mp3');
+    mockedFinalizeAudioCache.mockResolvedValue('/cache/audio_story-1.wav');
 
     const result = await streamStoryAudio('story-1', 'Hello world');
 
@@ -80,7 +82,7 @@ describe('streamStoryAudio', () => {
     expect(mockedWriteAudioChunk).toHaveBeenCalledWith('story-1', 'd29ybGQ=');
     expect(mockedEnforceFifoEviction).toHaveBeenCalledTimes(1);
     expect(mockedFinalizeAudioCache).toHaveBeenCalledWith('story-1');
-    expect(result).toBe('/cache/audio_story-1.mp3');
+    expect(result).toBe('/cache/audio_story-1.wav');
   });
 
   it('throws on SSE error event', async () => {
@@ -116,6 +118,53 @@ describe('streamStoryAudio', () => {
 
     await expect(streamStoryAudio('story-1', 'Hello')).rejects.toThrow(
       'Stream ended without done event'
+    );
+  });
+
+  it('processes sentence events and writes to cache', async () => {
+    const sseEvents = [
+      'event: sentence',
+      'data: {"index":0,"total":2,"audio":"aGVsbG8="}',
+      '',
+      'event: sentence',
+      'data: {"index":1,"total":2,"audio":"d29ybGQ="}',
+      '',
+      'event: done',
+      'data: {"total_sentences":2}',
+      '',
+    ];
+
+    (globalThis.fetch as jest.Mock).mockResolvedValue(createMockSSEResponse(sseEvents));
+    mockedFinalizeAudioCache.mockResolvedValue('/cache/audio_story-1.wav');
+
+    const result = await streamStoryAudio('story-1', 'Hello world');
+
+    expect(mockedWriteSentenceToCache).toHaveBeenCalledTimes(2);
+    expect(mockedWriteSentenceToCache).toHaveBeenCalledWith('story-1', 0, 'aGVsbG8=');
+    expect(mockedWriteSentenceToCache).toHaveBeenCalledWith('story-1', 1, 'd29ybGQ=');
+    expect(result).toBe('/cache/audio_story-1.wav');
+  });
+
+  it('sends max_sentences parameter when provided', async () => {
+    const sseEvents = [
+      'event: sentence',
+      'data: {"index":0,"total":1,"audio":"aGVsbG8="}',
+      '',
+      'event: done',
+      'data: {"total_sentences":1}',
+      '',
+    ];
+
+    (globalThis.fetch as jest.Mock).mockResolvedValue(createMockSSEResponse(sseEvents));
+    mockedFinalizeAudioCache.mockResolvedValue('/cache/audio_story-1.wav');
+
+    await streamStoryAudio('story-1', 'Hello world', 2);
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: JSON.stringify({ story_text: 'Hello world', max_sentences: 2 }),
+      })
     );
   });
 });
