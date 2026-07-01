@@ -16,6 +16,7 @@ import type { Story } from '@/types';
 export default function StoryScreen() {
   const { story: storyJson } = useLocalSearchParams<{ story: string }>();
   const [localCoverPath, setLocalCoverPath] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
 
   let story: Story;
   try {
@@ -31,7 +32,7 @@ export default function StoryScreen() {
     );
   }
 
-  const { coverUrl, isLoading: coverLoading } = useCoverImage(
+  const { coverUrl } = useCoverImage(
     story.id,
     story.title
   );
@@ -70,11 +71,12 @@ export default function StoryScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ThemedView style={styles.imageContainer}>
-        {imageSource ? (
+        {imageSource && !imageError ? (
           <Image
             source={imageSource}
             style={styles.coverImage}
             resizeMode="cover"
+            onError={() => setImageError(true)}
           />
         ) : (
           <ThemedView style={styles.placeholder}>
