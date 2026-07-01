@@ -17,8 +17,22 @@ jest.mock('expo-glass-effect', () => {
   };
 });
 
+jest.mock('@/hooks/use-cover-image', () => ({
+  useCoverImage: jest.fn(() => ({ coverUrl: null, isLoading: false, error: null })),
+}));
+
+jest.mock('@/lib/audio-cache', () => ({
+  getCachedCoverPath: jest.fn(() => Promise.resolve(null)),
+  cacheCoverImage: jest.fn(() => Promise.resolve('/cached/path')),
+}));
+
+jest.mock('@/lib/audio-utils', () => ({
+  preFetchAudio: jest.fn(() => Promise.resolve()),
+}));
+
 import StoryScreen from '../story';
 import { useLocalSearchParams } from 'expo-router';
+import { useCoverImage } from '@/hooks/use-cover-image';
 
 const { _mockPush: mockPush } = require('expo-router') as any;
 
@@ -42,6 +56,11 @@ describe('StoryScreen', () => {
     jest.clearAllMocks();
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       story: JSON.stringify(MOCK_STORY),
+    });
+    (useCoverImage as jest.Mock).mockReturnValue({
+      coverUrl: MOCK_STORY.cover_image_url,
+      isLoading: false,
+      error: null,
     });
   });
 
@@ -77,6 +96,11 @@ describe('StoryScreen', () => {
   it('shows placeholder when cover_image_url is null', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       story: JSON.stringify({ ...MOCK_STORY, cover_image_url: null }),
+    });
+    (useCoverImage as jest.Mock).mockReturnValue({
+      coverUrl: null,
+      isLoading: false,
+      error: null,
     });
     const { getByText } = await render(<StoryScreen />);
     expect(getByText('Cover art is being painted...')).toBeTruthy();

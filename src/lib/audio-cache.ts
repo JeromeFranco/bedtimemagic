@@ -51,6 +51,26 @@ export async function finalizeAudioCache(storyId: string): Promise<string> {
   return audioPath(storyId);
 }
 
+export async function getCachedCoverPath(storyId: string): Promise<string | null> {
+  const path = coverPath(storyId);
+  const info = await getInfoAsync(path);
+  return info.exists ? path : null;
+}
+
+export async function cacheCoverImage(storyId: string, imageUrl: string): Promise<string> {
+  const path = coverPath(storyId);
+  const response = await fetch(imageUrl);
+  const blob = await response.blob();
+  const reader = new FileReader();
+  const base64 = await new Promise<string>((resolve) => {
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.readAsDataURL(blob);
+  });
+  const base64Data = base64.split(',')[1];
+  await writeAsStringAsync(path, base64Data, { encoding: EncodingType.Base64 });
+  return path;
+}
+
 export async function evictStory(storyId: string): Promise<void> {
   const audio = audioPath(storyId);
   const cover = coverPath(storyId);

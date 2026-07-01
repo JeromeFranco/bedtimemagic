@@ -9,11 +9,13 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing } from '@/constants/theme';
 import { PROTAGONISTS } from '@/types';
 import { preFetchAudio } from '@/lib/audio-utils';
+import { useCoverImage } from '@/hooks/use-cover-image';
+import { getCachedCoverPath, cacheCoverImage } from '@/lib/audio-cache';
 import type { Story } from '@/types';
 
 export default function StoryScreen() {
   const { story: storyJson } = useLocalSearchParams<{ story: string }>();
-  const [imageError, setImageError] = useState(false);
+  const [localCoverPath, setLocalCoverPath] = useState<string | null>(null);
 
   let story: Story;
   try {
@@ -29,16 +31,37 @@ export default function StoryScreen() {
     );
   }
 
+  const { coverUrl, isLoading: coverLoading } = useCoverImage(
+    story.id,
+    story.title
+  );
+
+  useEffect(() => {
+    getCachedCoverPath(story.id).then((path) => {
+      if (path) setLocalCoverPath(path);
+    });
+  }, [story.id]);
+
+  useEffect(() => {
+    if (coverUrl && !localCoverPath) {
+      cacheCoverImage(story.id, coverUrl)
+        .then((path) => setLocalCoverPath(path))
+        .catch(() => {});
+    }
+  }, [coverUrl, story.id, localCoverPath]);
+
   useEffect(() => {
     if (story?.id && story?.story_text) {
-      preFetchAudio(story.id, story.story_text).catch(() => {
-        // Silent failure — playback will fall back to full stream
-      });
+      preFetchAudio(story.id, story.story_text).catch(() => {});
     }
   }, [story?.id, story?.story_text]);
 
   const protagonist = PROTAGONISTS.find((p) => p.id === story.protagonist);
-  const showPlaceholder = !story.cover_image_url || imageError;
+  const imageSource = localCoverPath
+    ? { uri: localCoverPath }
+    : coverUrl
+    ? { uri: coverUrl }
+    : null;
 
   const handlePlay = () => {
     router.push({ pathname: '/player', params: { story: storyJson } });
@@ -47,7 +70,13 @@ export default function StoryScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ThemedView style={styles.imageContainer}>
-        {showPlaceholder ? (
+        {imageSource ? (
+          <Image
+            source={imageSource}
+            style={styles.coverImage}
+            resizeMode="cover"
+          />
+        ) : (
           <ThemedView style={styles.placeholder}>
             <ThemedText style={styles.placeholderEmoji}>
               {protagonist?.emoji ?? '📖'}
@@ -56,13 +85,6 @@ export default function StoryScreen() {
               Cover art is being painted...
             </ThemedText>
           </ThemedView>
-        ) : (
-          <Image
-            source={{ uri: story.cover_image_url! }}
-            style={styles.coverImage}
-            resizeMode="cover"
-            onError={() => setImageError(true)}
-          />
         )}
         <ThemedView style={styles.gradientOverlay} />
       </ThemedView>
