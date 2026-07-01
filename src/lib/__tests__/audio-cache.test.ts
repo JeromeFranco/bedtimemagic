@@ -80,21 +80,29 @@ describe('writeSentenceToCache', () => {
     );
   });
 
-  it('appends PCM data for index > 0', async () => {
+  it('appends PCM data for index > 0 with correct header strip', async () => {
     mockedWrite.mockResolvedValue(undefined);
     mockedRead.mockResolvedValue('EXISTING');
 
-    // 59 chars = header (44 bytes), + 21 chars = PCM data
-    const sentenceBase64 = 'A'.repeat(59) + 'B'.repeat(21);
+    // Build a real 44-byte WAV header + 10 bytes PCM, base64-encode the full buffer
+    const headerBuf = Buffer.alloc(44, 0x01);
+    const pcmBuf = Buffer.alloc(10, 0x02);
+    const fullBuf = Buffer.concat([headerBuf, pcmBuf]);
+    const wavBase64 = fullBuf.toString('base64');
 
-    await writeSentenceToCache('story-1', 1, sentenceBase64);
+    // Verify the header occupies exactly 60 base64 chars: Math.ceil(44/3)*4 = 60
+    const headerBase64 = headerBuf.toString('base64');
+    expect(headerBase64).toHaveLength(60);
+
+    await writeSentenceToCache('story-1', 1, wavBase64);
 
     expect(mockedRead).toHaveBeenCalledWith('/mock/cache/audio_story-1.wav', {
       encoding: 'base64',
     });
+    // The function should strip the first 60 base64 chars (WAV header)
     expect(mockedWrite).toHaveBeenCalledWith(
       '/mock/cache/audio_story-1.wav',
-      'EXISTING' + 'B'.repeat(21),
+      'EXISTING' + wavBase64.slice(60),
       { encoding: 'base64' }
     );
   });

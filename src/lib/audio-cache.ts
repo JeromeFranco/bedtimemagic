@@ -51,7 +51,7 @@ export async function writeSentenceToCache(
       encoding: EncodingType.Base64,
     });
   } else {
-    const pcmBase64 = audioBase64.slice(Math.ceil(WAV_HEADER_SIZE * 4 / 3));
+    const pcmBase64 = audioBase64.slice(Math.ceil(WAV_HEADER_SIZE / 3) * 4);
     const existing = await readAsStringAsync(path, { encoding: EncodingType.Base64 });
     await writeAsStringAsync(path, existing + pcmBase64, {
       encoding: EncodingType.Base64,
