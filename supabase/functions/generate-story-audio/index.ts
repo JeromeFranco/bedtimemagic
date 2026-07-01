@@ -3,7 +3,6 @@ import OpenAI from "@openai/openai";
 const MODEL = "mimo-v2.5-tts";
 const VOICE = "Chloe";
 const STYLE = "gentle bedtime story narration, warm and soothing, slow pace";
-const CHUNK_SIZE = 32 * 1024;
 const MAX_WORDS = 5000;
 const MAX_CONCURRENT_TTS = 10;
 const TTS_TIMEOUT_MS = 30_000;

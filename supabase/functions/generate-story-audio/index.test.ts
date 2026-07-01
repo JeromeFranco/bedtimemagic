@@ -314,6 +314,49 @@ Deno.test("streamSentences - emits sentence events per sentence", async () => {
   assertEquals(events[3].data.total_sentences, 3);
 });
 
+Deno.test("streamSentences - yields sentence-error on TTS failure and continues", async () => {
+  const mockClient = {
+    chat: {
+      completions: {
+        create: (params: any) => {
+          const sentence = params.messages[1].content;
+          if (sentence === "B") {
+            return Promise.reject(new Error("TTS API timeout"));
+          }
+          const bytes = new Uint8Array([sentence.charCodeAt(0)]);
+          let binary = "";
+          for (const byte of bytes) {
+            binary += String.fromCharCode(byte);
+          }
+          return Promise.resolve({
+            choices: [{ message: { audio: { data: btoa(binary) } } }],
+          });
+        },
+      },
+    },
+  };
+
+  const events: Array<{ event: string; data: any }> = [];
+  for await (const event of streamSentences(["A", "B", "C"], mockClient as any)) {
+    events.push(event);
+  }
+
+  const errorEvent = events.find((e) => e.event === "sentence-error");
+  assertEquals(errorEvent != null, true);
+  assertEquals(errorEvent!.data.index, 1);
+  assertEquals(typeof errorEvent!.data.message, "string");
+  assertEquals(errorEvent!.data.message.includes("TTS API timeout"), true);
+
+  const sentenceEvents = events.filter((e) => e.event === "sentence");
+  assertEquals(sentenceEvents.length, 2);
+  assertEquals(sentenceEvents[0].data.index, 0);
+  assertEquals(sentenceEvents[1].data.index, 2);
+
+  const doneEvent = events.find((e) => e.event === "done");
+  assertEquals(doneEvent != null, true);
+  assertEquals(doneEvent!.data.total_sentences, 3);
+});
+
 Deno.test("streamSentences - respects maxSentences", async () => {
   const mockClient = {
     chat: {
