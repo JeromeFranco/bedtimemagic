@@ -15,3 +15,4 @@
 
 - Use conventional commit for commit message
 - Use expo-ui skill when working with expo ui components and prefer universal components over jetpack-compose and swiftui
+- Deno: prefer jsr.io imports (e.g. `jsr:@std/assert`) over legacy `deno.land/std` URLs

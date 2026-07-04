@@ -39,7 +39,6 @@
     "react-native-worklets": "0.8.3"
   },
   "devDependencies": {
-    "@types/deno": "^2.7.0",
     "@types/jest": "29.5.14",
     "@types/react": "~19.2.2",
     "eslint": "^9.0.0",
@@ -71,8 +70,7 @@
     "test:debug": "jest -o --watch --coverage=false",
     "test:ci": "jest",
     "typecheck": "tsc --noEmit",
-    "typecheck:functions": "tsc --noEmit -p supabase/functions/tsconfig.json",
-    "typecheck:functions:deno": "deno check supabase/functions/generate-story-audio/index.ts"
+    "typecheck:functions": "deno check supabase/functions/generate-story-audio/index.ts"
   },
   "private": true
 }

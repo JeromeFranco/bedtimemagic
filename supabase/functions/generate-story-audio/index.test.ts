@@ -1,15 +1,15 @@
-import { assertEquals, assertThrows } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assertEquals } from "@std/assert";
 import {
-  splitSentences,
-  createWavHeader,
-  uint8ToBase64,
-  sseEvent,
-  TTSError,
-  generateSentenceAudio,
-  streamSentences,
-  SAMPLE_RATE,
   BITS_PER_SAMPLE,
   CHANNELS,
+  createWavHeader,
+  generateSentenceAudio,
+  SAMPLE_RATE,
+  splitSentences,
+  sseEvent,
+  streamSentences,
+  TTSError,
+  uint8ToBase64,
 } from "./index.ts";
 
 Deno.test("splitSentences - splits on period followed by space", () => {
@@ -116,13 +116,13 @@ Deno.test("createWavHeader - encodes bits per sample", () => {
 Deno.test("createWavHeader - encodes byte rate", () => {
   const header = createWavHeader(1000);
   const view = new DataView(header.buffer);
-  assertEquals(view.getUint32(28, true), SAMPLE_RATE * CHANNELS * BITS_PER_SAMPLE / 8);
+  assertEquals(view.getUint32(28, true), (SAMPLE_RATE * CHANNELS * BITS_PER_SAMPLE) / 8);
 });
 
 Deno.test("createWavHeader - encodes block align", () => {
   const header = createWavHeader(1000);
   const view = new DataView(header.buffer);
-  assertEquals(view.getUint16(32, true), CHANNELS * BITS_PER_SAMPLE / 8);
+  assertEquals(view.getUint16(32, true), (CHANNELS * BITS_PER_SAMPLE) / 8);
 });
 
 Deno.test("createWavHeader - encodes PCM format", () => {
@@ -255,7 +255,7 @@ Deno.test("streamSentences - emits sentence events per sentence", async () => {
     },
   };
 
-  const events: Array<{ event: string; data: any }> = [];
+  const events: { event: string; data: any }[] = [];
   for await (const event of streamSentences(["A", "B", "C"], mockClient as any)) {
     events.push(event);
   }
@@ -291,7 +291,7 @@ Deno.test("streamSentences - yields sentence-error on TTS failure and continues"
     },
   };
 
-  const events: Array<{ event: string; data: any }> = [];
+  const events: { event: string; data: any }[] = [];
   for await (const event of streamSentences(["A", "B", "C"], mockClient as any)) {
     events.push(event);
   }
@@ -330,7 +330,7 @@ Deno.test("streamSentences - respects maxSentences", async () => {
     },
   };
 
-  const events: Array<{ event: string; data: any }> = [];
+  const events: { event: string; data: any }[] = [];
   for await (const event of streamSentences(["A", "B", "C"], mockClient as any, 2)) {
     events.push(event);
   }

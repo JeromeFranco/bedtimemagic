@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import OpenAI from "@openai/openai";
 import { buildPrompt, type PromptInput } from "./prompt.ts";
 
 const MODEL = "mimo-v2.5-pro";
@@ -80,12 +80,52 @@ const STAGE_LABELS: Record<string, string> = {
   older_kids: "Older Kids",
 };
 
-function parseJsonResponse(text: string): Record<string, string> {
-  const cleaned = text.replace(/```json?\s*/g, "").replace(/```\s*/g, "").trim();
+const REQUIRED_STORY_FIELDS = [
+  "title",
+  "storyText",
+  "moral",
+  "pillowTalkPrompt",
+  "sleepyAffirmation",
+] as const;
+
+export class SafetyFilterError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SafetyFilterError";
+  }
+}
+
+const SAFETY_REFUSAL_PATTERNS = [
+  /^i can'?t\b/i,
+  /^i'?m unable\b/i,
+  /^i apologize/i,
+  /^i'?m sorry,? but i/i,
+  /^as an ai/i,
+  /^i don'?t (?:think|feel) (?:it'?s )?appropriate/i,
+  /^unfortunately,? i/i,
+];
+
+export function parseJsonResponse(text: string): Record<string, string> {
+  const trimmed = text.trim();
+  for (const pattern of SAFETY_REFUSAL_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      throw new SafetyFilterError("Safety filter triggered");
+    }
+  }
+  const cleaned = trimmed.replace(/```json?\s*/g, "").replace(/```\s*/g, "").trim();
   return JSON.parse(cleaned);
 }
 
-async function callLLM(
+export function validateStoryFields(story: Record<string, string>): void {
+  const missing = REQUIRED_STORY_FIELDS.filter(
+    (field) => !story[field] || typeof story[field] !== "string" || story[field].trim() === ""
+  );
+  if (missing.length > 0) {
+    throw new Error(`Story missing required fields: ${missing.join(", ")}`);
+  }
+}
+
+export async function callLLM(
   client: OpenAI,
   system: string,
   user: string,
@@ -112,7 +152,9 @@ async function callLLM(
   const content = completion.choices[0]?.message?.content;
   if (!content) throw new Error("Empty response from model");
 
-  return parseJsonResponse(content);
+  const story = parseJsonResponse(content);
+  validateStoryFields(story);
+  return story;
 }
 
 async function getSupabaseAdmin() {
@@ -123,8 +165,7 @@ async function getSupabaseAdmin() {
   );
 }
 
-async function getUserFromJwt(authHeader: string): Promise<string> {
-  const supabase = await getSupabaseAdmin();
+async function getUserFromJwt(supabase: Awaited<ReturnType<typeof getSupabaseAdmin>>, authHeader: string): Promise<string> {
   const token = authHeader.replace("Bearer ", "");
   const { data: { user }, error } = await supabase.auth.getUser(token);
   if (error || !user) throw new Error("Unauthorized");
@@ -132,11 +173,11 @@ async function getUserFromJwt(authHeader: string): Promise<string> {
 }
 
 async function persistStory(
+  supabase: Awaited<ReturnType<typeof getSupabaseAdmin>>,
   userId: string,
   body: RequestBody,
   story: Record<string, string>
 ) {
-  const supabase = await getSupabaseAdmin();
   const { data, error } = await supabase
     .from("stories")
     .insert({
@@ -158,7 +199,7 @@ async function persistStory(
   return data;
 }
 
-async function handleRequest(req: Request): Promise<Response> {
+export async function handleRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -204,9 +245,11 @@ async function handleRequest(req: Request): Promise<Response> {
     );
   }
 
+  const supabase = await getSupabaseAdmin();
+
   let userId: string;
   try {
-    userId = await getUserFromJwt(authHeader);
+    userId = await getUserFromJwt(supabase, authHeader);
   } catch {
     return new Response(
       JSON.stringify({ error: "Unauthorized" }),
@@ -236,10 +279,22 @@ async function handleRequest(req: Request): Promise<Response> {
   try {
     story = await callLLM(client, system, user);
   } catch (err) {
+    if (err instanceof SafetyFilterError) {
+      return new Response(
+        JSON.stringify({ error: "Safety filter triggered" }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     if (err instanceof SyntaxError) {
       try {
         story = await callLLM(client, system, user, true);
-      } catch {
+      } catch (retryErr) {
+        if (retryErr instanceof SafetyFilterError) {
+          return new Response(
+            JSON.stringify({ error: "Safety filter triggered" }),
+            { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
         return new Response(
           JSON.stringify({ error: "Failed to generate valid story" }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -257,7 +312,7 @@ async function handleRequest(req: Request): Promise<Response> {
 
   let savedStory;
   try {
-    savedStory = await persistStory(userId, body, story);
+    savedStory = await persistStory(supabase, userId, body, story);
   } catch {
     return new Response(
       JSON.stringify({ error: "Failed to save story" }),
