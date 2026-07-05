@@ -63,8 +63,8 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
     return Response.json({ error: "AI_GATEWAY_API_KEY not configured" }, { status: 500 });
   }
 
-  const userId = ctx.userClaims!.sub;
-  const supabase = ctx.supabaseAdmin;
+  const userId = ctx.userClaims!.id;
+  const supabase = ctx.supabaseAdmin as any;
 
   // Verify story exists and belongs to user
   const { data: story, error: storyError } = await supabase
