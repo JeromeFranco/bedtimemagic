@@ -5,6 +5,7 @@
   "imports": {
     "@openai/openai": "npm:openai@^4.78.0",
     "openai": "npm:openai@^4.104.0",
-    "@std/assert": "jsr:@std/assert@^1"
+    "@std/assert": "jsr:@std/assert@^1",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2"
   }
 }

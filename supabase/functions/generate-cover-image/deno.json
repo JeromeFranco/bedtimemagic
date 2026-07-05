@@ -3,6 +3,8 @@
     "strict": true
   },
   "imports": {
-    "@std/assert": "jsr:@std/assert@^1"
+    "@std/assert": "jsr:@std/assert@^1",
+    "ai": "npm:ai@6",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2"
   }
 }

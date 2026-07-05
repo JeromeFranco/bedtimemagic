@@ -1,5 +1,16 @@
-import { createGoogleGenerativeAI } from "https://esm.sh/@ai-sdk/google@3";
-import { generateText } from "https://esm.sh/ai@6";
+import { generateImage, gateway } from "ai";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+let _supabase: SupabaseClient | undefined;
+function getSupabase(): SupabaseClient {
+  if (!_supabase) {
+    _supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+  }
+  return _supabase;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,24 +88,17 @@ export async function handleRequest(req: Request): Promise<Response> {
     );
   }
 
-  const apiKey = Deno.env.get("GOOGLE_AI_API_KEY");
+  const apiKey = Deno.env.get("AI_GATEWAY_API_KEY");
   if (!apiKey) {
     return new Response(
-      JSON.stringify({ error: "GOOGLE_AI_API_KEY not configured" }),
+      JSON.stringify({ error: "AI_GATEWAY_API_KEY not configured" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 
-  // Get Supabase admin client
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  );
-
   // Authenticate user
-  const token = authHeader.replace("Bearer ", "");
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authHeader;
+  const { data: { user }, error: authError } = await getSupabase().auth.getUser(token);
   if (authError || !user) {
     return new Response(
       JSON.stringify({ error: "Unauthorized" }),
@@ -103,7 +107,7 @@ export async function handleRequest(req: Request): Promise<Response> {
   }
 
   // Verify story exists and belongs to user
-  const { data: story, error: storyError } = await supabase
+  const { data: story, error: storyError } = await getSupabase()
     .from("stories")
     .select("id, protagonist, challenge")
     .eq("id", body.storyId)
@@ -124,27 +128,15 @@ export async function handleRequest(req: Request): Promise<Response> {
     body.challenge ?? story.challenge ?? "bedtime"
   );
 
-  // Generate image with Gemini
-  const google = createGoogleGenerativeAI({ apiKey });
-  const model = google("gemini-3.1-flash-image-generation");
-
+  // Generate image with BFL Flux via Vercel AI Gateway
   let imageBytes: Uint8Array;
   try {
-    const result = await generateText({
-      model,
+    const result = await generateImage({
+      model: gateway.image("bfl/flux-2-klein-4b"),
       prompt,
-      timeout: 60_000,
-      providerOptions: {
-        google: { responseModalities: ["image"] },
-      },
     });
 
-    // Extract image from response
-    const imagePart = result.files?.find((f) => f.mediaType.startsWith("image/"));
-    if (!imagePart) {
-      throw new Error("No image in response");
-    }
-    imageBytes = imagePart.uint8Array;
+    imageBytes = result.image.uint8Array;
   } catch (err) {
     console.error("Image generation failed:", err);
     return new Response(
@@ -155,7 +147,7 @@ export async function handleRequest(req: Request): Promise<Response> {
 
   // Upload to Supabase Storage
   const filePath = `covers/${body.storyId}.png`;
-  const { error: uploadError } = await supabase.storage
+  const { error: uploadError } = await getSupabase().storage
     .from("covers")
     .upload(filePath, imageBytes, {
       contentType: "image/png",
@@ -171,14 +163,14 @@ export async function handleRequest(req: Request): Promise<Response> {
   }
 
   // Get public URL
-  const { data: urlData } = supabase.storage
+  const { data: urlData } = getSupabase().storage
     .from("covers")
     .getPublicUrl(filePath);
 
   const coverImageUrl = urlData.publicUrl;
 
   // Update story record
-  const { error: updateError } = await supabase
+  const { error: updateError } = await getSupabase()
     .from("stories")
     .update({ cover_image_url: coverImageUrl })
     .eq("id", body.storyId);

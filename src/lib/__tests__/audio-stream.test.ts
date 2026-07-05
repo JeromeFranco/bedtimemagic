@@ -4,12 +4,19 @@ jest.mock('../audio-cache', () => ({
   enforceFifoEviction: jest.fn(),
 }));
 
+const mockGetSession = jest.fn().mockResolvedValue({
+  data: { session: { access_token: 'test-access-token' } },
+});
+
 jest.mock('../supabase', () => ({
   supabase: {
-    supabaseUrl: 'https://test.supabase.co',
-    supabaseKey: 'test-anon-key',
+    auth: {
+      getSession: mockGetSession,
+    },
   },
 }));
+
+process.env.EXPO_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
 
 import { writeSentenceToCache, finalizeAudioCache, enforceFifoEviction } from '../audio-cache';
 import { streamStoryAudio } from '../audio-stream';
@@ -37,6 +44,7 @@ function createMockSSEResponse(events: string[]): Response {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockGetSession.mockResolvedValue({ data: { session: { access_token: 'test-access-token' } } });
   globalThis.fetch = jest.fn() as typeof fetch;
 });
 
@@ -66,7 +74,7 @@ describe('streamStoryAudio', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer test-anon-key',
+          'Authorization': 'Bearer test-access-token',
         },
         body: JSON.stringify({ story_text: 'Hello world' }),
       })
@@ -184,5 +192,17 @@ describe('streamStoryAudio', () => {
         body: JSON.stringify({ story_text: 'Hello world', max_sentences: 2 }),
       })
     );
+  });
+
+  it('throws when session is null', async () => {
+    mockGetSession.mockResolvedValueOnce({ data: { session: null } });
+
+    await expect(streamStoryAudio('story-1', 'Hello')).rejects.toThrow('Not authenticated');
+  });
+
+  it('throws when getSession fails', async () => {
+    mockGetSession.mockRejectedValueOnce(new Error('Network error'));
+
+    await expect(streamStoryAudio('story-1', 'Hello')).rejects.toThrow('Network error');
   });
 });

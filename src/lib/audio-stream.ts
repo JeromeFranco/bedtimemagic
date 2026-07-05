@@ -2,12 +2,11 @@ import { writeSentenceToCache, finalizeAudioCache, enforceFifoEviction } from '.
 import { supabase } from './supabase';
 
 export async function streamStoryAudio(storyId: string, storyText: string, maxSentences?: number): Promise<string> {
-  const supabaseAny = supabase as unknown as Record<string, unknown>;
-  const supabaseUrl = supabaseAny.supabaseUrl as string;
-  const supabaseKey = supabaseAny.supabaseKey as string;
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Supabase URL or key not available');
-  }
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not authenticated');
+
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) throw new Error('EXPO_PUBLIC_SUPABASE_URL not configured');
 
   const body: Record<string, unknown> = { story_text: storyText };
   if (maxSentences !== undefined) {
@@ -18,7 +17,7 @@ export async function streamStoryAudio(storyId: string, storyText: string, maxSe
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${supabaseKey}`,
+      Authorization: `Bearer ${session.access_token}`,
     },
     body: JSON.stringify(body),
   });
@@ -70,8 +69,6 @@ export async function streamStoryAudio(storyId: string, storyText: string, maxSe
         }
       }
     }
-  } catch (error) {
-    throw error;
   } finally {
     reader.releaseLock();
   }

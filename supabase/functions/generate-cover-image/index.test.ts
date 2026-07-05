@@ -48,3 +48,27 @@ Deno.test("handleRequest returns 400 without storyId", async () => {
   const res = await handleRequest(req);
   assertEquals(res.status, 400);
 });
+
+Deno.test("handleRequest returns 400 for invalid JSON body", async () => {
+  const req = new Request("http://localhost", {
+    method: "POST",
+    headers: { Authorization: "Bearer fake-token" },
+    body: "not-json",
+  });
+  const res = await handleRequest(req);
+  assertEquals(res.status, 400);
+  const body = await res.json();
+  assertEquals(body.error, "Invalid JSON body");
+});
+
+Deno.test("handleRequest returns 400 without title", async () => {
+  const req = new Request("http://localhost", {
+    method: "POST",
+    headers: { Authorization: "Bearer fake-token" },
+    body: JSON.stringify({ storyId: "123" }),
+  });
+  const res = await handleRequest(req);
+  assertEquals(res.status, 400);
+  const body = await res.json();
+  assertEquals(body.error, "storyId and title are required");
+});
