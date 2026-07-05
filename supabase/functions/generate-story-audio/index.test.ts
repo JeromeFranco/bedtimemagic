@@ -344,16 +344,21 @@ Deno.test("streamSentences - respects maxSentences", async () => {
 });
 
 // --- handleRequest integration tests ---
+// withSupabase requires SUPABASE_URL and SUPABASE_PUBLISHABLE_KEYS
 
-Deno.test("handleRequest - returns 200 for OPTIONS preflight", async () => {
+Deno.test("handleRequest - returns 204 for OPTIONS preflight", async () => {
+  Deno.env.set("SUPABASE_URL", "https://test.supabase.co");
+  Deno.env.set("SUPABASE_PUBLISHABLE_KEYS", "test-anon-key");
   const req = new Request("http://localhost", { method: "OPTIONS" });
   const res = await handleRequest(req);
-  assertEquals(res.status, 200);
-  const text = await res.text();
-  assertEquals(text, "ok");
+  assertEquals(res.status, 204);
+  Deno.env.delete("SUPABASE_URL");
+  Deno.env.delete("SUPABASE_PUBLISHABLE_KEYS");
 });
 
 Deno.test("handleRequest - returns 401 when no Authorization header", async () => {
+  Deno.env.set("SUPABASE_URL", "https://test.supabase.co");
+  Deno.env.set("SUPABASE_PUBLISHABLE_KEYS", "test-anon-key");
   Deno.env.set("MIMO_API_KEY", "test-key");
   const req = new Request("http://localhost", {
     method: "POST",
@@ -361,13 +366,15 @@ Deno.test("handleRequest - returns 401 when no Authorization header", async () =
   });
   const res = await handleRequest(req);
   assertEquals(res.status, 401);
+  Deno.env.delete("SUPABASE_URL");
+  Deno.env.delete("SUPABASE_PUBLISHABLE_KEYS");
   Deno.env.delete("MIMO_API_KEY");
 });
 
 Deno.test("handleRequest - returns 401 for missing story_text (auth check first)", async () => {
-  Deno.env.set("MIMO_API_KEY", "test-key");
   Deno.env.set("SUPABASE_URL", "https://test.supabase.co");
-  Deno.env.set("SUPABASE_SECRET_KEY", "test-service-role-key");
+  Deno.env.set("SUPABASE_PUBLISHABLE_KEYS", "test-anon-key");
+  Deno.env.set("MIMO_API_KEY", "test-key");
   const req = new Request("http://localhost", {
     method: "POST",
     headers: { Authorization: "Bearer fake-token" },
@@ -375,15 +382,15 @@ Deno.test("handleRequest - returns 401 for missing story_text (auth check first)
   });
   const res = await handleRequest(req);
   assertEquals(res.status, 401);
-  Deno.env.delete("MIMO_API_KEY");
   Deno.env.delete("SUPABASE_URL");
-  Deno.env.delete("SUPABASE_SECRET_KEY");
+  Deno.env.delete("SUPABASE_PUBLISHABLE_KEYS");
+  Deno.env.delete("MIMO_API_KEY");
 });
 
 Deno.test("handleRequest - returns 401 for empty story_text (auth check first)", async () => {
-  Deno.env.set("MIMO_API_KEY", "test-key");
   Deno.env.set("SUPABASE_URL", "https://test.supabase.co");
-  Deno.env.set("SUPABASE_SECRET_KEY", "test-service-role-key");
+  Deno.env.set("SUPABASE_PUBLISHABLE_KEYS", "test-anon-key");
+  Deno.env.set("MIMO_API_KEY", "test-key");
   const req = new Request("http://localhost", {
     method: "POST",
     headers: { Authorization: "Bearer fake-token" },
@@ -391,15 +398,15 @@ Deno.test("handleRequest - returns 401 for empty story_text (auth check first)",
   });
   const res = await handleRequest(req);
   assertEquals(res.status, 401);
-  Deno.env.delete("MIMO_API_KEY");
   Deno.env.delete("SUPABASE_URL");
-  Deno.env.delete("SUPABASE_SECRET_KEY");
+  Deno.env.delete("SUPABASE_PUBLISHABLE_KEYS");
+  Deno.env.delete("MIMO_API_KEY");
 });
 
 Deno.test("handleRequest - returns 401 for invalid JSON body (auth check first)", async () => {
-  Deno.env.set("MIMO_API_KEY", "test-key");
   Deno.env.set("SUPABASE_URL", "https://test.supabase.co");
-  Deno.env.set("SUPABASE_SECRET_KEY", "test-service-role-key");
+  Deno.env.set("SUPABASE_PUBLISHABLE_KEYS", "test-anon-key");
+  Deno.env.set("MIMO_API_KEY", "test-key");
   const req = new Request("http://localhost", {
     method: "POST",
     headers: { Authorization: "Bearer fake-token" },
@@ -407,15 +414,15 @@ Deno.test("handleRequest - returns 401 for invalid JSON body (auth check first)"
   });
   const res = await handleRequest(req);
   assertEquals(res.status, 401);
-  Deno.env.delete("MIMO_API_KEY");
   Deno.env.delete("SUPABASE_URL");
-  Deno.env.delete("SUPABASE_SECRET_KEY");
+  Deno.env.delete("SUPABASE_PUBLISHABLE_KEYS");
+  Deno.env.delete("MIMO_API_KEY");
 });
 
 Deno.test("handleRequest - returns 401 for invalid max_sentences (auth check first)", async () => {
-  Deno.env.set("MIMO_API_KEY", "test-key");
   Deno.env.set("SUPABASE_URL", "https://test.supabase.co");
-  Deno.env.set("SUPABASE_SECRET_KEY", "test-service-role-key");
+  Deno.env.set("SUPABASE_PUBLISHABLE_KEYS", "test-anon-key");
+  Deno.env.set("MIMO_API_KEY", "test-key");
   const req = new Request("http://localhost", {
     method: "POST",
     headers: { Authorization: "Bearer fake-token" },
@@ -423,7 +430,7 @@ Deno.test("handleRequest - returns 401 for invalid max_sentences (auth check fir
   });
   const res = await handleRequest(req);
   assertEquals(res.status, 401);
-  Deno.env.delete("MIMO_API_KEY");
   Deno.env.delete("SUPABASE_URL");
-  Deno.env.delete("SUPABASE_SECRET_KEY");
+  Deno.env.delete("SUPABASE_PUBLISHABLE_KEYS");
+  Deno.env.delete("MIMO_API_KEY");
 });

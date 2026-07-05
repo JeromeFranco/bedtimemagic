@@ -1,16 +1,5 @@
 import OpenAI from "@openai/openai";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-
-let _supabase: SupabaseClient | undefined;
-function getSupabase(): SupabaseClient {
-  if (!_supabase) {
-    _supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SECRET_KEY")!
-    );
-  }
-  return _supabase;
-}
+import { withSupabase, type SupabaseContext } from "@supabase/server";
 
 const MODEL = "mimo-v2.5-tts";
 const VOICE = "Chloe";
@@ -21,12 +10,6 @@ const TTS_TIMEOUT_MS = 30_000;
 export const SAMPLE_RATE = 24000;
 export const BITS_PER_SAMPLE = 16;
 export const CHANNELS = 1;
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
 
 export class TTSError extends Error {
   constructor(
@@ -190,35 +173,10 @@ export function sseEvent(event: string, data: string): Uint8Array {
   return new TextEncoder().encode(`event: ${event}\ndata: ${data}\n\n`);
 }
 
-export async function handleRequest(req: Request): Promise<Response> {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
+async function handler(req: Request, _ctx: SupabaseContext): Promise<Response> {
   const apiKey = Deno.env.get("MIMO_API_KEY");
   if (!apiKey) {
-    return new Response(
-      JSON.stringify({ error: "MIMO_API_KEY not configured" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-
-  // Authenticate before doing any input parsing
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) {
-    return new Response(
-      JSON.stringify({ error: "Unauthorized" }),
-      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authHeader;
-  const { data: { user }, error: authError } = await getSupabase().auth.getUser(token);
-  if (authError || !user) {
-    return new Response(
-      JSON.stringify({ error: "Unauthorized" }),
-      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "MIMO_API_KEY not configured" }, { status: 500 });
   }
 
   let storyText: string;
@@ -228,40 +186,25 @@ export async function handleRequest(req: Request): Promise<Response> {
     storyText = body.story_text;
     maxSentences = body.max_sentences;
   } catch {
-    return new Response(
-      JSON.stringify({ error: "Invalid JSON body" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
   if (!storyText || typeof storyText !== "string" || storyText.trim().length === 0) {
-    return new Response(
-      JSON.stringify({ error: "story_text is required and must be non-empty" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "story_text is required and must be non-empty" }, { status: 400 });
   }
 
   if (maxSentences !== undefined && (!Number.isInteger(maxSentences) || maxSentences < 1)) {
-    return new Response(
-      JSON.stringify({ error: "max_sentences must be a positive integer" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "max_sentences must be a positive integer" }, { status: 400 });
   }
 
   const wordCount = storyText.trim().split(/\s+/).length;
   if (wordCount > MAX_WORDS) {
-    return new Response(
-      JSON.stringify({ error: `story_text exceeds maximum of ${MAX_WORDS} words` }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: `story_text exceeds maximum of ${MAX_WORDS} words` }, { status: 400 });
   }
 
   const sentences = splitSentences(storyText);
   if (sentences.length === 0) {
-    return new Response(
-      JSON.stringify({ error: "No sentences found in story_text" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "No sentences found in story_text" }, { status: 400 });
   }
 
   const client = new OpenAI({
@@ -277,9 +220,7 @@ export async function handleRequest(req: Request): Promise<Response> {
         }
       } catch (err: unknown) {
         const message = err instanceof TTSError ? String(err.cause) : String(err);
-        controller.enqueue(
-          sseEvent("error", JSON.stringify({ message }))
-        );
+        controller.enqueue(sseEvent("error", JSON.stringify({ message })));
       } finally {
         controller.close();
       }
@@ -288,12 +229,13 @@ export async function handleRequest(req: Request): Promise<Response> {
 
   return new Response(stream, {
     headers: {
-      ...corsHeaders,
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
     },
   });
 }
+
+export const handleRequest = withSupabase({ auth: "user" }, handler);
 
 if (import.meta.main) {
   Deno.serve(handleRequest);
