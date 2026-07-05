@@ -6,5 +6,10 @@
     "@std/assert": "jsr:@std/assert@^1",
     "ai": "npm:ai@6",
     "@supabase/server": "npm:@supabase/server@^1"
+  },
+  "test": {
+    "permissions": {
+      "sys": true
+    }
   }
 }
