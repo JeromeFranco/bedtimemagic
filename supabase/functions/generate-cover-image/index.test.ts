@@ -4,7 +4,6 @@ import { assertEquals } from "@std/assert";
 // Set required env vars for withSupabase initialization
 Deno.env.set("SUPABASE_URL", "https://test.supabase.co");
 Deno.env.set("SUPABASE_PUBLISHABLE_KEYS", "test-publishable-key");
-Deno.env.set("SUPABASE_SECRET_KEY", "sb_secret_test-key");
 
 Deno.test("mapChallengeToScene returns scene for stopping_games", () => {
   const scene = mapChallengeToScene("stopping_games");
