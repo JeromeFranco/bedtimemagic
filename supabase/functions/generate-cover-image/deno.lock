@@ -3,7 +3,8 @@
   "specifiers": {
     "jsr:@std/assert@1": "1.0.19",
     "jsr:@std/internal@^1.0.12": "1.0.14",
-    "npm:@supabase/supabase-js@2": "2.110.0",
+    "npm:@supabase/server@*": "1.3.0_@supabase+supabase-js@2.110.0",
+    "npm:@supabase/server@latest": "1.3.0_@supabase+supabase-js@2.110.0",
     "npm:ai@6": "6.0.219_zod@4.4.3"
   },
   "jsr": {
@@ -76,6 +77,13 @@
         "tslib"
       ]
     },
+    "@supabase/server@1.3.0_@supabase+supabase-js@2.110.0": {
+      "integrity": "sha512-p7KbRV8zpA/fX/eAw7z2x7hHIkGYeV8nzFLQLDCChVbSBNY5OcPK4lgHsry7LiEwM3H0t2ia5MtfVfuVMqT6yg==",
+      "dependencies": [
+        "@supabase/supabase-js",
+        "jose"
+      ]
+    },
     "@supabase/storage-js@2.110.0": {
       "integrity": "sha512-71+gU3HrhiylAhftY6FmO5PPdcsScnVcS766CVD+vTYK9qTDLbrx8FhgBYbqGm3iV/wkTfzrNJfjGsMeFRkJRQ==",
       "dependencies": [
@@ -112,6 +120,9 @@
     "iceberg-js@0.8.1": {
       "integrity": "sha512-1dhVQZXhcHje7798IVM+xoo/1ZdVfzOMIc8/rgVSijRK38EDqOJoGula9N/8ZI5RD8QTxNQtK/Gozpr+qUqRRA=="
     },
+    "jose@6.2.3": {
+      "integrity": "sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw=="
+    },
     "json-schema@0.4.0": {
       "integrity": "sha512-es94M3nTIfsEPisRafak+HDLfHXnKBhV3vU5eqPcS3flIWqcxJWgXHXiey3YrpaNsanY5ei1VoYEbOzijuq9BA=="
     },
@@ -144,7 +155,7 @@
   "workspace": {
     "dependencies": [
       "jsr:@std/assert@1",
-      "npm:@supabase/supabase-js@2",
+      "npm:@supabase/server@latest",
       "npm:ai@6"
     ]
   }

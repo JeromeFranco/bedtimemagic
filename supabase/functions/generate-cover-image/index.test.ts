@@ -1,6 +1,11 @@
 import { buildCoverPrompt, mapChallengeToScene, handleRequest } from "./index.ts";
 import { assertEquals } from "@std/assert";
 
+// Set required env vars for withSupabase initialization
+Deno.env.set("SUPABASE_URL", "https://test.supabase.co");
+Deno.env.set("SUPABASE_PUBLISHABLE_KEYS", "test-publishable-key");
+Deno.env.set("SUPABASE_SECRET_KEY", "sb_secret_test-key");
+
 Deno.test("mapChallengeToScene returns scene for stopping_games", () => {
   const scene = mapChallengeToScene("stopping_games");
   assertEquals(scene, "a child happily putting away a video game controller in a cozy room");
@@ -52,10 +57,10 @@ Deno.test("buildCoverPrompt uses scene from challenge", () => {
   assertEquals(prompt.includes("sharing and playing together"), true);
 });
 
-Deno.test("handleRequest returns 405 for non-POST", async () => {
+Deno.test("handleRequest returns 401 for non-POST without auth", async () => {
   const req = new Request("http://localhost", { method: "GET" });
   const res = await handleRequest(req);
-  assertEquals(res.status, 405);
+  assertEquals(res.status, 401);
 });
 
 Deno.test("handleRequest returns 401 without auth header", async () => {
@@ -67,36 +72,32 @@ Deno.test("handleRequest returns 401 without auth header", async () => {
   assertEquals(res.status, 401);
 });
 
-Deno.test("handleRequest returns 400 without storyId", async () => {
+Deno.test("handleRequest returns 401 with invalid token (before body validation)", async () => {
   const req = new Request("http://localhost", {
     method: "POST",
     headers: { Authorization: "Bearer fake-token" },
     body: JSON.stringify({ title: "Test" }),
   });
   const res = await handleRequest(req);
-  assertEquals(res.status, 400);
+  assertEquals(res.status, 401);
 });
 
-Deno.test("handleRequest returns 400 for invalid JSON body", async () => {
+Deno.test("handleRequest returns 401 for invalid JSON body with fake token", async () => {
   const req = new Request("http://localhost", {
     method: "POST",
     headers: { Authorization: "Bearer fake-token" },
     body: "not-json",
   });
   const res = await handleRequest(req);
-  assertEquals(res.status, 400);
-  const body = await res.json();
-  assertEquals(body.error, "Invalid JSON body");
+  assertEquals(res.status, 401);
 });
 
-Deno.test("handleRequest returns 400 without title", async () => {
+Deno.test("handleRequest returns 401 with invalid token (missing title)", async () => {
   const req = new Request("http://localhost", {
     method: "POST",
     headers: { Authorization: "Bearer fake-token" },
     body: JSON.stringify({ storyId: "123" }),
   });
   const res = await handleRequest(req);
-  assertEquals(res.status, 400);
-  const body = await res.json();
-  assertEquals(body.error, "storyId and title are required");
+  assertEquals(res.status, 401);
 });

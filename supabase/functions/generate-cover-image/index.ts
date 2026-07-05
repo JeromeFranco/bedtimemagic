@@ -1,22 +1,5 @@
 import { generateImage, gateway } from "ai";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-
-let _supabase: SupabaseClient | undefined;
-function getSupabase(): SupabaseClient {
-  if (!_supabase) {
-    _supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SECRET_KEY")!
-    );
-  }
-  return _supabase;
-}
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+import { withSupabase, type SupabaseContext } from "@supabase/server";
 
 interface RequestBody {
   storyId: string;
@@ -59,103 +42,62 @@ export function buildCoverPrompt(
   ].join(" ");
 }
 
-export async function handleRequest(req: Request): Promise<Response> {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
+async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
   if (req.method !== "POST") {
-    return new Response(
-      JSON.stringify({ error: "Method not allowed" }),
-      { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) {
-    return new Response(
-      JSON.stringify({ error: "Unauthorized" }),
-      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "Method not allowed" }, { status: 405 });
   }
 
   let body: RequestBody;
   try {
     body = await req.json();
   } catch {
-    return new Response(
-      JSON.stringify({ error: "Invalid JSON body" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
   if (!body.storyId || !body.title) {
-    return new Response(
-      JSON.stringify({ error: "storyId and title are required" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "storyId and title are required" }, { status: 400 });
   }
 
   const apiKey = Deno.env.get("AI_GATEWAY_API_KEY");
   if (!apiKey) {
-    return new Response(
-      JSON.stringify({ error: "AI_GATEWAY_API_KEY not configured" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "AI_GATEWAY_API_KEY not configured" }, { status: 500 });
   }
 
-  // Authenticate user
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authHeader;
-  const { data: { user }, error: authError } = await getSupabase().auth.getUser(token);
-  if (authError || !user) {
-    return new Response(
-      JSON.stringify({ error: "Unauthorized" }),
-      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
+  const userId = ctx.userClaims!.sub;
+  const supabase = ctx.supabaseAdmin;
 
   // Verify story exists and belongs to user
-  const { data: story, error: storyError } = await getSupabase()
+  const { data: story, error: storyError } = await supabase
     .from("stories")
     .select("id, protagonist, challenge")
     .eq("id", body.storyId)
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .single();
 
   if (storyError || !story) {
-    return new Response(
-      JSON.stringify({ error: "Story not found" }),
-      { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "Story not found" }, { status: 404 });
   }
 
-  // Build prompt
   const prompt = buildCoverPrompt(
     body.title,
     body.protagonist ?? story.protagonist ?? "bear",
     body.challenge ?? story.challenge ?? "bedtime"
   );
 
-  // Generate image with BFL Flux via Vercel AI Gateway
   let imageBytes: Uint8Array;
   try {
     const result = await generateImage({
       model: gateway.image("bfl/flux-2-klein-4b"),
       prompt,
     });
-
     imageBytes = result.image.uint8Array;
   } catch (err) {
     console.error("Image generation failed:", err);
-    return new Response(
-      JSON.stringify({ error: "Image generation failed" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "Image generation failed" }, { status: 500 });
   }
 
-  // Upload to Supabase Storage
   const filePath = `${body.storyId}.png`;
-  const { error: uploadError } = await getSupabase().storage
+  const { error: uploadError } = await supabase.storage
     .from("covers")
     .upload(filePath, imageBytes, {
       contentType: "image/png",
@@ -164,38 +106,26 @@ export async function handleRequest(req: Request): Promise<Response> {
 
   if (uploadError) {
     console.error("Storage upload failed:", uploadError);
-    return new Response(
-      JSON.stringify({ error: "Failed to upload image" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "Failed to upload image" }, { status: 500 });
   }
 
-  // Get public URL
-  const { data: urlData } = getSupabase().storage
-    .from("covers")
-    .getPublicUrl(filePath);
-
+  const { data: urlData } = supabase.storage.from("covers").getPublicUrl(filePath);
   const coverImageUrl = urlData.publicUrl;
 
-  // Update story record
-  const { error: updateError } = await getSupabase()
+  const { error: updateError } = await supabase
     .from("stories")
     .update({ cover_image_url: coverImageUrl })
     .eq("id", body.storyId);
 
   if (updateError) {
     console.error("Story update failed:", updateError);
-    return new Response(
-      JSON.stringify({ error: "Failed to update story" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "Failed to update story" }, { status: 500 });
   }
 
-  return new Response(
-    JSON.stringify({ coverImageUrl }),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
+  return Response.json({ coverImageUrl });
 }
+
+export const handleRequest = withSupabase({ auth: "user" }, handler);
 
 if (import.meta.main) {
   Deno.serve(handleRequest);
