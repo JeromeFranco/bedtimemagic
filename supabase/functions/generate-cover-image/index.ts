@@ -6,7 +6,7 @@ function getSupabase(): SupabaseClient {
   if (!_supabase) {
     _supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_SECRET_KEY")!
     );
   }
   return _supabase;
@@ -27,10 +27,18 @@ interface RequestBody {
 
 export function mapChallengeToScene(challenge: string): string {
   const scenes: Record<string, string> = {
-    screentime: "a child putting away a device in a cozy room",
-    emotions: "a child breathing calmly with warm soothing colors around",
-    bedtime: "a peaceful bedroom with stars and moon visible through a window",
-    social: "friendly characters sharing and playing together gently",
+    stopping_games: "a child happily putting away a video game controller in a cozy room",
+    turning_off_tv: "a child turning off a TV screen in a warm living room",
+    giving_back_tablet: "a child gently handing back a tablet device",
+    yelling: "a child taking a deep breath with calming colors around",
+    hitting: "a child holding hands gently with a friend",
+    tantrum_no: "a child sitting calmly after hearing the word no",
+    leaving_bedroom: "a child snuggled in bed with a nightlight glowing softly",
+    refusing_teeth: "a child smiling and brushing teeth at a bathroom sink",
+    staying_up_late: "a peaceful bedroom with stars and moon visible through a window",
+    sharing_toys: "friendly characters sharing and playing together gently",
+    telling_truth: "a child speaking honestly with a warm golden glow around",
+    chores_patience: "a child helping with chores in a tidy kitchen",
   };
   return scenes[challenge] ?? "a cozy bedtime scene";
 }
@@ -146,7 +154,7 @@ export async function handleRequest(req: Request): Promise<Response> {
   }
 
   // Upload to Supabase Storage
-  const filePath = `covers/${body.storyId}.png`;
+  const filePath = `${body.storyId}.png`;
   const { error: uploadError } = await getSupabase().storage
     .from("covers")
     .upload(filePath, imageBytes, {

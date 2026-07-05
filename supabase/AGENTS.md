@@ -3,3 +3,4 @@
 - Check official docs before implementing – don't reverse-engineer package internals from CDN bundles
 - Use the supabase skill
 - Use ai-sdk skill when working with ai sdk
+- Edge Functions: `sb_secret_` key in `SUPABASE_SECRET_KEY`, deploy with `--no-verify-jwt`. Local testing needs legacy JWT key.

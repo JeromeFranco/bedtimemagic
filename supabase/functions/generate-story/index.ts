@@ -161,7 +161,7 @@ async function getSupabaseAdmin() {
   const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
   return createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    Deno.env.get("SUPABASE_SECRET_KEY")!
   );
 }
 
