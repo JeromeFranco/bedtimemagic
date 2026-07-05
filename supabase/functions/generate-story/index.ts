@@ -1,14 +1,9 @@
 import OpenAI from "@openai/openai";
+import { withSupabase, type SupabaseContext } from "@supabase/server";
 import { buildPrompt, type PromptInput } from "./prompt.ts";
 
 const MODEL = "mimo-v2.5-pro";
 const TIMEOUT_MS = 60_000;
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
 
 interface RequestBody {
   childId: string;
@@ -157,28 +152,13 @@ export async function callLLM(
   return story;
 }
 
-async function getSupabaseAdmin() {
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  return createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SECRET_KEY")!
-  );
-}
-
-async function getUserFromJwt(supabase: Awaited<ReturnType<typeof getSupabaseAdmin>>, authHeader: string): Promise<string> {
-  const token = authHeader.replace("Bearer ", "");
-  const { data: { user }, error } = await supabase.auth.getUser(token);
-  if (error || !user) throw new Error("Unauthorized");
-  return user.id;
-}
-
 async function persistStory(
-  supabase: Awaited<ReturnType<typeof getSupabaseAdmin>>,
+  supabase: SupabaseContext["supabaseAdmin"],
   userId: string,
   body: RequestBody,
   story: Record<string, string>
 ) {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from("stories")
     .insert({
       user_id: userId,
@@ -199,63 +179,29 @@ async function persistStory(
   return data;
 }
 
-export async function handleRequest(req: Request): Promise<Response> {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
+async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
   const apiKey = Deno.env.get("MIMO_API_KEY");
   if (!apiKey) {
-    return new Response(
-      JSON.stringify({ error: "MIMO_API_KEY not configured" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) {
-    return new Response(
-      JSON.stringify({ error: "Unauthorized" }),
-      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "MIMO_API_KEY not configured" }, { status: 500 });
   }
 
   let body: RequestBody;
   try {
     body = await req.json();
   } catch {
-    return new Response(
-      JSON.stringify({ error: "Invalid JSON body" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
   if (!body.childId || !body.protagonistId || !body.childNickname || !body.developmentalStage || !body.tier1Challenge || !body.tier2Trigger) {
-    return new Response(
-      JSON.stringify({ error: "Missing required fields" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "Missing required fields" }, { status: 400 });
   }
 
   const protagonist = PROTAGONISTS[body.protagonistId];
   if (!protagonist) {
-    return new Response(
-      JSON.stringify({ error: "Invalid protagonist" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "Invalid protagonist" }, { status: 400 });
   }
 
-  const supabase = await getSupabaseAdmin();
-
-  let userId: string;
-  try {
-    userId = await getUserFromJwt(supabase, authHeader);
-  } catch {
-    return new Response(
-      JSON.stringify({ error: "Unauthorized" }),
-      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
+  const userId = ctx.userClaims!.id;
 
   const client = new OpenAI({
     apiKey,
@@ -280,31 +226,19 @@ export async function handleRequest(req: Request): Promise<Response> {
     story = await callLLM(client, system, user);
   } catch (err) {
     if (err instanceof SafetyFilterError) {
-      return new Response(
-        JSON.stringify({ error: "Safety filter triggered" }),
-        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return Response.json({ error: "Safety filter triggered" }, { status: 422 });
     }
     if (err instanceof SyntaxError) {
       try {
         story = await callLLM(client, system, user, true);
       } catch (retryErr) {
         if (retryErr instanceof SafetyFilterError) {
-          return new Response(
-            JSON.stringify({ error: "Safety filter triggered" }),
-            { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          return Response.json({ error: "Safety filter triggered" }, { status: 422 });
         }
-        return new Response(
-          JSON.stringify({ error: "Failed to generate valid story" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return Response.json({ error: "Failed to generate valid story" }, { status: 500 });
       }
     } else if (err instanceof Error && err.message.includes("timeout")) {
-      return new Response(
-        JSON.stringify({ error: "Story generation timed out" }),
-        { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return Response.json({ error: "Story generation timed out" }, { status: 504 });
     } else {
       throw err;
     }
@@ -312,19 +246,15 @@ export async function handleRequest(req: Request): Promise<Response> {
 
   let savedStory;
   try {
-    savedStory = await persistStory(supabase, userId, body, story);
+    savedStory = await persistStory(ctx.supabaseAdmin, userId, body, story);
   } catch {
-    return new Response(
-      JSON.stringify({ error: "Failed to save story" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "Failed to save story" }, { status: 500 });
   }
 
-  return new Response(JSON.stringify(savedStory), {
-    status: 200,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+  return Response.json(savedStory);
 }
+
+export const handleRequest = withSupabase({ auth: "user" }, handler);
 
 if (import.meta.main) {
   Deno.serve(handleRequest);

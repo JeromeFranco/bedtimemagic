@@ -245,15 +245,21 @@ Deno.test("callLLM - strips markdown fences from response", async () => {
   assertEquals(result.title, "Test");
 });
 
-Deno.test("handleRequest - returns 200 for OPTIONS preflight", async () => {
+// Integration tests — withSupabase requires SUPABASE_URL and SUPABASE_PUBLISHABLE_KEYS
+
+Deno.test("handleRequest - returns 204 for OPTIONS preflight", async () => {
+  Deno.env.set("SUPABASE_URL", "https://test.supabase.co");
+  Deno.env.set("SUPABASE_PUBLISHABLE_KEYS", "test-anon-key");
   const req = new Request("http://localhost", { method: "OPTIONS" });
   const res = await handleRequest(req);
-  assertEquals(res.status, 200);
-  const text = await res.text();
-  assertEquals(text, "ok");
+  assertEquals(res.status, 204);
+  Deno.env.delete("SUPABASE_URL");
+  Deno.env.delete("SUPABASE_PUBLISHABLE_KEYS");
 });
 
 Deno.test("handleRequest - returns 401 when no Authorization header", async () => {
+  Deno.env.set("SUPABASE_URL", "https://test.supabase.co");
+  Deno.env.set("SUPABASE_PUBLISHABLE_KEYS", "test-anon-key");
   Deno.env.set("MIMO_API_KEY", "test-key");
   const req = new Request("http://localhost", {
     method: "POST",
@@ -268,10 +274,14 @@ Deno.test("handleRequest - returns 401 when no Authorization header", async () =
   });
   const res = await handleRequest(req);
   assertEquals(res.status, 401);
+  Deno.env.delete("SUPABASE_URL");
+  Deno.env.delete("SUPABASE_PUBLISHABLE_KEYS");
   Deno.env.delete("MIMO_API_KEY");
 });
 
-Deno.test("handleRequest - returns 400 for missing fields", async () => {
+Deno.test("handleRequest - returns 401 for invalid token (before field validation)", async () => {
+  Deno.env.set("SUPABASE_URL", "https://test.supabase.co");
+  Deno.env.set("SUPABASE_PUBLISHABLE_KEYS", "test-anon-key");
   Deno.env.set("MIMO_API_KEY", "test-key");
   const req = new Request("http://localhost", {
     method: "POST",
@@ -279,13 +289,15 @@ Deno.test("handleRequest - returns 400 for missing fields", async () => {
     body: JSON.stringify({ childId: "c1" }),
   });
   const res = await handleRequest(req);
-  assertEquals(res.status, 400);
-  const body = await res.json();
-  assertEquals(body.error, "Missing required fields");
+  assertEquals(res.status, 401);
+  Deno.env.delete("SUPABASE_URL");
+  Deno.env.delete("SUPABASE_PUBLISHABLE_KEYS");
   Deno.env.delete("MIMO_API_KEY");
 });
 
-Deno.test("handleRequest - returns 400 for invalid protagonist", async () => {
+Deno.test("handleRequest - returns 401 for invalid token with invalid protagonist", async () => {
+  Deno.env.set("SUPABASE_URL", "https://test.supabase.co");
+  Deno.env.set("SUPABASE_PUBLISHABLE_KEYS", "test-anon-key");
   Deno.env.set("MIMO_API_KEY", "test-key");
   const req = new Request("http://localhost", {
     method: "POST",
@@ -300,22 +312,23 @@ Deno.test("handleRequest - returns 400 for invalid protagonist", async () => {
     }),
   });
   const res = await handleRequest(req);
-  assertEquals(res.status, 400);
-  const body = await res.json();
-  assertEquals(body.error, "Invalid protagonist");
+  assertEquals(res.status, 401);
+  Deno.env.delete("SUPABASE_URL");
+  Deno.env.delete("SUPABASE_PUBLISHABLE_KEYS");
   Deno.env.delete("MIMO_API_KEY");
 });
 
-Deno.test("handleRequest - returns 400 for invalid JSON body", async () => {
+Deno.test("handleRequest - returns 401 for invalid JSON body (no auth header)", async () => {
+  Deno.env.set("SUPABASE_URL", "https://test.supabase.co");
+  Deno.env.set("SUPABASE_PUBLISHABLE_KEYS", "test-anon-key");
   Deno.env.set("MIMO_API_KEY", "test-key");
   const req = new Request("http://localhost", {
     method: "POST",
-    headers: { Authorization: "Bearer fake-token" },
     body: "not-json",
   });
   const res = await handleRequest(req);
-  assertEquals(res.status, 400);
-  const body = await res.json();
-  assertEquals(body.error, "Invalid JSON body");
+  assertEquals(res.status, 401);
+  Deno.env.delete("SUPABASE_URL");
+  Deno.env.delete("SUPABASE_PUBLISHABLE_KEYS");
   Deno.env.delete("MIMO_API_KEY");
 });
