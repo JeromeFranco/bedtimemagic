@@ -6,7 +6,7 @@ export function useStory(id: string): UseQueryResult<Story> {
   return useQuery({
     queryKey: ['story', id],
     queryFn: () => getStory(id),
-    staleTime: 1000 * 60 * 5,
+    enabled: !!id,
   });
 }
 
@@ -14,6 +14,5 @@ export function useStories(childId?: string): UseQueryResult<Story[]> {
   return useQuery({
     queryKey: ['stories', childId],
     queryFn: () => getStories(childId),
-    staleTime: 1000 * 60 * 5,
   });
 }

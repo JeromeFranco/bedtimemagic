@@ -43,6 +43,15 @@ describe('useStory', () => {
     expect(result.current.data).toEqual(mockStory);
   });
 
+  it('does not call getStory when id is empty', async () => {
+    const { result } = await renderHook(() => useStory(''), {
+      wrapper: createWrapper(),
+    });
+
+    expect(mockGetStory).not.toHaveBeenCalled();
+    expect(result.current.fetchStatus).toBe('idle');
+  });
+
   it('returns error when fetch fails', async () => {
     const error = new Error('Not found');
     mockGetStory.mockRejectedValue(error);
