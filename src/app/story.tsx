@@ -19,6 +19,32 @@ export default function StoryScreen() {
   const [localCoverPath, setLocalCoverPath] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
 
+  const { coverUrl } = useCoverImage(
+    story?.id ?? '',
+    story?.title ?? ''
+  );
+
+  useEffect(() => {
+    if (!story) return;
+    getCachedCoverPath(story.id).then((path) => {
+      if (path) setLocalCoverPath(path);
+    });
+  }, [story?.id]);
+
+  useEffect(() => {
+    if (coverUrl && story && !localCoverPath) {
+      cacheCoverImage(story.id, coverUrl)
+        .then((path) => setLocalCoverPath(path))
+        .catch(() => {});
+    }
+  }, [coverUrl, story?.id, localCoverPath]);
+
+  useEffect(() => {
+    if (story?.id && story?.story_text) {
+      preFetchAudio(story.id, story.story_text).catch(() => {});
+    }
+  }, [story?.id, story?.story_text]);
+
   if (isLoading) {
     return (
       <ThemedView style={[styles.container, styles.center]}>
@@ -38,31 +64,6 @@ export default function StoryScreen() {
       </ThemedView>
     );
   }
-
-  const { coverUrl } = useCoverImage(
-    story.id,
-    story.title
-  );
-
-  useEffect(() => {
-    getCachedCoverPath(story.id).then((path) => {
-      if (path) setLocalCoverPath(path);
-    });
-  }, [story.id]);
-
-  useEffect(() => {
-    if (coverUrl && !localCoverPath) {
-      cacheCoverImage(story.id, coverUrl)
-        .then((path) => setLocalCoverPath(path))
-        .catch(() => {});
-    }
-  }, [coverUrl, story.id, localCoverPath]);
-
-  useEffect(() => {
-    if (story?.id && story?.story_text) {
-      preFetchAudio(story.id, story.story_text).catch(() => {});
-    }
-  }, [story?.id, story?.story_text]);
 
   const protagonist = PROTAGONISTS.find((p) => p.id === story.protagonist);
   const imageSource = localCoverPath
