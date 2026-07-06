@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Image, Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { GlassView } from 'expo-glass-effect';
@@ -10,21 +10,28 @@ import { Colors, Spacing } from '@/constants/theme';
 import { PROTAGONISTS } from '@/types';
 import { preFetchAudio } from '@/lib/audio-utils';
 import { useCoverImage } from '@/hooks/use-cover-image';
+import { useStory } from '@/hooks/use-story';
 import { getCachedCoverPath, cacheCoverImage } from '@/lib/audio-cache';
-import type { Story } from '@/types';
 
 export default function StoryScreen() {
-  const { story: storyJson } = useLocalSearchParams<{ story: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { data: story, isLoading, error } = useStory(id!);
   const [localCoverPath, setLocalCoverPath] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
 
-  let story: Story;
-  try {
-    story = JSON.parse(storyJson!);
-  } catch {
+  if (isLoading) {
     return (
-      <ThemedView style={styles.container}>
-        <ThemedText style={styles.errorText}>No story data</ThemedText>
+      <ThemedView style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color={Colors.dark.text} />
+        <ThemedText style={styles.loadingText}>Loading story...</ThemedText>
+      </ThemedView>
+    );
+  }
+
+  if (error || !story) {
+    return (
+      <ThemedView style={[styles.container, styles.center]}>
+        <ThemedText style={styles.errorText}>Failed to load story</ThemedText>
         <Pressable onPress={() => router.back()}>
           <ThemedText style={styles.backText}>Go Back</ThemedText>
         </Pressable>
@@ -65,7 +72,7 @@ export default function StoryScreen() {
     : null;
 
   const handlePlay = () => {
-    router.push({ pathname: '/player', params: { story: storyJson } });
+    router.push({ pathname: '/player', params: { id: story.id } });
   };
 
   return (
@@ -187,6 +194,15 @@ const styles = StyleSheet.create({
     color: Colors.dark.text,
     fontWeight: '600',
     fontSize: 17,
+  },
+  center: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
+  loadingText: {
+    color: Colors.dark.textSecondary,
+    fontSize: 16,
   },
   errorText: {
     color: Colors.dark.textSecondary,

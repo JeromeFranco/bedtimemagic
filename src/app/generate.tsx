@@ -38,7 +38,7 @@ export default function GenerateScreen() {
 
       router.replace({
         pathname: '/story',
-        params: { story: JSON.stringify(story) },
+        params: { id: story.id },
       });
     },
   });

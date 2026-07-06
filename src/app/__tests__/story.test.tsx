@@ -17,6 +17,10 @@ jest.mock('expo-glass-effect', () => {
   };
 });
 
+jest.mock('@/hooks/use-story', () => ({
+  useStory: jest.fn(),
+}));
+
 jest.mock('@/hooks/use-cover-image', () => ({
   useCoverImage: jest.fn(() => ({ coverUrl: null, isLoading: false, error: null })),
 }));
@@ -32,6 +36,7 @@ jest.mock('@/lib/audio-utils', () => ({
 
 import StoryScreen from '../story';
 import { useLocalSearchParams } from 'expo-router';
+import { useStory } from '@/hooks/use-story';
 import { useCoverImage } from '@/hooks/use-cover-image';
 
 const { _mockPush: mockPush } = require('expo-router') as any;
@@ -54,8 +59,11 @@ const MOCK_STORY = {
 describe('StoryScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (useLocalSearchParams as jest.Mock).mockReturnValue({
-      story: JSON.stringify(MOCK_STORY),
+    (useLocalSearchParams as jest.Mock).mockReturnValue({ id: 'story-1' });
+    (useStory as jest.Mock).mockReturnValue({
+      data: MOCK_STORY,
+      isLoading: false,
+      error: null,
     });
     (useCoverImage as jest.Mock).mockReturnValue({
       coverUrl: MOCK_STORY.cover_image_url,
@@ -84,18 +92,20 @@ describe('StoryScreen', () => {
     expect(getByText('Play Story')).toBeTruthy();
   });
 
-  it('navigates to /player when Play is tapped', async () => {
+  it('navigates to /player with story id when Play is tapped', async () => {
     const { getByText } = await render(<StoryScreen />);
     fireEvent.press(getByText('Play Story'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/player',
-      params: { story: JSON.stringify(MOCK_STORY) },
+      params: { id: 'story-1' },
     });
   });
 
   it('shows placeholder when cover_image_url is null', async () => {
-    (useLocalSearchParams as jest.Mock).mockReturnValue({
-      story: JSON.stringify({ ...MOCK_STORY, cover_image_url: null }),
+    (useStory as jest.Mock).mockReturnValue({
+      data: { ...MOCK_STORY, cover_image_url: null },
+      isLoading: false,
+      error: null,
     });
     (useCoverImage as jest.Mock).mockReturnValue({
       coverUrl: null,
@@ -106,9 +116,24 @@ describe('StoryScreen', () => {
     expect(getByText('Cover art is being painted...')).toBeTruthy();
   });
 
-  it('shows error state when no story param', async () => {
-    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+  it('shows loading state', async () => {
+    (useStory as jest.Mock).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      error: null,
+    });
     const { getByText } = await render(<StoryScreen />);
-    expect(getByText('No story data')).toBeTruthy();
+    expect(getByText('Loading story...')).toBeTruthy();
+  });
+
+  it('shows error state when fetch fails', async () => {
+    (useStory as jest.Mock).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error('fetch failed'),
+    });
+    const { getByText } = await render(<StoryScreen />);
+    expect(getByText('Failed to load story')).toBeTruthy();
+    expect(getByText('Go Back')).toBeTruthy();
   });
 });
