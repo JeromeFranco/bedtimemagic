@@ -72,7 +72,7 @@ export default function PlayerScreen() {
         playStory(story);
       }
     }
-  }, [story]); // eslint-disable-line react-hooks/exhaustive-deps -- ref guard prevents re-runs
+  }, [story, currentStory, isPlaying, playStory]);
 
   // Hide timer + unmount cleanup
   useEffect(() => {
