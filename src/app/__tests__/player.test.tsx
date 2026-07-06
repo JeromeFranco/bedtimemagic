@@ -42,8 +42,13 @@ jest.mock('expo-glass-effect', () => {
   };
 });
 
+jest.mock('@/hooks/use-story', () => ({
+  useStory: jest.fn(),
+}));
+
 import PlayerScreen from '../player';
 import { useLocalSearchParams } from 'expo-router';
+import { useStory } from '@/hooks/use-story';
 
 const MOCK_STORY = {
   id: 'story-1',
@@ -63,9 +68,8 @@ const MOCK_STORY = {
 describe('PlayerScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (useLocalSearchParams as jest.Mock).mockReturnValue({
-      story: JSON.stringify(MOCK_STORY),
-    });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({ id: 'story-1' });
+    (useStory as jest.Mock).mockReturnValue({ data: MOCK_STORY, isLoading: false, error: null });
   });
 
   it('renders story title', async () => {
@@ -78,10 +82,11 @@ describe('PlayerScreen', () => {
     expect(getByText(/Barnaby/)).toBeTruthy();
   });
 
-  it('shows error state when no story param', async () => {
-    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+  it('shows error state when story fetch fails', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({ id: 'bad-id' });
+    (useStory as jest.Mock).mockReturnValue({ data: undefined, isLoading: false, error: new Error('not found') });
     const { getByText } = await render(<PlayerScreen />);
-    expect(getByText('No story data')).toBeTruthy();
+    expect(getByText('Could not load story')).toBeTruthy();
   });
 
   it('calls playStory on mount', async () => {
@@ -95,9 +100,8 @@ describe('post-story bridge', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (useLocalSearchParams as jest.Mock).mockReturnValue({
-      story: JSON.stringify(MOCK_STORY),
-    });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({ id: 'story-1' });
+    (useStory as jest.Mock).mockReturnValue({ data: MOCK_STORY, isLoading: false, error: null });
   });
 
   it('renders pillow talk prompt when phase is pillow_talk', async () => {

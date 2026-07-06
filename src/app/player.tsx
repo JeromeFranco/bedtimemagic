@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { GlassView } from 'expo-glass-effect';
@@ -18,21 +18,15 @@ import { ThemedView } from '@/components/themed-view';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { Colors, Spacing } from '@/constants/theme';
 import { PROTAGONISTS } from '@/types';
+import { useStory } from '@/hooks/use-story';
 import { formatDuration } from '@/lib/utils';
 import type { Story } from '@/types';
 
 const CONTROL_HIDE_DELAY = 5000;
 
 export default function PlayerScreen() {
-  const { story: storyJson } = useLocalSearchParams<{ story: string }>();
-
-  let story: Story | null = null;
-  let parseError = false;
-  try {
-    story = JSON.parse(storyJson!);
-  } catch {
-    parseError = true;
-  }
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { data: story, isLoading, error } = useStory(id!);
 
   const {
     currentStory,
@@ -58,6 +52,8 @@ export default function PlayerScreen() {
   const seekBarWidthRef = useRef(1);
   const hasAutoPlayed = useRef(false);
 
+  const progress = duration > 0 ? position / duration : 0;
+
   const resetHideTimer = useCallback(() => {
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     setControlsVisible(true);
@@ -66,7 +62,7 @@ export default function PlayerScreen() {
     }, CONTROL_HIDE_DELAY);
   }, []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only effect, guarded by hasAutoPlayed ref
+  // Auto-play once when story loads
   useEffect(() => {
     if (story && !hasAutoPlayed.current) {
       hasAutoPlayed.current = true;
@@ -76,6 +72,10 @@ export default function PlayerScreen() {
         playStory(story);
       }
     }
+  }, [story]);
+
+  // Hide timer + unmount cleanup
+  useEffect(() => {
     hideTimerRef.current = setTimeout(() => {
       setControlsVisible(false);
     }, CONTROL_HIDE_DELAY);
@@ -126,11 +126,21 @@ export default function PlayerScreen() {
     }
   }, [postStoryPhase]);
 
-  if (parseError || !story) {
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <ActivityIndicator size="large" color={Colors.dark.text} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !story) {
     return (
       <SafeAreaView style={styles.container}>
         <ThemedView style={styles.errorContainer}>
-          <ThemedText style={styles.errorText}>No story data</ThemedText>
+          <ThemedText style={styles.errorText}>Could not load story</ThemedText>
           <Pressable onPress={() => router.back()}>
             <ThemedText style={styles.backText}>Go Back</ThemedText>
           </Pressable>
@@ -141,7 +151,6 @@ export default function PlayerScreen() {
 
   const protagonist = PROTAGONISTS.find((p) => p.id === story.protagonist);
   const showPlaceholder = !story.cover_image_url || imageError;
-  const progress = duration > 0 ? position / duration : 0;
 
   if (postStoryPhase === 'pillow_talk') {
     return (
