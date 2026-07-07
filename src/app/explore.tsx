@@ -10,7 +10,7 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { Colors } from '@/constants/theme';
 
 export default function HistoryVaultScreen() {
-  const { data: stories, isLoading } = useStories();
+  const { data: stories, isLoading, isError } = useStories();
 
   const handleStoryPress = (storyId: string) => {
     router.push({ pathname: '/story', params: { id: storyId } });
@@ -31,10 +31,21 @@ export default function HistoryVaultScreen() {
     );
   }
 
+  if (isError) {
+    return (
+      <ThemedView style={[styles.container, styles.center]}>
+        <ThemedText style={styles.emptyTitle}>Something went wrong</ThemedText>
+        <ThemedText themeColor="textSecondary" style={styles.emptyText}>
+          Could not load your stories. Try again later.
+        </ThemedText>
+      </ThemedView>
+    );
+  }
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ThemedText style={styles.heading}>Story Vault</ThemedText>
+        <ThemedText style={styles.heading}>Vault</ThemedText>
 
         {!stories || stories.length === 0 ? (
           <ThemedView style={[styles.container, styles.center]}>

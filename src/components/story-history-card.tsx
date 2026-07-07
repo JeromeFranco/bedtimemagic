@@ -31,7 +31,7 @@ export function StoryHistoryCard({ story, onPress }: StoryHistoryCardProps) {
   const challenge = CHALLENGE_TRIGGERS.find((c) => c.id === story.challenge);
 
   useEffect(() => {
-    getCachedCoverPath(story.id).then(setCoverPath);
+    getCachedCoverPath(story.id).then(setCoverPath).catch(() => {});
   }, [story.id]);
 
   return (
