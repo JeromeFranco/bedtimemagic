@@ -56,6 +56,10 @@
     "transformIgnorePatterns": [
       "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|.deno/)"
     ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/supabase/functions/"
+    ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/src/$1"
     }
@@ -70,6 +74,7 @@
     "test": "jest --watchAll",
     "test:debug": "jest -o --watch --coverage=false",
     "test:ci": "jest",
+    "test:functions": "deno test --no-check --allow-env --allow-sys --config supabase/functions/deno.json supabase/functions/",
     "typecheck": "tsc --noEmit",
     "typecheck:functions": "deno check supabase/functions/generate-story-audio/index.ts"
   },
