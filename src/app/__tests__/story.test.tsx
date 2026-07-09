@@ -34,7 +34,7 @@ jest.mock('@/lib/audio-utils', () => ({
   preFetchAudio: jest.fn(() => Promise.resolve()),
 }));
 
-import StoryScreen from '../story';
+import StoryScreen from '../(index,explore)/story';
 import { useLocalSearchParams } from 'expo-router';
 import { useStory } from '@/hooks/use-story';
 import { useCoverImage } from '@/hooks/use-cover-image';

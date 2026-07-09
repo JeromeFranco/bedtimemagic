@@ -46,7 +46,7 @@ jest.mock('@/hooks/use-story', () => ({
   useStory: jest.fn(),
 }));
 
-import PlayerScreen from '../player';
+import PlayerScreen from '../(index,explore)/player';
 import { useLocalSearchParams } from 'expo-router';
 import { useStory } from '@/hooks/use-story';
 
