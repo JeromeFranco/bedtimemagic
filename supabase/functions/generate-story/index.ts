@@ -1,6 +1,9 @@
 import OpenAI from "@openai/openai";
 import { withSupabase, type SupabaseContext } from "@supabase/server";
 import { buildPrompt, type PromptInput } from "./prompt.ts";
+import { createMimoClient } from "../_shared/openai.ts";
+import { SafetyFilterError } from "../_shared/errors.ts";
+import { PROTAGONISTS, CHALLENGE_LABELS, TRIGGER_LABELS, STAGE_LABELS } from "../_shared/constants.ts";
 
 const MODEL = "mimo-v2.5-pro";
 const TIMEOUT_MS = 60_000;
@@ -14,67 +17,6 @@ interface RequestBody {
   tier2Trigger: string;
 }
 
-const PROTAGONISTS: Record<string, { name: string; species: string; personality: string; voiceNotes: string }> = {
-  barnaby: {
-    name: "Barnaby",
-    species: "Bear",
-    personality: "Gentle, patient bear who loves warm hugs and honey. Always speaks slowly and kindly, making everyone feel safe.",
-    voiceNotes: "Warm baritone, slow and comforting, like a cozy blanket",
-  },
-  nova: {
-    name: "Captain Nova",
-    species: "Star Pilot",
-    personality: "Brave space explorer who is curious about every star. Speaks with wonder and excitement but calms down at bedtime.",
-    voiceNotes: "Energetic but softening, like a campfire winding down",
-  },
-  pip: {
-    name: "Pip",
-    species: "Penguin",
-    personality: "Playful penguin who waddles everywhere and loves sliding on ice. Always giggling and making others laugh.",
-    voiceNotes: "Cheerful and slightly squeaky, like a happy child",
-  },
-  luna: {
-    name: "Luna",
-    species: "Owl",
-    personality: "Wise owl who sees everything from her tree. Speaks softly with ancient knowledge, making the world feel magical.",
-    voiceNotes: "Whispery and mysterious, like rustling leaves at night",
-  },
-  rex: {
-    name: "Rex",
-    species: "Dragon",
-    personality: "Friendly dragon who breathes warm air and guards his friends fiercely. Despite his size, he is incredibly gentle.",
-    voiceNotes: "Deep and rumbly but kind, like distant thunder fading",
-  },
-};
-
-const CHALLENGE_LABELS: Record<string, string> = {
-  screentime: "Screen Time Limits",
-  emotions: "Big Emotions / Anger",
-  bedtime: "Bedtime Friction",
-  social: "Social Skills",
-};
-
-const TRIGGER_LABELS: Record<string, string> = {
-  stopping_games: "Stopping video games",
-  turning_off_tv: "Turning off the TV",
-  giving_back_tablet: "Giving back the tablet",
-  yelling: "Yelling",
-  hitting: "Hitting/Pushing",
-  tantrum_no: "Tantrum when told 'No'",
-  leaving_bedroom: "Leaving the bedroom",
-  refusing_teeth: "Refusing to brush teeth",
-  staying_up_late: "Wanting to stay up late",
-  sharing_toys: "Sharing toys",
-  telling_truth: "Telling the truth",
-  chores_patience: "Chores and Patience",
-};
-
-const STAGE_LABELS: Record<string, string> = {
-  preschool: "Preschool",
-  early_primary: "Early Primary",
-  older_kids: "Older Kids",
-};
-
 const REQUIRED_STORY_FIELDS = [
   "title",
   "storyText",
@@ -83,12 +25,7 @@ const REQUIRED_STORY_FIELDS = [
   "sleepyAffirmation",
 ] as const;
 
-export class SafetyFilterError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "SafetyFilterError";
-  }
-}
+export { SafetyFilterError } from "../_shared/errors.ts";
 
 const SAFETY_REFUSAL_PATTERNS = [
   /^i can'?t\b/i,
@@ -180,8 +117,10 @@ async function persistStory(
 }
 
 async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
-  const apiKey = Deno.env.get("MIMO_API_KEY");
-  if (!apiKey) {
+  let client: OpenAI;
+  try {
+    client = createMimoClient(TIMEOUT_MS);
+  } catch {
     return Response.json({ error: "MIMO_API_KEY not configured" }, { status: 500 });
   }
 
@@ -202,11 +141,6 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
   }
 
   const userId = ctx.userClaims!.id;
-
-  const client = new OpenAI({
-    apiKey,
-    baseURL: "https://api.xiaomimimo.com/v1",
-  });
 
   const promptInput: PromptInput = {
     protagonistName: protagonist.name,
