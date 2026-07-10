@@ -120,7 +120,8 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
   let client: OpenAI;
   try {
     client = createMimoClient();
-  } catch {
+  } catch (err) {
+    console.error("Failed to create MiMo client:", err);
     return Response.json({ error: "MIMO_API_KEY not configured" }, { status: 500 });
   }
 
@@ -166,6 +167,7 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
       try {
         story = await callLLM(client, system, user, true);
       } catch (retryErr) {
+        console.error("LLM retry failed:", retryErr);
         if (retryErr instanceof SafetyFilterError) {
           return Response.json({ error: "Safety filter triggered" }, { status: 422 });
         }
@@ -174,6 +176,7 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
     } else if (err instanceof APIConnectionTimeoutError) {
       return Response.json({ error: "Story generation timed out" }, { status: 504 });
     } else {
+      console.error("LLM call failed:", err);
       throw err;
     }
   }
@@ -181,7 +184,8 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
   let savedStory;
   try {
     savedStory = await persistStory(ctx.supabaseAdmin, userId, body, story);
-  } catch {
+  } catch (err) {
+    console.error("Failed to persist story:", err);
     return Response.json({ error: "Failed to save story" }, { status: 500 });
   }
 

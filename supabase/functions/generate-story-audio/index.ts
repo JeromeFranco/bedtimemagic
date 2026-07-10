@@ -110,11 +110,14 @@ export async function* streamSentences(
     const promises = batch.map((sentence, j) =>
       withRetry(() => generateSentenceAudio(sentence, client))
         .then((pcm) => ({ index: batchOffset + j, pcm, error: null as null }))
-        .catch((err) => ({
-          index: batchOffset + j,
-          pcm: null as Uint8Array | null,
-          error: err,
-        }))
+        .catch((err) => {
+          console.warn(`TTS failed for sentence ${batchOffset + j}:`, err);
+          return {
+            index: batchOffset + j,
+            pcm: null as Uint8Array | null,
+            error: err,
+          };
+        })
     );
 
     const pending = new Set(promises.map((_, j) => j));
@@ -171,7 +174,8 @@ async function handler(req: Request, _ctx: SupabaseContext): Promise<Response> {
   let client: OpenAI;
   try {
     client = createMimoClient();
-  } catch {
+  } catch (err) {
+    console.error("Failed to create MiMo client:", err);
     return Response.json({ error: "MIMO_API_KEY not configured" }, { status: 500 });
   }
 
@@ -210,6 +214,7 @@ async function handler(req: Request, _ctx: SupabaseContext): Promise<Response> {
           controller.enqueue(sseEvent(event.event, JSON.stringify(event.data)));
         }
       } catch (err: unknown) {
+        console.error("TTS stream failed:", err);
         const message = err instanceof TTSError ? String(err.cause) : String(err);
         controller.enqueue(sseEvent("error", JSON.stringify({ message })));
       } finally {
