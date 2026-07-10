@@ -47,7 +47,7 @@ describe('BreathingCircle', () => {
     const circle = getByTestId('circle');
     expect(circle.props.style).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ shadowColor: '#8B5CF6' }),
+        expect.objectContaining({ shadowColor: '#A07BD4' }),
       ])
     );
   });

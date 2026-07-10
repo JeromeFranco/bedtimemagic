@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
   },
   affirmationBackground: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#0A0E27',
+    backgroundColor: '#0F1328',
   },
   breathingCircleBehind: {
     position: 'absolute',
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryButton: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#A07BD4',
     paddingVertical: Spacing.three,
     paddingHorizontal: Spacing.six,
     borderRadius: 28,

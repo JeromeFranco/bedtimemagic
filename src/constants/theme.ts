@@ -1,30 +1,23 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
+ * Bedtime Magic design tokens — dark mode only.
+ * See DESIGN.md for the full design system specification.
  */
 
 import { Platform } from 'react-native';
 import { ChallengeCategory } from '@/types';
 
 export const Colors = {
-  light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
-    loadingBackground: '#0A0E27',
-  },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
-    loadingBackground: '#0A0E27',
+    text: '#E2E0F0',
+    background: '#0F1328',
+    backgroundElement: '#1F2545',
+    backgroundSelected: '#2D345C',
+    textSecondary: '#8E8AA8',
+    loadingBackground: '#060A1A',
   },
 } as const;
 
-export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
+export type ThemeColor = keyof typeof Colors.dark;
 
 export const Fonts = Platform.select({
   ios: {
@@ -60,44 +53,44 @@ export const MaxContentWidth = 800;
 
 export const CATEGORY_COLORS = {
   screentime: {
-    primary: '#60A5FA',
-    tint: 'rgba(96,165,250,0.15)',
-    tintLight: 'rgba(96,165,250,0.08)',
-    tintStrong: 'rgba(96,165,250,0.20)',
-    tintSelected: 'rgba(96,165,250,0.25)',
-    textMuted: 'rgba(96,165,250,0.70)',
-    border: 'rgba(96,165,250,0.40)',
-    borderSubtle: 'rgba(96,165,250,0.30)',
+    primary: '#7EB8E0',
+    tint: 'rgba(126,184,224,0.12)',
+    tintLight: 'rgba(126,184,224,0.06)',
+    tintStrong: 'rgba(126,184,224,0.18)',
+    tintSelected: 'rgba(126,184,224,0.24)',
+    textMuted: 'rgba(126,184,224,0.65)',
+    border: 'rgba(126,184,224,0.35)',
+    borderSubtle: 'rgba(126,184,224,0.25)',
   },
   emotions: {
-    primary: '#F59E0B',
-    tint: 'rgba(245,158,11,0.15)',
-    tintLight: 'rgba(245,158,11,0.08)',
-    tintStrong: 'rgba(245,158,11,0.20)',
-    tintSelected: 'rgba(245,158,11,0.25)',
-    textMuted: 'rgba(245,158,11,0.70)',
-    border: 'rgba(245,158,11,0.40)',
-    borderSubtle: 'rgba(245,158,11,0.30)',
+    primary: '#D4A06A',
+    tint: 'rgba(212,160,106,0.12)',
+    tintLight: 'rgba(212,160,106,0.06)',
+    tintStrong: 'rgba(212,160,106,0.18)',
+    tintSelected: 'rgba(212,160,106,0.24)',
+    textMuted: 'rgba(212,160,106,0.65)',
+    border: 'rgba(212,160,106,0.35)',
+    borderSubtle: 'rgba(212,160,106,0.25)',
   },
   bedtime: {
-    primary: '#8B5CF6',
-    tint: 'rgba(139,92,246,0.15)',
-    tintLight: 'rgba(139,92,246,0.08)',
-    tintStrong: 'rgba(139,92,246,0.20)',
-    tintSelected: 'rgba(139,92,246,0.25)',
-    textMuted: 'rgba(139,92,246,0.70)',
-    border: 'rgba(139,92,246,0.40)',
-    borderSubtle: 'rgba(139,92,246,0.30)',
+    primary: '#A07BD4',
+    tint: 'rgba(160,123,212,0.12)',
+    tintLight: 'rgba(160,123,212,0.06)',
+    tintStrong: 'rgba(160,123,212,0.18)',
+    tintSelected: 'rgba(160,123,212,0.24)',
+    textMuted: 'rgba(160,123,212,0.65)',
+    border: 'rgba(160,123,212,0.35)',
+    borderSubtle: 'rgba(160,123,212,0.25)',
   },
   social: {
-    primary: '#34D399',
-    tint: 'rgba(52,211,153,0.15)',
-    tintLight: 'rgba(52,211,153,0.08)',
-    tintStrong: 'rgba(52,211,153,0.20)',
-    tintSelected: 'rgba(52,211,153,0.25)',
-    textMuted: 'rgba(52,211,153,0.70)',
-    border: 'rgba(52,211,153,0.40)',
-    borderSubtle: 'rgba(52,211,153,0.30)',
+    primary: '#7BC4A8',
+    tint: 'rgba(123,196,168,0.12)',
+    tintLight: 'rgba(123,196,168,0.06)',
+    tintStrong: 'rgba(123,196,168,0.18)',
+    tintSelected: 'rgba(123,196,168,0.24)',
+    textMuted: 'rgba(123,196,168,0.65)',
+    border: 'rgba(123,196,168,0.35)',
+    borderSubtle: 'rgba(123,196,168,0.25)',
   },
 } as const;
 

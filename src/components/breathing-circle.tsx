@@ -68,7 +68,7 @@ export function BreathingCircle({
 
 const styles = StyleSheet.create({
   circle: {
-    shadowColor: '#8B5CF6',
+    shadowColor: '#A07BD4',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
     shadowRadius: 20,
