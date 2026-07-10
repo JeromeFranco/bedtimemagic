@@ -1,5 +1,26 @@
 # Edge Functions — Agent Guidelines
 
+## Project Structure
+
+```
+supabase/functions/
+├── _shared/              # Shared code (underscore = not a standalone function)
+├── tests/
+│   ├── generate-story/        # Tests for generate-story
+│   ├── generate-story-audio/  # Tests for generate-story-audio
+│   └── generate-cover-image/  # Tests for generate-cover-image
+├── generate-story/       # Function with per-function deno.json
+├── generate-story-audio/ # Function with per-function deno.json
+├── generate-cover-image/ # Function with per-function deno.json
+└── deno.json             # Top-level: dev/test config (local only)
+```
+
+- Shared code lives in `_shared/` (underscore prefix = not a standalone function)
+- Tests live in `tests/<function-name>/` directory
+- Per-function `deno.json` has production imports (used at deploy time)
+- Top-level `deno.json` has dev/test config (local only)
+- Deno child configs **REPLACE** (not merge with) parent configs, so `@std/assert` must stay in per-function deno.json while tests import it
+
 ## @supabase/server Pattern (migrated July 2026)
 
 All edge functions use `@supabase/server`'s `withSupabase` wrapper:
@@ -41,4 +62,15 @@ if (import.meta.main) {
 - Prefer jsr.io imports over deno.land/std URLs.
 - Declare npm dependencies in `deno.json` imports.
 - Do NOT use esm.sh CDN URLs.
-- Run tests from each function's directory: `cd supabase/functions/<name> && deno test --allow-all`.
+
+## Test Running Commands
+
+Run all tests:
+```bash
+cd supabase/functions && deno task test
+```
+
+Run single function tests:
+```bash
+cd supabase/functions && deno test tests/<function-name>/ --allow-all --no-check
+```
