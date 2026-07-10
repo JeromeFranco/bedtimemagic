@@ -1,5 +1,6 @@
 import { generateImage, gateway } from "ai";
 import { withSupabase, type SupabaseContext } from "@supabase/server";
+import { CHALLENGE_SCENES } from "../_shared/constants.ts";
 
 interface RequestBody {
   storyId: string;
@@ -9,21 +10,7 @@ interface RequestBody {
 }
 
 export function mapChallengeToScene(challenge: string): string {
-  const scenes: Record<string, string> = {
-    stopping_games: "a child happily putting away a video game controller in a cozy room",
-    turning_off_tv: "a child turning off a TV screen in a warm living room",
-    giving_back_tablet: "a child gently handing back a tablet device",
-    yelling: "a child taking a deep breath with calming colors around",
-    hitting: "a child holding hands gently with a friend",
-    tantrum_no: "a child sitting calmly after hearing the word no",
-    leaving_bedroom: "a child snuggled in bed with a nightlight glowing softly",
-    refusing_teeth: "a child smiling and brushing teeth at a bathroom sink",
-    staying_up_late: "a peaceful bedroom with stars and moon visible through a window",
-    sharing_toys: "friendly characters sharing and playing together gently",
-    telling_truth: "a child speaking honestly with a warm golden glow around",
-    chores_patience: "a child helping with chores in a tidy kitchen",
-  };
-  return scenes[challenge] ?? "a cozy bedtime scene";
+  return CHALLENGE_SCENES[challenge] ?? "a cozy bedtime scene";
 }
 
 export function buildCoverPrompt(
