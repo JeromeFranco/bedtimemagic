@@ -30,10 +30,6 @@ export function buildCoverPrompt(
 }
 
 async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
-  if (req.method !== "POST") {
-    return Response.json({ error: "Method not allowed" }, { status: 405 });
-  }
-
   let body: RequestBody;
   try {
     body = await req.json();

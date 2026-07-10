@@ -170,7 +170,7 @@ export function sseEvent(event: string, data: string): Uint8Array {
 async function handler(req: Request, _ctx: SupabaseContext): Promise<Response> {
   let client: OpenAI;
   try {
-    client = createMimoClient(TTS_TIMEOUT_MS);
+    client = createMimoClient();
   } catch {
     return Response.json({ error: "MIMO_API_KEY not configured" }, { status: 500 });
   }

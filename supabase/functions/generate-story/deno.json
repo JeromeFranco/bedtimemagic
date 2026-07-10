@@ -4,7 +4,6 @@
   },
   "imports": {
     "@openai/openai": "npm:openai@^4.78.0",
-    "@std/assert": "jsr:@std/assert@^1",
     "@supabase/server": "npm:@supabase/server@^1"
   }
 }

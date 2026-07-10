@@ -17,9 +17,9 @@ supabase/functions/
 
 - Shared code lives in `_shared/` (underscore prefix = not a standalone function)
 - Tests live in `tests/<function-name>/` directory
-- Per-function `deno.json` has production imports (used at deploy time)
-- Top-level `deno.json` has dev/test config (local only)
-- Deno child configs **REPLACE** (not merge with) parent configs, so `@std/assert` must stay in per-function deno.json while tests import it
+- Per-function `deno.json` has production imports only (used at deploy time)
+- Top-level `deno.json` has dev/test config including `@std/assert` and `@std/testing` (local only)
+- Deno resolves `deno.json` by walking up from the file — since tests are in `tests/` (not inside function dirs), they resolve from the top-level config, not per-function configs
 
 ## @supabase/server Pattern (migrated July 2026)
 

@@ -1,4 +1,4 @@
-import OpenAI from "@openai/openai";
+import OpenAI, { APIConnectionTimeoutError } from "@openai/openai";
 import { withSupabase, type SupabaseContext } from "@supabase/server";
 import { buildPrompt, type PromptInput } from "./prompt.ts";
 import { createMimoClient } from "../_shared/openai.ts";
@@ -119,7 +119,7 @@ async function persistStory(
 async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
   let client: OpenAI;
   try {
-    client = createMimoClient(TIMEOUT_MS);
+    client = createMimoClient();
   } catch {
     return Response.json({ error: "MIMO_API_KEY not configured" }, { status: 500 });
   }
@@ -171,7 +171,7 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
         }
         return Response.json({ error: "Failed to generate valid story" }, { status: 500 });
       }
-    } else if (err instanceof Error && err.message.includes("timeout")) {
+    } else if (err instanceof APIConnectionTimeoutError) {
       return Response.json({ error: "Story generation timed out" }, { status: 504 });
     } else {
       throw err;
