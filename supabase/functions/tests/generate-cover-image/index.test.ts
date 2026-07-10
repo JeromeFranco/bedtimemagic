@@ -1,4 +1,4 @@
-import { buildCoverPrompt, mapChallengeToScene, handleRequest } from "./index.ts";
+import { buildCoverPrompt, mapChallengeToScene, handleRequest } from "../../generate-cover-image/index.ts";
 import { assertEquals } from "@std/assert";
 
 // Set required env vars for withSupabase initialization

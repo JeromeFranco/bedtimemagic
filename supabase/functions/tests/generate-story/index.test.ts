@@ -5,7 +5,7 @@ import {
   callLLM,
   handleRequest,
   SafetyFilterError,
-} from "./index.ts";
+} from "../../generate-story/index.ts";
 
 Deno.test("parseJsonResponse - parses valid JSON", () => {
   const input = JSON.stringify({ title: "Test", storyText: "A story" });

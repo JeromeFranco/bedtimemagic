@@ -11,7 +11,7 @@ import {
   streamSentences,
   TTSError,
   uint8ToBase64,
-} from "./index.ts";
+} from "../../generate-story-audio/index.ts";
 
 Deno.test("splitSentences - splits on period followed by space", () => {
   const result = splitSentences("Hello world. How are you.");

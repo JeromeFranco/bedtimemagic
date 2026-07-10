@@ -1,8 +1,15 @@
 {
+  "compilerOptions": {
+    "strict": true
+  },
   "imports": {
     "@openai/openai": "npm:openai@^4.78.0",
     "@std/assert": "jsr:@std/assert@^1",
+    "@std/testing": "jsr:@std/testing@^1",
     "@supabase/server": "npm:@supabase/server@^1",
     "ai": "npm:ai@6"
+  },
+  "tasks": {
+    "test": "deno test tests/ --allow-all --no-check"
   }
 }
