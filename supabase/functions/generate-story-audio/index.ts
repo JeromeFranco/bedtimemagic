@@ -1,5 +1,9 @@
 import OpenAI from "@openai/openai";
 import { withSupabase, type SupabaseContext } from "@supabase/server";
+import { createMimoClient } from "../_shared/openai.ts";
+import { TTSError } from "../_shared/errors.ts";
+
+export { TTSError } from "../_shared/errors.ts";
 
 const MODEL = "mimo-v2.5-tts";
 const VOICE = "Chloe";
@@ -10,16 +14,6 @@ const TTS_TIMEOUT_MS = 30_000;
 export const SAMPLE_RATE = 24000;
 export const BITS_PER_SAMPLE = 16;
 export const CHANNELS = 1;
-
-export class TTSError extends Error {
-  constructor(
-    public sentenceIndex: number,
-    public override cause: unknown
-  ) {
-    super(`TTS failed for sentence ${sentenceIndex}`);
-    this.name = "TTSError";
-  }
-}
 
 export function splitSentences(text: string): string[] {
   return text
@@ -174,8 +168,10 @@ export function sseEvent(event: string, data: string): Uint8Array {
 }
 
 async function handler(req: Request, _ctx: SupabaseContext): Promise<Response> {
-  const apiKey = Deno.env.get("MIMO_API_KEY");
-  if (!apiKey) {
+  let client: OpenAI;
+  try {
+    client = createMimoClient(TTS_TIMEOUT_MS);
+  } catch {
     return Response.json({ error: "MIMO_API_KEY not configured" }, { status: 500 });
   }
 
@@ -206,11 +202,6 @@ async function handler(req: Request, _ctx: SupabaseContext): Promise<Response> {
   if (sentences.length === 0) {
     return Response.json({ error: "No sentences found in story_text" }, { status: 400 });
   }
-
-  const client = new OpenAI({
-    apiKey,
-    baseURL: "https://api.xiaomimimo.com/v1",
-  });
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
