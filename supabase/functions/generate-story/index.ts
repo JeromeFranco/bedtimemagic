@@ -1,9 +1,9 @@
-import OpenAI, { APIConnectionTimeoutError } from "@openai/openai";
+import OpenAI from "@openai/openai";
 import { withSupabase, type SupabaseContext } from "@supabase/server";
-import { buildPrompt, type PromptInput } from "./prompt.ts";
-import { createMimoClient } from "../_shared/openai.ts";
+import { CHALLENGE_LABELS, PROTAGONISTS, STAGE_LABELS, TRIGGER_LABELS } from "../_shared/constants.ts";
 import { SafetyFilterError } from "../_shared/errors.ts";
-import { PROTAGONISTS, CHALLENGE_LABELS, TRIGGER_LABELS, STAGE_LABELS } from "../_shared/constants.ts";
+import { createMimoClient } from "../_shared/openai.ts";
+import { buildPrompt, type PromptInput } from "./prompt.ts";
 
 const MODEL = "mimo-v2.5-pro";
 const TIMEOUT_MS = 60_000;
@@ -17,13 +17,7 @@ interface RequestBody {
   tier2Trigger: string;
 }
 
-const REQUIRED_STORY_FIELDS = [
-  "title",
-  "storyText",
-  "moral",
-  "pillowTalkPrompt",
-  "sleepyAffirmation",
-] as const;
+const REQUIRED_STORY_FIELDS = ["title", "storyText", "moral", "pillowTalkPrompt", "sleepyAffirmation"] as const;
 
 export { SafetyFilterError } from "../_shared/errors.ts";
 
@@ -44,13 +38,16 @@ export function parseJsonResponse(text: string): Record<string, string> {
       throw new SafetyFilterError("Safety filter triggered");
     }
   }
-  const cleaned = trimmed.replace(/```json?\s*/g, "").replace(/```\s*/g, "").trim();
+  const cleaned = trimmed
+    .replace(/```json?\s*/g, "")
+    .replace(/```\s*/g, "")
+    .trim();
   return JSON.parse(cleaned);
 }
 
 export function validateStoryFields(story: Record<string, string>): void {
   const missing = REQUIRED_STORY_FIELDS.filter(
-    (field) => !story[field] || typeof story[field] !== "string" || story[field].trim() === ""
+    (field) => !story[field] || typeof story[field] !== "string" || story[field].trim() === "",
   );
   if (missing.length > 0) {
     throw new Error(`Story missing required fields: ${missing.join(", ")}`);
@@ -61,7 +58,7 @@ export async function callLLM(
   client: OpenAI,
   system: string,
   user: string,
-  retry = false
+  { retry = false, signal }: { retry?: boolean; signal?: AbortSignal } = {},
 ): Promise<Record<string, string>> {
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: "system", content: system },
@@ -77,8 +74,9 @@ export async function callLLM(
     {
       model: MODEL,
       messages,
+      reasoning_effort: "high",
     },
-    { timeout: TIMEOUT_MS }
+    { timeout: TIMEOUT_MS, maxRetries: 0, signal },
   );
 
   const content = completion.choices[0]?.message?.content;
@@ -93,7 +91,7 @@ async function persistStory(
   supabase: SupabaseContext["supabaseAdmin"],
   userId: string,
   body: RequestBody,
-  story: Record<string, string>
+  story: Record<string, string>,
 ) {
   const { data, error } = await (supabase as any)
     .from("stories")
@@ -132,7 +130,14 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  if (!body.childId || !body.protagonistId || !body.childNickname || !body.developmentalStage || !body.tier1Challenge || !body.tier2Trigger) {
+  if (
+    !body.childId ||
+    !body.protagonistId ||
+    !body.childNickname ||
+    !body.developmentalStage ||
+    !body.tier1Challenge ||
+    !body.tier2Trigger
+  ) {
     return Response.json({ error: "Missing required fields" }, { status: 400 });
   }
 
@@ -158,26 +163,29 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
 
   let story: Record<string, string>;
   try {
-    story = await callLLM(client, system, user);
+    story = await callLLM(client, system, user, { signal: req.signal });
   } catch (err) {
     if (err instanceof SafetyFilterError) {
       return Response.json({ error: "Safety filter triggered" }, { status: 422 });
     }
+
     if (err instanceof SyntaxError) {
       try {
-        story = await callLLM(client, system, user, true);
+        story = await callLLM(client, system, user, { retry: true, signal: req.signal });
       } catch (retryErr) {
-        console.error("LLM retry failed:", retryErr);
         if (retryErr instanceof SafetyFilterError) {
           return Response.json({ error: "Safety filter triggered" }, { status: 422 });
         }
+        console.error("LLM retry failed:", retryErr);
         return Response.json({ error: "Failed to generate valid story" }, { status: 500 });
       }
-    } else if (err instanceof APIConnectionTimeoutError) {
-      return Response.json({ error: "Story generation timed out" }, { status: 504 });
+    } else if (err instanceof OpenAI.APIError) {
+      const status = err.status || 502;
+      console.error(`LLM API error (${status}):`, err.message);
+      return Response.json({ error: err.message }, { status });
     } else {
       console.error("LLM call failed:", err);
-      throw err;
+      return Response.json({ error: "Story generation failed" }, { status: 500 });
     }
   }
 
