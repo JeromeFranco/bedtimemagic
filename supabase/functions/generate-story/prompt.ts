@@ -1,8 +1,9 @@
+import { STAGE_PROFILES } from "../_shared/constants.ts";
+
 export interface PromptInput {
   protagonistName: string;
   protagonistSpecies: string;
   protagonistPersonality: string;
-  protagonistVoiceNotes: string;
   childNickname: string;
   developmentalStage: string;
   tier1ChallengeLabel: string;
@@ -54,15 +55,19 @@ Return ONLY valid JSON (no markdown fences, no explanation) with these exact fie
 }`;
 
 function buildUserPrompt(input: PromptInput): string {
+  const stageProfile = STAGE_PROFILES[input.developmentalStage] || null;
+
   return `Write a bedtime story for a child nicknamed "${input.childNickname}".
 
 PROTAGONIST: ${input.protagonistName} the ${input.protagonistSpecies}
 Personality: ${input.protagonistPersonality}
 
-TONALITY: ${input.protagonistVoiceNotes}
-
-CHILD'S DEVELOPMENTAL STAGE: ${input.developmentalStage}
-(Adjust vocabulary and sentence complexity accordingly)
+CHILD'S DEVELOPMENTAL STAGE: ${stageProfile ? stageProfile.label : input.developmentalStage}
+${stageProfile ? `
+Vocabulary guidance: ${stageProfile.vocabulary}
+Sentence structure: ${stageProfile.sentences}
+Concept complexity: ${stageProfile.concepts}
+` : '(Adjust vocabulary and sentence complexity accordingly)'}
 
 TONIGHT'S CHALLENGE:
 Category: ${input.tier1ChallengeLabel}

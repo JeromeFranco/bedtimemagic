@@ -67,6 +67,27 @@ export const STAGE_LABELS: Record<string, string> = {
   older_kids: "Older Kids",
 };
 
+export const STAGE_PROFILES: Record<string, { label: string; vocabulary: string; sentences: string; concepts: string }> = {
+  preschool: {
+    label: "Preschool (ages 4-5)",
+    vocabulary: "Concrete, familiar objects (blanket, stars, moon, teddy). Avoid abstract nouns. Use simple, warm words.",
+    sentences: "5-8 words per sentence. Repetition welcome. Use 'and then... and then...' patterns. Keep paragraphs short.",
+    concepts: "Cause-effect only. Name emotions directly ('Barnaby felt sad'). No metaphors yet - keep it literal and warm.",
+  },
+  early_primary: {
+    label: "Early Primary (ages 6-7)",
+    vocabulary: "Some abstract words (patience, kindness) with context clues. Mix familiar and new vocabulary.",
+    sentences: "8-12 words per sentence. Mix simple and compound sentences. Dialogue can appear.",
+    concepts: "Simple metaphors allowed ('her heart felt like a balloon deflating'). Basic perspective-taking.",
+  },
+  older_kids: {
+    label: "Older Kids (ages 8-10)",
+    vocabulary: "Richer vocabulary, figurative language, more descriptive prose.",
+    sentences: "10-15 words per sentence. Complex sentences with subordinate clauses. Varied paragraph structure.",
+    concepts: "Extended metaphors, perspective-taking, internal monologue. Can explore nuanced emotions.",
+  },
+};
+
 export const CHALLENGE_SCENES: Record<string, string> = {
   stopping_games:
     "a child happily putting away a video game controller in a cozy room",

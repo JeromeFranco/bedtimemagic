@@ -1,6 +1,6 @@
 import OpenAI from "@openai/openai";
 import { withSupabase, type SupabaseContext } from "@supabase/server";
-import { CHALLENGE_LABELS, PROTAGONISTS, STAGE_LABELS, TRIGGER_LABELS } from "../_shared/constants.ts";
+import { CHALLENGE_LABELS, PROTAGONISTS, TRIGGER_LABELS } from "../_shared/constants.ts";
 import { SafetyFilterError } from "../_shared/errors.ts";
 import { createMimoClient } from "../_shared/openai.ts";
 import { buildPrompt, type PromptInput } from "./prompt.ts";
@@ -152,9 +152,8 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
     protagonistName: protagonist.name,
     protagonistSpecies: protagonist.species,
     protagonistPersonality: protagonist.personality,
-    protagonistVoiceNotes: protagonist.voiceNotes,
     childNickname: body.childNickname,
-    developmentalStage: STAGE_LABELS[body.developmentalStage] || body.developmentalStage,
+    developmentalStage: body.developmentalStage, // Pass key directly, not label
     tier1ChallengeLabel: CHALLENGE_LABELS[body.tier1Challenge] || body.tier1Challenge,
     tier2TriggerLabel: TRIGGER_LABELS[body.tier2Trigger] || body.tier2Trigger,
   };
