@@ -114,3 +114,17 @@ Deno.test("buildPrompt - user prompt includes protagonist details", () => {
   assertStringIncludes(user, "Brave space explorer");
   assertStringIncludes(user, "Mia");
 });
+
+Deno.test("buildPrompt - user prompt falls back for unknown stage", () => {
+  const { user } = buildPrompt({
+    protagonistName: "Barnaby",
+    protagonistSpecies: "Bear",
+    protagonistPersonality: "Gentle, patient bear",
+    childNickname: "Alex",
+    developmentalStage: "unknown_stage",
+    tier1ChallengeLabel: "Bedtime Friction",
+    tier2TriggerLabel: "Leaving the bedroom",
+  });
+
+  assertStringIncludes(user, "Adjust vocabulary and sentence complexity accordingly");
+});
