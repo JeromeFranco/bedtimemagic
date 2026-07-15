@@ -72,6 +72,7 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
     const result = await generateImage({
       model: gateway.image("bfl/flux-2-klein-4b"),
       prompt,
+      size: "512x512",
     });
     imageBytes = result.image.uint8Array;
   } catch (err) {
