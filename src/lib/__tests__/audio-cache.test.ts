@@ -15,7 +15,6 @@ import {
   evictStory,
   enforceFifoEviction,
   writeSentenceToCache,
-  AUDIO_CACHE_PREFIX,
 } from '../audio-cache';
 
 const mockedGetInfo = FileSystem.getInfoAsync as jest.Mock;

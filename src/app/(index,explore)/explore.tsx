@@ -6,8 +6,7 @@ import { StoryHistoryCard } from '@/components/story-history-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useStories } from '@/hooks/use-story';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { Colors } from '@/constants/theme';
+import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 
 export default function HistoryVaultScreen() {
   const { data: stories, isLoading, isError } = useStories();

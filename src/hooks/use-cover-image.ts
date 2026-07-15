@@ -16,17 +16,15 @@ export function useCoverImage(
   options?: { enabled?: boolean }
 ): UseCoverImageResult {
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const enabled = options?.enabled !== false;
+  const shouldFetch = enabled && !!storyId && !!title;
+  const [isLoading, setIsLoading] = useState(shouldFetch);
   const [error, setError] = useState<Error | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const enabled = options?.enabled !== false;
 
   useEffect(() => {
-    if (!enabled || !storyId || !title) {
-      setIsLoading(false);
-      return;
-    }
+    if (!shouldFetch) return;
 
     let cancelled = false;
 
@@ -88,7 +86,7 @@ export function useCoverImage(
       cancelled = true;
       cleanup();
     };
-  }, [storyId, title, enabled]);
+  }, [storyId, title, enabled, shouldFetch]);
 
   return { coverUrl, isLoading, error };
 }

@@ -21,15 +21,17 @@ export default function GenerateScreen() {
   const { selectedProfile } = useSelectedChild();
 
   const mutation = useMutation({
-    mutationFn: () =>
-      generateStory(
-        selectedProfile!.id,
-        selectedProfile!.protagonist,
-        selectedProfile!.name,
-        selectedProfile!.developmental_stage,
+    mutationFn: () => {
+      if (!selectedProfile) throw new Error('No profile selected');
+      return generateStory(
+        selectedProfile.id,
+        selectedProfile.protagonist,
+        selectedProfile.name,
+        selectedProfile.developmental_stage,
         category!,
         trigger!
-      ),
+      );
+    },
     onSuccess: (story) => {
       // Fire cover image generation async (don't await)
       generateCoverImage(story.id, story.title).catch(() => {
