@@ -16,3 +16,4 @@
 - Use conventional commit for commit message
 - Use expo-ui skill when working with expo ui components and prefer universal components over jetpack-compose and swiftui
 - Use ai-sdk skill when working with ai sdk
+- Run `npm run lint` and `npm run typecheck` after every code change and fix any errors before committing
