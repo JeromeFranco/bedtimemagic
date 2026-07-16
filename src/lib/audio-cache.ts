@@ -2,7 +2,6 @@ import {
   cacheDirectory,
   getInfoAsync,
   writeAsStringAsync,
-  readAsStringAsync,
   deleteAsync,
   readDirectoryAsync,
   EncodingType,
@@ -11,10 +10,9 @@ import {
 export const AUDIO_CACHE_PREFIX = 'audio_';
 const COVER_CACHE_PREFIX = 'cover_';
 const MAX_CACHED_STORIES = 5;
-const WAV_HEADER_SIZE = 44;
 
 function audioPath(storyId: string): string {
-  return `${cacheDirectory}${AUDIO_CACHE_PREFIX}${storyId}.wav`;
+  return `${cacheDirectory}${AUDIO_CACHE_PREFIX}${storyId}.mp3`;
 }
 
 function coverPath(storyId: string): string {
@@ -27,28 +25,15 @@ export async function getCachedAudioPath(storyId: string): Promise<string | null
   return info.exists ? path : null;
 }
 
-export async function writeSentenceToCache(
+export async function writeAudioToCache(
   storyId: string,
-  index: number,
   audioBase64: string
-): Promise<void> {
+): Promise<string> {
   const path = audioPath(storyId);
-
-  if (index === 0) {
-    await writeAsStringAsync(path, audioBase64, {
-      encoding: EncodingType.Base64,
-    });
-  } else {
-    const pcmBase64 = audioBase64.slice(Math.ceil(WAV_HEADER_SIZE / 3) * 4);
-    const existing = await readAsStringAsync(path, { encoding: EncodingType.Base64 });
-    await writeAsStringAsync(path, existing + pcmBase64, {
-      encoding: EncodingType.Base64,
-    });
-  }
-}
-
-export async function finalizeAudioCache(storyId: string): Promise<string> {
-  return audioPath(storyId);
+  await writeAsStringAsync(path, audioBase64, {
+    encoding: EncodingType.Base64,
+  });
+  return path;
 }
 
 export async function getCachedCoverPath(storyId: string): Promise<string | null> {
@@ -90,7 +75,7 @@ export async function enforceFifoEviction(): Promise<void> {
   if (!cacheDirectory) return;
 
   const files = await readDirectoryAsync(cacheDirectory);
-  const audioFiles = files.filter((f) => f.startsWith(AUDIO_CACHE_PREFIX) && f.endsWith('.wav'));
+  const audioFiles = files.filter((f) => f.startsWith(AUDIO_CACHE_PREFIX) && f.endsWith('.mp3'));
 
   if (audioFiles.length <= MAX_CACHED_STORIES) return;
 
@@ -108,7 +93,7 @@ export async function enforceFifoEviction(): Promise<void> {
 
   const toEvict = withTimes.slice(0, audioFiles.length - MAX_CACHED_STORIES);
   for (const { file } of toEvict) {
-    const storyId = file.replace(AUDIO_CACHE_PREFIX, '').replace('.wav', '');
+    const storyId = file.replace(AUDIO_CACHE_PREFIX, '').replace('.mp3', '');
     await evictStory(storyId);
   }
 }
