@@ -1,5 +1,5 @@
 import { getCachedAudioPath } from './audio-cache';
-import { streamStoryAudio } from './audio-stream';
+import { fetchStoryAudio } from './audio-stream';
 import type { Story } from '@/types';
 
 const SAMPLE_AUDIO = require('../../assets/audio/sample-story.mp3');
@@ -9,13 +9,12 @@ const inflightPrefetches = new Map<string, Promise<string>>();
 
 export async function preFetchAudio(
   storyId: string,
-  storyText: string,
-  maxSentences: number = 2
+  storyText: string
 ): Promise<string> {
   const existing = inflightPrefetches.get(storyId);
   if (existing) return existing;
 
-  const promise = streamStoryAudio(storyId, storyText, maxSentences)
+  const promise = fetchStoryAudio(storyId, storyText)
     .finally(() => inflightPrefetches.delete(storyId));
   inflightPrefetches.set(storyId, promise);
   return promise;
@@ -32,7 +31,7 @@ export async function getAudioSource(story: Story): Promise<{ uri: string }> {
   if (cachedPath) {
     return { uri: cachedPath };
   }
-  const localPath = await streamStoryAudio(story.id, story.story_text);
+  const localPath = await fetchStoryAudio(story.id, story.story_text);
   return { uri: localPath };
 }
 
