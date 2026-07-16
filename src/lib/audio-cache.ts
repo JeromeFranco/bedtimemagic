@@ -1,49 +1,38 @@
-import {
-  cacheDirectory,
-  getInfoAsync,
-  writeAsStringAsync,
-  deleteAsync,
-  readDirectoryAsync,
-  EncodingType,
-} from 'expo-file-system/legacy';
+import { File, Paths, EncodingType } from 'expo-file-system';
 
 export const AUDIO_CACHE_PREFIX = 'audio_';
 const COVER_CACHE_PREFIX = 'cover_';
 const MAX_CACHED_STORIES = 5;
 
 function audioPath(storyId: string): string {
-  return `${cacheDirectory}${AUDIO_CACHE_PREFIX}${storyId}.mp3`;
+  return new File(Paths.cache, `${AUDIO_CACHE_PREFIX}${storyId}.mp3`).uri;
 }
 
 function coverPath(storyId: string): string {
-  return `${cacheDirectory}${COVER_CACHE_PREFIX}${storyId}.jpg`;
+  return new File(Paths.cache, `${COVER_CACHE_PREFIX}${storyId}.jpg`).uri;
 }
 
 export async function getCachedAudioPath(storyId: string): Promise<string | null> {
-  const path = audioPath(storyId);
-  const info = await getInfoAsync(path);
-  return info.exists ? path : null;
+  const file = new File(audioPath(storyId));
+  return file.exists ? file.uri : null;
 }
 
 export async function writeAudioToCache(
   storyId: string,
   audioBase64: string
 ): Promise<string> {
-  const path = audioPath(storyId);
-  await writeAsStringAsync(path, audioBase64, {
-    encoding: EncodingType.Base64,
-  });
-  return path;
+  const file = new File(audioPath(storyId));
+  file.write(audioBase64, { encoding: EncodingType.Base64 });
+  return file.uri;
 }
 
 export async function getCachedCoverPath(storyId: string): Promise<string | null> {
-  const path = coverPath(storyId);
-  const info = await getInfoAsync(path);
-  return info.exists ? path : null;
+  const file = new File(coverPath(storyId));
+  return file.exists ? file.uri : null;
 }
 
 export async function cacheCoverImage(storyId: string, imageUrl: string): Promise<string> {
-  const path = coverPath(storyId);
+  const file = new File(coverPath(storyId));
   const response = await fetch(imageUrl);
   const blob = await response.blob();
   const reader = new FileReader();
@@ -52,48 +41,43 @@ export async function cacheCoverImage(storyId: string, imageUrl: string): Promis
     reader.readAsDataURL(blob);
   });
   const base64Data = base64.split(',')[1];
-  await writeAsStringAsync(path, base64Data, { encoding: EncodingType.Base64 });
-  return path;
+  file.write(base64Data, { encoding: EncodingType.Base64 });
+  return file.uri;
 }
 
 export async function evictStory(storyId: string): Promise<void> {
-  const audio = audioPath(storyId);
-  const cover = coverPath(storyId);
+  const audio = new File(audioPath(storyId));
+  const cover = new File(coverPath(storyId));
 
-  const audioInfo = await getInfoAsync(audio);
-  if (audioInfo.exists) {
-    await deleteAsync(audio);
+  if (audio.exists) {
+    audio.delete();
   }
 
-  const coverInfo = await getInfoAsync(cover);
-  if (coverInfo.exists) {
-    await deleteAsync(cover);
+  if (cover.exists) {
+    cover.delete();
   }
 }
 
 export async function enforceFifoEviction(): Promise<void> {
-  if (!cacheDirectory) return;
+  if (!Paths.cache.exists) return;
 
-  const files = await readDirectoryAsync(cacheDirectory);
-  const audioFiles = files.filter((f) => f.startsWith(AUDIO_CACHE_PREFIX) && f.endsWith('.mp3'));
+  const files = Paths.cache.list();
+  const audioFiles = files
+    .filter((f): f is File => f instanceof File)
+    .filter((f) => f.name.startsWith(AUDIO_CACHE_PREFIX) && f.name.endsWith('.mp3'));
 
   if (audioFiles.length <= MAX_CACHED_STORIES) return;
 
-  const withTimes = await Promise.all(
-    audioFiles.map(async (file) => {
-      const info = await getInfoAsync(`${cacheDirectory}${file}`);
-      return {
-        file,
-        modificationTime: 'modificationTime' in info ? (info.modificationTime as number) : 0,
-      };
-    })
-  );
+  const withTimes = audioFiles.map((file) => ({
+    file,
+    modificationTime: file.lastModified ?? 0,
+  }));
 
   withTimes.sort((a, b) => a.modificationTime - b.modificationTime);
 
   const toEvict = withTimes.slice(0, audioFiles.length - MAX_CACHED_STORIES);
   for (const { file } of toEvict) {
-    const storyId = file.replace(AUDIO_CACHE_PREFIX, '').replace('.mp3', '');
+    const storyId = file.name.replace(AUDIO_CACHE_PREFIX, '').replace('.mp3', '');
     await evictStory(storyId);
   }
 }

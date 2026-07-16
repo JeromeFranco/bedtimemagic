@@ -1,13 +1,66 @@
-jest.mock('expo-file-system/legacy', () => ({
-  cacheDirectory: '/mock/cache/',
-  getInfoAsync: jest.fn(),
-  writeAsStringAsync: jest.fn(),
-  deleteAsync: jest.fn(),
-  readDirectoryAsync: jest.fn(),
-  EncodingType: { Base64: 'base64' },
-}));
+const mockFiles = new Map<string, { exists: boolean; lastModified: number }>();
 
-import * as FileSystem from 'expo-file-system/legacy';
+jest.mock('expo-file-system', () => {
+  function resolveUri(...parts: any[]): string {
+    return parts
+      .map((p) => (p && typeof p === 'object' && 'uri' in p ? p.uri : String(p)))
+      .join('/');
+  }
+
+  class MockFile {
+    uri: string;
+    name: string;
+    exists: boolean;
+    lastModified: number | null;
+
+    constructor(...parts: any[]) {
+      this.uri = resolveUri(...parts);
+      this.name = this.uri.split('/').pop() ?? '';
+      const mock = mockFiles.get(this.uri);
+      this.exists = mock?.exists ?? false;
+      this.lastModified = mock?.lastModified ?? null;
+    }
+
+    write(_content: string, _options?: { encoding?: string }) {
+      mockFiles.set(this.uri, { exists: true, lastModified: Date.now() });
+      this.exists = true;
+    }
+
+    delete() {
+      mockFiles.set(this.uri, { exists: false, lastModified: 0 });
+      this.exists = false;
+    }
+  }
+
+  class MockDirectory {
+    uri: string;
+    exists: boolean;
+
+    constructor(...parts: any[]) {
+      this.uri = resolveUri(...parts);
+      this.exists = this.uri === '/mock/cache';
+    }
+
+    list(): MockFile[] {
+      return Array.from(mockFiles.entries())
+        .filter(([path]) => path.startsWith(this.uri + '/'))
+        .map(([path]) => new MockFile(path));
+    }
+  }
+
+  return {
+    File: MockFile,
+    Directory: MockDirectory,
+    Paths: {
+      cache: new MockDirectory('/mock/cache'),
+    },
+    EncodingType: {
+      Base64: 'base64',
+      UTF8: 'utf8',
+    },
+  };
+});
+
 import {
   getCachedAudioPath,
   writeAudioToCache,
@@ -15,25 +68,18 @@ import {
   enforceFifoEviction,
 } from '../audio-cache';
 
-const mockedGetInfo = FileSystem.getInfoAsync as jest.Mock;
-const mockedWrite = FileSystem.writeAsStringAsync as jest.Mock;
-const mockedDelete = FileSystem.deleteAsync as jest.Mock;
-const mockedReadDir = FileSystem.readDirectoryAsync as jest.Mock;
-
 beforeEach(() => {
-  jest.clearAllMocks();
+  mockFiles.clear();
 });
 
 describe('getCachedAudioPath', () => {
   it('returns path when file exists', async () => {
-    mockedGetInfo.mockResolvedValue({ exists: true });
+    mockFiles.set('/mock/cache/audio_story-1.mp3', { exists: true, lastModified: 1000 });
     const result = await getCachedAudioPath('story-1');
     expect(result).toBe('/mock/cache/audio_story-1.mp3');
-    expect(mockedGetInfo).toHaveBeenCalledWith('/mock/cache/audio_story-1.mp3');
   });
 
   it('returns null when file does not exist', async () => {
-    mockedGetInfo.mockResolvedValue({ exists: false });
     const result = await getCachedAudioPath('story-1');
     expect(result).toBeNull();
   });
@@ -41,70 +87,65 @@ describe('getCachedAudioPath', () => {
 
 describe('writeAudioToCache', () => {
   it('writes base64 audio to mp3 file and returns path', async () => {
-    mockedWrite.mockResolvedValue(undefined);
-
     const result = await writeAudioToCache('story-1', 'aGVsbG8=');
-
-    expect(mockedWrite).toHaveBeenCalledWith(
-      '/mock/cache/audio_story-1.mp3',
-      'aGVsbG8=',
-      { encoding: 'base64' }
-    );
     expect(result).toBe('/mock/cache/audio_story-1.mp3');
+    expect(mockFiles.get('/mock/cache/audio_story-1.mp3')?.exists).toBe(true);
   });
 });
 
 describe('evictStory', () => {
   it('deletes audio and cover when they exist', async () => {
-    mockedGetInfo.mockResolvedValue({ exists: true });
-    mockedDelete.mockResolvedValue(undefined);
+    mockFiles.set('/mock/cache/audio_story-1.mp3', { exists: true, lastModified: 1000 });
+    mockFiles.set('/mock/cache/cover_story-1.jpg', { exists: true, lastModified: 1000 });
 
     await evictStory('story-1');
 
-    expect(mockedDelete).toHaveBeenCalledWith('/mock/cache/audio_story-1.mp3');
-    expect(mockedDelete).toHaveBeenCalledWith('/mock/cache/cover_story-1.jpg');
+    expect(mockFiles.get('/mock/cache/audio_story-1.mp3')?.exists).toBe(false);
+    expect(mockFiles.get('/mock/cache/cover_story-1.jpg')?.exists).toBe(false);
   });
 
   it('skips deletion when files do not exist', async () => {
-    mockedGetInfo.mockResolvedValue({ exists: false });
-
     await evictStory('story-1');
-
-    expect(mockedDelete).not.toHaveBeenCalled();
+    expect(mockFiles.size).toBe(0);
   });
 });
 
 describe('enforceFifoEviction', () => {
   it('does nothing if <= 5 files', async () => {
-    mockedReadDir.mockResolvedValue([
-      'audio_story-1.mp3',
-      'audio_story-2.mp3',
-      'audio_story-3.mp3',
-      'other-file.txt',
-    ]);
-    mockedGetInfo.mockResolvedValue({ exists: true, modificationTime: 1000 });
+    const ids = ['1', '2', '3'];
+    for (const id of ids) {
+      mockFiles.set(`/mock/cache/audio_story-${id}.mp3`, {
+        exists: true,
+        lastModified: parseInt(id) * 1000,
+      });
+    }
 
     await enforceFifoEviction();
 
-    expect(mockedDelete).not.toHaveBeenCalled();
+    const audioFiles = Array.from(mockFiles.entries()).filter(
+      ([path]) => path.startsWith('/mock/cache/audio_') && path.endsWith('.mp3')
+    );
+    expect(audioFiles.length).toBe(3);
   });
 
   it('evicts oldest when > 5 files', async () => {
-    const audioFiles = Array.from({ length: 7 }, (_, i) => `audio_story-${i + 1}.mp3`);
-    mockedReadDir.mockResolvedValue(audioFiles);
-    mockedGetInfo.mockImplementation(async (path: string) => {
-      const match = path.match(/story-(\d+)/);
-      const id = match ? parseInt(match[1]) : 0;
-      return { exists: true, modificationTime: id * 1000 };
-    });
-    mockedDelete.mockResolvedValue(undefined);
+    const ids = ['1', '2', '3', '4', '5', '6', '7'];
+    for (const id of ids) {
+      mockFiles.set(`/mock/cache/audio_story-${id}.mp3`, {
+        exists: true,
+        lastModified: parseInt(id) * 1000,
+      });
+      mockFiles.set(`/mock/cache/cover_story-${id}.jpg`, {
+        exists: true,
+        lastModified: parseInt(id) * 1000,
+      });
+    }
 
     await enforceFifoEviction();
 
-    expect(mockedDelete).toHaveBeenCalledWith('/mock/cache/audio_story-1.mp3');
-    expect(mockedDelete).toHaveBeenCalledWith('/mock/cache/cover_story-1.jpg');
-    expect(mockedDelete).toHaveBeenCalledWith('/mock/cache/audio_story-2.mp3');
-    expect(mockedDelete).toHaveBeenCalledWith('/mock/cache/cover_story-2.jpg');
-    expect(mockedDelete).toHaveBeenCalledTimes(4);
+    expect(mockFiles.get('/mock/cache/audio_story-1.mp3')?.exists).toBe(false);
+    expect(mockFiles.get('/mock/cache/cover_story-1.jpg')?.exists).toBe(false);
+    expect(mockFiles.get('/mock/cache/audio_story-2.mp3')?.exists).toBe(false);
+    expect(mockFiles.get('/mock/cache/cover_story-2.jpg')?.exists).toBe(false);
   });
 });
