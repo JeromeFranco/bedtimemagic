@@ -1,50 +1,33 @@
 jest.mock('../audio-cache', () => ({
-  writeSentenceToCache: jest.fn(),
-  finalizeAudioCache: jest.fn(),
+  writeAudioToCache: jest.fn(),
   enforceFifoEviction: jest.fn(),
 }));
-
-const mockGetSession = jest.fn().mockResolvedValue({
-  data: { session: { access_token: 'test-access-token' } },
-});
 
 jest.mock('../supabase', () => ({
   supabase: {
     auth: {
-      getSession: mockGetSession,
+      getSession: jest.fn().mockResolvedValue({
+        data: { session: { access_token: 'test-access-token' } },
+      }),
     },
   },
 }));
 
 process.env.EXPO_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
 
-import { writeSentenceToCache, finalizeAudioCache, enforceFifoEviction } from '../audio-cache';
-import { streamStoryAudio } from '../audio-stream';
+import { writeAudioToCache, enforceFifoEviction } from '../audio-cache';
+import { supabase } from '../supabase';
+import { fetchStoryAudio } from '../audio-stream';
 
-const mockedWriteSentenceToCache = writeSentenceToCache as jest.Mock;
-const mockedFinalizeAudioCache = finalizeAudioCache as jest.Mock;
+const mockedWriteAudioToCache = writeAudioToCache as jest.Mock;
 const mockedEnforceFifoEviction = enforceFifoEviction as jest.Mock;
+const mockedGetSession = supabase.auth.getSession as jest.Mock;
 
 const originalFetch = globalThis.fetch;
 
-function createMockSSEResponse(events: string[]): Response {
-  const body = events.join('\n') + '\n';
-  const encoder = new TextEncoder();
-  const encoded = encoder.encode(body);
-
-  const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      controller.enqueue(encoded);
-      controller.close();
-    },
-  });
-
-  return new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
-}
-
 beforeEach(() => {
   jest.clearAllMocks();
-  mockGetSession.mockResolvedValue({ data: { session: { access_token: 'test-access-token' } } });
+  mockedGetSession.mockResolvedValue({ data: { session: { access_token: 'test-access-token' } } });
   globalThis.fetch = jest.fn() as typeof fetch;
 });
 
@@ -52,21 +35,17 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
-describe('streamStoryAudio', () => {
-  it('processes sentence events via SSE and writes to cache', async () => {
-    const sseEvents = [
-      'event: sentence',
-      'data: {"index":0,"total":1,"audio":"aGVsbG8="}',
-      '',
-      'event: done',
-      'data: {"total_sentences":1}',
-      '',
-    ];
+describe('fetchStoryAudio', () => {
+  it('fetches mp3 audio and writes to cache', async () => {
+    (globalThis.fetch as jest.Mock).mockResolvedValue(
+      new Response(JSON.stringify({ audio: 'aGVsbG8=' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    mockedWriteAudioToCache.mockResolvedValue('/cache/audio_story-1.mp3');
 
-    (globalThis.fetch as jest.Mock).mockResolvedValue(createMockSSEResponse(sseEvents));
-    mockedFinalizeAudioCache.mockResolvedValue('/cache/audio_story-1.wav');
-
-    const result = await streamStoryAudio('story-1', 'Hello world');
+    const result = await fetchStoryAudio('story-1', 'Hello world');
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
       'https://test.supabase.co/functions/v1/generate-story-audio',
@@ -74,28 +53,14 @@ describe('streamStoryAudio', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer test-access-token',
+          Authorization: 'Bearer test-access-token',
         },
         body: JSON.stringify({ story_text: 'Hello world' }),
       })
     );
-    expect(mockedWriteSentenceToCache).toHaveBeenCalledTimes(1);
-    expect(mockedWriteSentenceToCache).toHaveBeenCalledWith('story-1', 0, 'aGVsbG8=');
+    expect(mockedWriteAudioToCache).toHaveBeenCalledWith('story-1', 'aGVsbG8=');
     expect(mockedEnforceFifoEviction).toHaveBeenCalledTimes(1);
-    expect(mockedFinalizeAudioCache).toHaveBeenCalledWith('story-1');
-    expect(result).toBe('/cache/audio_story-1.wav');
-  });
-
-  it('throws on SSE error event', async () => {
-    const sseEvents = [
-      'event: error',
-      'data: {"message":"TTS failed","sentence_index":2}',
-      '',
-    ];
-
-    (globalThis.fetch as jest.Mock).mockResolvedValue(createMockSSEResponse(sseEvents));
-
-    await expect(streamStoryAudio('story-1', 'Hello')).rejects.toThrow('TTS failed');
+    expect(result).toBe('/cache/audio_story-1.mp3');
   });
 
   it('throws on non-ok response', async () => {
@@ -103,106 +68,27 @@ describe('streamStoryAudio', () => {
       new Response('Internal Server Error', { status: 500 })
     );
 
-    await expect(streamStoryAudio('story-1', 'Hello')).rejects.toThrow(
+    await expect(fetchStoryAudio('story-1', 'Hello')).rejects.toThrow(
       'Edge function returned 500'
     );
   });
 
-  it('throws when stream ends without done event', async () => {
-    const sseEvents = [
-      'event: chunk',
-      'data: {"audio":"aGVsbG8="}',
-      '',
-    ];
-
-    (globalThis.fetch as jest.Mock).mockResolvedValue(createMockSSEResponse(sseEvents));
-
-    await expect(streamStoryAudio('story-1', 'Hello')).rejects.toThrow(
-      'Stream ended without done event'
-    );
-  });
-
-  it('processes sentence events and writes to cache', async () => {
-    const sseEvents = [
-      'event: sentence',
-      'data: {"index":0,"total":2,"audio":"aGVsbG8="}',
-      '',
-      'event: sentence',
-      'data: {"index":1,"total":2,"audio":"d29ybGQ="}',
-      '',
-      'event: done',
-      'data: {"total_sentences":2}',
-      '',
-    ];
-
-    (globalThis.fetch as jest.Mock).mockResolvedValue(createMockSSEResponse(sseEvents));
-    mockedFinalizeAudioCache.mockResolvedValue('/cache/audio_story-1.wav');
-
-    const result = await streamStoryAudio('story-1', 'Hello world');
-
-    expect(mockedWriteSentenceToCache).toHaveBeenCalledTimes(2);
-    expect(mockedWriteSentenceToCache).toHaveBeenCalledWith('story-1', 0, 'aGVsbG8=');
-    expect(mockedWriteSentenceToCache).toHaveBeenCalledWith('story-1', 1, 'd29ybGQ=');
-    expect(result).toBe('/cache/audio_story-1.wav');
-  });
-
-  it('continues stream after sentence-error event', async () => {
-    const sseEvents = [
-      'event: sentence',
-      'data: {"index":0,"total":2,"audio":"aGVsbG8="}',
-      '',
-      'event: sentence-error',
-      'data: {"index":1,"message":"TTS timeout"}',
-      '',
-      'event: done',
-      'data: {"total_sentences":2}',
-      '',
-    ];
-
-    (globalThis.fetch as jest.Mock).mockResolvedValue(createMockSSEResponse(sseEvents));
-    mockedFinalizeAudioCache.mockResolvedValue('/cache/audio_story-1.wav');
-
-    const result = await streamStoryAudio('story-1', 'Hello world');
-
-    // First sentence was written
-    expect(mockedWriteSentenceToCache).toHaveBeenCalledTimes(1);
-    expect(mockedWriteSentenceToCache).toHaveBeenCalledWith('story-1', 0, 'aGVsbG8=');
-    // Stream completed successfully
-    expect(result).toBe('/cache/audio_story-1.wav');
-  });
-
-  it('sends max_sentences parameter when provided', async () => {
-    const sseEvents = [
-      'event: sentence',
-      'data: {"index":0,"total":1,"audio":"aGVsbG8="}',
-      '',
-      'event: done',
-      'data: {"total_sentences":1}',
-      '',
-    ];
-
-    (globalThis.fetch as jest.Mock).mockResolvedValue(createMockSSEResponse(sseEvents));
-    mockedFinalizeAudioCache.mockResolvedValue('/cache/audio_story-1.wav');
-
-    await streamStoryAudio('story-1', 'Hello world', 2);
-
-    expect(globalThis.fetch).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        body: JSON.stringify({ story_text: 'Hello world', max_sentences: 2 }),
+  it('throws when response has no audio data', async () => {
+    (globalThis.fetch as jest.Mock).mockResolvedValue(
+      new Response(JSON.stringify({ error: 'TTS failed' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
       })
+    );
+
+    await expect(fetchStoryAudio('story-1', 'Hello')).rejects.toThrow(
+      'No audio data in response'
     );
   });
 
   it('throws when session is null', async () => {
-    mockGetSession.mockResolvedValueOnce({ data: { session: null } });
+    mockedGetSession.mockResolvedValueOnce({ data: { session: null } });
 
-    await expect(streamStoryAudio('story-1', 'Hello')).rejects.toThrow('Not authenticated');
-  });
-
-  it('throws when getSession fails', async () => {
-    mockGetSession.mockRejectedValueOnce(new Error('Network error'));
-
-    await expect(streamStoryAudio('story-1', 'Hello')).rejects.toThrow('Network error');
+    await expect(fetchStoryAudio('story-1', 'Hello')).rejects.toThrow('Not authenticated');
   });
 });
