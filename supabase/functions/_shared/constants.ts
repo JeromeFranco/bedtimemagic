@@ -71,8 +71,8 @@ export const STAGE_PROFILES: Record<string, { label: string; vocabulary: string;
   preschool: {
     label: "Preschool (ages 4-5)",
     vocabulary: "Concrete, familiar objects (blanket, stars, moon, teddy). Avoid abstract nouns. Use simple, warm words.",
-    sentences: "5-8 words per sentence. Repetition welcome. Use 'and then... and then...' patterns. Keep paragraphs short.",
-    concepts: "Cause-effect only. Name emotions directly ('Barnaby felt sad'). No metaphors yet - keep it literal and warm.",
+    sentences: "Average 6-10 words per sentence. Prefer simple subject-verb-object structures. Use coordinating conjunctions ('and', 'but', 'so') to connect ideas. Avoid subordinate clauses, relative clauses, and passive voice. Repetition of sentence patterns is welcome. Keep paragraphs short.",
+    concepts: "Cause-effect only. Name emotions directly ('Barnaby felt sad'). Simple physical similes are fine ('it felt like a hug') — avoid abstract literary metaphors that require reasoning beyond the child's experience.",
   },
   early_primary: {
     label: "Early Primary (ages 6-7)",
