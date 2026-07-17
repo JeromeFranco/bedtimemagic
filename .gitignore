@@ -45,3 +45,6 @@ example
 
 # test coverage
 coverage/
+
+# test output
+output/

@@ -5,7 +5,7 @@ import { SafetyFilterError } from "../_shared/errors.ts";
 import { createMimoClient } from "../_shared/openai.ts";
 import { buildPrompt, type PromptInput } from "./prompt.ts";
 
-const MODEL = "mimo-v2.5-pro";
+const MODEL = "mimo-v2.5-pro-ultraspeed";
 const TIMEOUT_MS = 60_000;
 
 interface RequestBody {
