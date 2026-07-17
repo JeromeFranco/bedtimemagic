@@ -30,6 +30,12 @@ jest.mock('expo-file-system', () => {
       mockFiles.set(this.uri, { exists: false, lastModified: 0 });
       this.exists = false;
     }
+
+    static async downloadFileAsync(_url: string, dest: MockFile): Promise<MockFile> {
+      mockFiles.set(dest.uri, { exists: true, lastModified: Date.now() });
+      dest.exists = true;
+      return dest;
+    }
   }
 
   class MockDirectory {

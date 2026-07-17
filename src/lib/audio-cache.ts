@@ -33,15 +33,7 @@ export async function getCachedCoverPath(storyId: string): Promise<string | null
 
 export async function cacheCoverImage(storyId: string, imageUrl: string): Promise<string> {
   const file = new File(coverPath(storyId));
-  const response = await fetch(imageUrl);
-  const blob = await response.blob();
-  const reader = new FileReader();
-  const base64 = await new Promise<string>((resolve) => {
-    reader.onloadend = () => resolve(reader.result as string);
-    reader.readAsDataURL(blob);
-  });
-  const base64Data = base64.split(',')[1];
-  file.write(base64Data, { encoding: EncodingType.Base64 });
+  await File.downloadFileAsync(imageUrl, file);
   return file.uri;
 }
 
