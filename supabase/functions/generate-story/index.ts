@@ -74,7 +74,7 @@ export async function callLLM(
     {
       model: MODEL,
       messages,
-      reasoning_effort: "high",
+      reasoning_effort: "medium",
     },
     { timeout: TIMEOUT_MS, maxRetries: 0, signal },
   );
