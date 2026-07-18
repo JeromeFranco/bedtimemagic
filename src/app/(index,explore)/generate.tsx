@@ -8,7 +8,7 @@ import { GlassView } from 'expo-glass-effect';
 import { BreathingCircle } from '@/components/breathing-circle';
 import { CalmingCopy } from '@/components/calming-copy';
 import { ThemedText } from '@/components/themed-text';
-import { generateStory, generateCoverImage } from '@/api/stories';
+import { generateStory } from '@/api/stories';
 import { useSelectedChild } from '@/contexts/SelectedChildContext';
 import { Colors, Spacing } from '@/constants/theme';
 import type { ChallengeCategory, ChallengeTrigger } from '@/types';
@@ -33,11 +33,6 @@ export default function GenerateScreen() {
       );
     },
     onSuccess: (story) => {
-      // Fire cover image generation async (don't await)
-      generateCoverImage(story.id, story.title).catch(() => {
-        // Failure is non-fatal, placeholder will show
-      });
-
       router.replace({
         pathname: '/story',
         params: { id: story.id },

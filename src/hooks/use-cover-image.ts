@@ -57,15 +57,23 @@ export function useCoverImage(
 
     const init = async () => {
       try {
-        // Fire generation (don't await full completion)
+        // Check if story already has a cover
+        const story = await getStory(storyId);
+        if (cancelled) return;
+
+        if (story.cover_image_url) {
+          setCoverUrl(story.cover_image_url);
+          setIsLoading(false);
+          return;
+        }
+
+        // No cover yet — trigger generation and poll
         generateCoverImage(storyId, title).catch(() => {
           // Generation failure is non-fatal, placeholder stays
         });
 
-        // Start polling immediately
         startPolling();
 
-        // Set timeout
         timeoutRef.current = setTimeout(() => {
           if (!cancelled) {
             setIsLoading(false);
