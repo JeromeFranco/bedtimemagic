@@ -59,12 +59,17 @@ describe('getAudioSource', () => {
   });
 
   it('waits for inflight pre-fetch instead of starting a new fetch', async () => {
+    mockedGetCachedAudioPath.mockResolvedValue(null);
     let resolveFetch!: (value: string) => void;
     mockedFetchStoryAudio.mockImplementation(
       () => new Promise<string>((resolve) => { resolveFetch = resolve; })
     );
 
     const preFetchPromise = preFetchAudio('story-1', MOCK_STORY.story_text);
+    // Let preFetchAudio's first await (getCachedAudioPath) settle so the
+    // inflight promise is stored in the map before getAudioSource checks it.
+    await new Promise((r) => setTimeout(r, 0));
+
     const sourcePromise = getAudioSource(MOCK_STORY);
 
     resolveFetch('/cache/audio_story-1.mp3');
@@ -85,7 +90,8 @@ describe('getAmbientAudioSource', () => {
 });
 
 describe('preFetchAudio', () => {
-  it('calls fetchStoryAudio with story text', async () => {
+  it('calls fetchStoryAudio with story text on cache miss', async () => {
+    mockedGetCachedAudioPath.mockResolvedValue(null);
     mockedFetchStoryAudio.mockResolvedValue('/cache/audio_story-1.mp3');
 
     await preFetchAudio('story-1', 'Hello world');
@@ -93,13 +99,26 @@ describe('preFetchAudio', () => {
     expect(mockedFetchStoryAudio).toHaveBeenCalledWith('story-1', 'Hello world');
   });
 
+  it('returns cached path without fetching on cache hit', async () => {
+    mockedGetCachedAudioPath.mockResolvedValue('/cache/audio_story-1.mp3');
+
+    const result = await preFetchAudio('story-1', 'Hello world');
+
+    expect(result).toBe('/cache/audio_story-1.mp3');
+    expect(mockedFetchStoryAudio).not.toHaveBeenCalled();
+  });
+
   it('deduplicates concurrent calls for the same storyId', async () => {
+    mockedGetCachedAudioPath.mockResolvedValue(null);
     let resolveFetch!: (value: string) => void;
     mockedFetchStoryAudio.mockImplementation(
       () => new Promise<string>((resolve) => { resolveFetch = resolve; })
     );
 
     const promise1 = preFetchAudio('story-1', 'Hello world');
+    // Let promise1's getCachedAudioPath settle so the inflight entry is stored.
+    await new Promise((r) => setTimeout(r, 0));
+
     const promise2 = preFetchAudio('story-1', 'Hello world');
 
     expect(mockedFetchStoryAudio).toHaveBeenCalledTimes(1);
@@ -111,12 +130,16 @@ describe('preFetchAudio', () => {
     expect(result2).toBe('/cache/audio_story-1.mp3');
   });
 
-  it('allows new preFetch after previous completes', async () => {
+  it('skips fetch on second call when first completed and cached', async () => {
+    mockedGetCachedAudioPath.mockResolvedValueOnce(null);
     mockedFetchStoryAudio.mockResolvedValue('/cache/audio_story-1.mp3');
 
     await preFetchAudio('story-1', 'Hello world');
+
+    // Second call: cache now exists
+    mockedGetCachedAudioPath.mockResolvedValue('/cache/audio_story-1.mp3');
     await preFetchAudio('story-1', 'Hello world');
 
-    expect(mockedFetchStoryAudio).toHaveBeenCalledTimes(2);
+    expect(mockedFetchStoryAudio).toHaveBeenCalledTimes(1);
   });
 });

@@ -14,6 +14,9 @@ export async function preFetchAudio(
   const existing = inflightPrefetches.get(storyId);
   if (existing) return existing;
 
+  const cachedPath = await getCachedAudioPath(storyId);
+  if (cachedPath) return cachedPath;
+
   const promise = fetchStoryAudio(storyId, storyText)
     .finally(() => inflightPrefetches.delete(storyId));
   inflightPrefetches.set(storyId, promise);
