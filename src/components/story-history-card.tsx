@@ -1,11 +1,14 @@
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { useEffect, useState } from 'react';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing } from '@/constants/theme';
 import { getCachedCoverPath } from '@/lib/audio-cache';
 import { CHALLENGE_TRIGGERS, PROTAGONISTS, type Story } from '@/types';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface StoryHistoryCardProps {
   story: Story;
@@ -26,6 +29,11 @@ function formatRelativeDate(dateString: string): string {
 
 export function StoryHistoryCard({ story, onPress }: StoryHistoryCardProps) {
   const [coverPath, setCoverPath] = useState<string | null>(null);
+  const bgColor = useSharedValue<string>(Colors.dark.bgElement);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    backgroundColor: bgColor.value,
+  }));
 
   const protagonist = PROTAGONISTS.find((p) => p.id === story.protagonist);
   const challenge = CHALLENGE_TRIGGERS.find((c) => c.id === story.challenge);
@@ -35,8 +43,18 @@ export function StoryHistoryCard({ story, onPress }: StoryHistoryCardProps) {
   }, [story.id]);
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => pressed && styles.pressed}>
-      <ThemedView type="backgroundElement" style={styles.card}>
+    <AnimatedPressable
+      onPress={onPress}
+      onPressIn={() => {
+        // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
+        bgColor.value = withTiming(Colors.dark.bgElementHover, { duration: 150 });
+      }}
+      onPressOut={() => {
+        // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
+        bgColor.value = withTiming(Colors.dark.bgElement, { duration: 150 });
+      }}
+      style={[styles.card, animatedStyle]}
+    >
         <View style={styles.coverContainer}>
           {coverPath ? (
             <Image source={{ uri: coverPath }} style={styles.coverImage} resizeMode="cover" />
@@ -69,8 +87,7 @@ export function StoryHistoryCard({ story, onPress }: StoryHistoryCardProps) {
             {formatRelativeDate(story.created_at)}
           </ThemedText>
         </View>
-      </ThemedView>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -81,9 +98,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     gap: Spacing.three,
   },
-  pressed: {
-    opacity: 0.8,
-  },
+
   coverContainer: {
     width: 80,
     height: 80,
@@ -99,7 +114,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.dark.loadingBackground,
+    backgroundColor: Colors.dark.bgDeepest,
   },
   coverEmoji: {
     fontSize: 32,
@@ -112,9 +127,9 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
   },
   title: {
-    color: Colors.dark.text,
+    color: Colors.dark.textPrimary,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   metadata: {
     flexDirection: 'row',

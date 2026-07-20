@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
-import { GlassView } from 'expo-glass-effect';
+
 import Animated, {
   FadeIn,
   FadeOut,
@@ -130,7 +130,7 @@ export default function PlayerScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
-          <ActivityIndicator size="large" color={Colors.dark.text} />
+          <ActivityIndicator size="large" color={Colors.dark.textPrimary} />
         </View>
       </SafeAreaView>
     );
@@ -186,7 +186,7 @@ export default function PlayerScreen() {
               onPress={confirmAffirmation}
               style={({ pressed }) => [
                 styles.primaryButton,
-                pressed && { opacity: 0.85 },
+                { backgroundColor: pressed ? Colors.dark.bgElementHover : Colors.dark.bgElement },
               ]}
             >
               <ThemedText style={styles.primaryButtonText}>Goodnight</ThemedText>
@@ -245,14 +245,12 @@ export default function PlayerScreen() {
               onPress={handlePlayPause}
               style={({ pressed }) => [
                 styles.playPauseButton,
-                pressed && { opacity: 0.85 },
+                { backgroundColor: pressed ? Colors.dark.bgElementHover : Colors.dark.bgElement },
               ]}
             >
-              <GlassView glassEffectStyle="regular" style={styles.playPauseGlass}>
-                <ThemedText style={styles.playPauseIcon}>
-                  {isBuffering ? '⏳' : isPlaying ? '⏸' : '▶'}
-                </ThemedText>
-              </GlassView>
+              <ThemedText style={styles.playPauseIcon}>
+                {isBuffering ? '⏳' : isPlaying ? '⏸' : '▶'}
+              </ThemedText>
             </Pressable>
           </View>
 
@@ -292,7 +290,7 @@ export default function PlayerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.dark.bgBase,
   },
   backgroundContainer: {
     ...StyleSheet.absoluteFill,
@@ -305,7 +303,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.dark.loadingBackground,
+    backgroundColor: Colors.dark.bgDeepest,
   },
   placeholderEmoji: {
     fontSize: 80,
@@ -332,7 +330,7 @@ const styles = StyleSheet.create({
   },
   topButtonText: {
     fontSize: 24,
-    color: Colors.dark.text,
+    color: Colors.dark.textPrimary,
   },
   titleArea: {
     alignItems: 'center',
@@ -340,9 +338,9 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   storyTitle: {
-    color: Colors.dark.text,
+    color: Colors.dark.textPrimary,
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: '700',
     textAlign: 'center',
   },
   protagonistLabel: {
@@ -369,7 +367,7 @@ const styles = StyleSheet.create({
   },
   playPauseIcon: {
     fontSize: 32,
-    color: Colors.dark.text,
+    color: Colors.dark.textPrimary,
   },
   bottomArea: {
     paddingHorizontal: Spacing.four,
@@ -387,7 +385,7 @@ const styles = StyleSheet.create({
   },
   seekBarFill: {
     height: 4,
-    backgroundColor: Colors.dark.text,
+    backgroundColor: Colors.dark.textPrimary,
     borderRadius: 2,
     position: 'absolute',
     top: 0,
@@ -397,7 +395,7 @@ const styles = StyleSheet.create({
     width: 14,
     height: 14,
     borderRadius: 7,
-    backgroundColor: Colors.dark.text,
+    backgroundColor: Colors.dark.textPrimary,
     position: 'absolute',
     top: -5,
     marginLeft: -7,
@@ -414,7 +412,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.dark.bgBase,
   },
   errorText: {
     color: Colors.dark.textSecondary,
@@ -457,16 +455,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.five,
   },
   pillowTalkText: {
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: Colors.dark.textPrimary,
     fontSize: 24,
-    fontWeight: '300',
+    fontWeight: '400',
     lineHeight: 36,
     textAlign: 'center',
   },
   affirmationText: {
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: Colors.dark.textPrimary,
     fontSize: 28,
-    fontWeight: '300',
+    fontWeight: '400',
     lineHeight: 40,
     textAlign: 'center',
   },
@@ -478,15 +476,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryButton: {
-    backgroundColor: '#A07BD4',
+    backgroundColor: Colors.dark.bgElement,
     paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.six,
-    borderRadius: 28,
+    paddingHorizontal: Spacing.seven,
+    borderRadius: 12,
     width: '100%',
     alignItems: 'center',
   },
   primaryButtonText: {
-    color: '#ffffff',
+    color: Colors.dark.textPrimary,
     fontSize: 18,
     fontWeight: '500',
   },
@@ -608,7 +606,7 @@ function PillowTalkBridge({
               onPress={onSkip}
               style={({ pressed }) => [
                 styles.primaryButton,
-                pressed && { opacity: 0.85 },
+                { backgroundColor: pressed ? Colors.dark.bgElementHover : Colors.dark.bgElement },
               ]}
             >
               <ThemedText style={styles.primaryButtonText}>Next</ThemedText>
@@ -617,7 +615,7 @@ function PillowTalkBridge({
               onPress={onSkip}
               style={({ pressed }) => [
                 styles.ghostButton,
-                pressed && { opacity: 0.7 },
+                pressed && { backgroundColor: Colors.dark.bgElementHover },
               ]}
             >
               <ThemedText style={styles.ghostButtonText}>Skip for tonight</ThemedText>

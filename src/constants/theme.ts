@@ -8,12 +8,24 @@ import { ChallengeCategory } from '@/types';
 
 export const Colors = {
   dark: {
-    text: '#E2E0F0',
-    background: '#0F1328',
-    backgroundElement: '#1F2545',
-    backgroundSelected: '#2D345C',
+    // Backgrounds
+    bgDeepest: '#060A1A',
+    bgBase: '#0F1328',
+    bgSurface: '#171C38',
+    bgElement: '#1F2545',
+    bgElementHover: '#282F55',
+    bgSelected: '#2D345C',
+    // Borders
+    borderSubtle: '#232848',
+    borderDefault: '#2E3560',
+    // Text
+    textPrimary: '#E2E0F0',
     textSecondary: '#8E8AA8',
-    loadingBackground: '#060A1A',
+    textMuted: '#5C5878',
+    // Semantic
+    success: '#7BC4A8',
+    warning: '#D4A06A',
+    error: '#D47A6A',
   },
 } as const;
 
@@ -42,10 +54,12 @@ export const Spacing = {
   half: 2,
   one: 4,
   two: 8,
+  twoHalf: 12,
   three: 16,
   four: 24,
   five: 32,
-  six: 64,
+  six: 48,
+  seven: 64,
 } as const;
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;

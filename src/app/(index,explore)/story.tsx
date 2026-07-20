@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
-import { GlassView } from 'expo-glass-effect';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -12,6 +12,8 @@ import { preFetchAudio } from '@/lib/audio-utils';
 import { useCoverImage } from '@/hooks/use-cover-image';
 import { useStory } from '@/hooks/use-story';
 import { getCachedCoverPath, cacheCoverImage } from '@/lib/audio-cache';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function StoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -45,10 +47,15 @@ export default function StoryScreen() {
     }
   }, [story?.id, story?.story_text]);
 
+  const playBgColor = useSharedValue<string>(Colors.dark.bgElement);
+  const playAnimatedStyle = useAnimatedStyle(() => ({
+    backgroundColor: playBgColor.value,
+  }));
+
   if (isLoading) {
     return (
       <ThemedView style={[styles.container, styles.center]}>
-        <ActivityIndicator size="large" color={Colors.dark.text} />
+        <ActivityIndicator size="large" color={Colors.dark.textPrimary} />
         <ThemedText style={styles.loadingText}>Loading story...</ThemedText>
       </ThemedView>
     );
@@ -106,17 +113,20 @@ export default function StoryScreen() {
         <ThemedText style={styles.title}>{story.title}</ThemedText>
         <ThemedText style={styles.moral}>{story.moral}</ThemedText>
 
-        <Pressable
+        <AnimatedPressable
           onPress={handlePlay}
-          style={({ pressed }) => [
-            styles.playButton,
-            pressed && { opacity: 0.85 },
-          ]}
+          onPressIn={() => {
+            // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
+            playBgColor.value = withTiming(Colors.dark.bgElementHover, { duration: 150 });
+          }}
+          onPressOut={() => {
+            // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
+            playBgColor.value = withTiming(Colors.dark.bgElement, { duration: 150 });
+          }}
+          style={[styles.playButton, playAnimatedStyle]}
         >
-          <GlassView glassEffectStyle="regular" style={styles.playButtonGlass}>
-            <ThemedText style={styles.playButtonText}>Play Story</ThemedText>
-          </GlassView>
-        </Pressable>
+          <ThemedText style={styles.playButtonText}>Play Story</ThemedText>
+        </AnimatedPressable>
       </ThemedView>
     </SafeAreaView>
   );
@@ -125,7 +135,7 @@ export default function StoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.dark.bgBase,
   },
   imageContainer: {
     flex: 1,
@@ -142,14 +152,14 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'transparent',
-    borderBottomColor: Colors.dark.background,
+    borderBottomColor: Colors.dark.bgBase,
     borderBottomWidth: 80,
   },
   placeholder: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.dark.loadingBackground,
+    backgroundColor: Colors.dark.bgDeepest,
     gap: Spacing.three,
   },
   placeholderEmoji: {
@@ -170,7 +180,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   title: {
-    color: Colors.dark.text,
+    color: Colors.dark.textPrimary,
     fontSize: 24,
     fontWeight: '700',
   },
@@ -181,19 +191,15 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   playButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginTop: Spacing.one,
-  },
-  playButtonGlass: {
+    borderRadius: 12,
     paddingVertical: Spacing.three,
     paddingHorizontal: Spacing.five,
-    borderRadius: 16,
     alignItems: 'center',
+    marginTop: Spacing.one,
   },
   playButtonText: {
-    color: Colors.dark.text,
-    fontWeight: '600',
+    color: Colors.dark.textPrimary,
+    fontWeight: '500',
     fontSize: 17,
   },
   center: {

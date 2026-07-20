@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   sheet: {
-    backgroundColor: Colors.dark.backgroundElement,
+    backgroundColor: Colors.dark.bgElement,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: Spacing.two,
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: Colors.dark.textMuted,
     alignSelf: 'center',
     marginBottom: Spacing.three,
   },
@@ -107,17 +107,17 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.one,
   },
   profileRowSelected: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: Colors.dark.bgSelected,
   },
   profileInfo: {
     flex: 1,
   },
   profileName: {
-    fontWeight: 600,
+    fontWeight: '500',
   },
   check: {
     fontSize: 18,
-    color: Colors.dark.text,
+    color: Colors.dark.textPrimary,
   },
   addProfileRow: {
     flexDirection: 'row',
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two,
     marginTop: Spacing.two,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    borderTopColor: Colors.dark.borderSubtle,
   },
   addProfileRowDisabled: {
     opacity: 0.5,

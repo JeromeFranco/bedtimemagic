@@ -98,11 +98,13 @@ Category colors are desaturated and shifted toward warmth. They glow softly agai
 
 - **Iconography:** SF Symbols (iOS) / Material Symbols (Android), weight "regular" (24px default). Icons are used only for playback controls (play, pause, skip) and navigation (back arrow). No decorative icons. No emoji in UI chrome — emoji appear only in the post-story feedback mechanic where they're functional (Great / Okay / Missed the mark).
 
+- **Press feedback:** Every interactive element (buttons, chips, cards with tap actions) uses the same press effect — background shifts to the next elevation step on the neutral scale (`--bg-element` → `--bg-element-hover` for buttons/chips, `--bg-surface` → `--bg-element` for cards). No opacity dimming, no scale transforms, no haptic feedback. The background shift is the only signal. Duration: 150ms, easing: `withTiming()` from Reanimated. On release, the element returns to its resting state over the same duration. The press state should feel like the element warms slightly — not like it's being squashed or flickered.
+
 ## 4. Accessibility
 
 - **Text contrast:** All text meets WCAG AA. Primary text (`#E2E0F0` on `#0F1328`) ≈ 11.8:1. Secondary text (`#8E8AA8` on `#0F1328`) ≈ 5.0:1. Both exceed 4.5:1 minimum.
-- **Motion:** The loading screen's breathing pacer animation respects `prefers-reduced-motion`. All screen transitions use crossfade (200ms), never slide or bounce. The sleep mode transition fades to black over 1000ms.
-- **Focus indicators:** 2px outline in `--text-secondary` (`#8890A8`), offset 2px from the element. Visible on all interactive elements when using keyboard/switch control.
+- **Motion:** The loading screen's breathing pacer animation respects reduced-motion preferences via `AccessibilityInfo.isReduceMotionEnabled()`. All screen transitions use crossfade (200ms), never slide or bounce. The sleep mode transition fades to black over 1000ms.
+- **Focus indicators:** On platforms with keyboard/switch control, interactive elements show a 2px border in `--text-secondary` with 2px offset when focused. On phone-only use, the press feedback (background elevation shift) serves as the primary interaction cue.
 - **Alt text:** Cover art alt text describes the scene (e.g., "Watercolor illustration of a bear in a forest clearing") — never says "image" or "cover art." Challenge chips are self-labeling and need no additional alt text.
 
 ## 5. Voice & Tone
@@ -119,7 +121,11 @@ Category colors are desaturated and shifted toward warmth. They glow softly agai
 - **Component library convention:** `@expo/ui` universal components for native feel (SwiftUI on iOS, Jetpack Compose on Android). React Native `StyleSheet` for layout. No third-party UI kit.
 - **Image treatment:** Cover art is AI-generated watercolor children's book illustration, displayed at 1:1 aspect ratio on the Story Card, no border radius on the image itself (the card's rounded corners clip it). No other images in the app.
 - **Grid system:** No formal grid. Single-column vertical stack for all screens. Content is centered with max-width 800px on larger devices.
-- **Motion rules:** Easing: `ease-out` for all transitions. Duration: 150ms for micro-interactions (chip tap, button press), 200ms for screen transitions, 1000ms for sleep mode fade. No spring animations. No bounce. The motion language is "settle" — everything slows down, nothing pops.
+- **Motion rules:** Easing: `ease-out` for all transitions. Duration: 150ms for micro-interactions (chip tap, button press), 200ms for screen transitions, 1000ms for sleep mode fade. No spring animations. No bounce. The motion language is "settle" — everything slows down, nothing pops. In Reanimated, use `withTiming()` exclusively — never `withSpring()`, which defaults to bounce.
+- **Orientation:** Portrait-locked. The app never rotates. Set via `expo-screen-orientation` or `app.json` `orientation` field.
+- **Safe areas:** All screens respect safe area insets. Content does not bleed into the status bar or home indicator area. Use `SafeAreaView` from `react-native-safe-area-context`. On screens with a visible header, the header sits below the safe area; on immersive screens (player, sleep mode), content extends edge-to-edge with the status bar overlaid.
+- **Status bar:** `expo-status-bar` with `style="light"` globally. On Android, translucent status bar with `backgroundColor` set to `--bg-base` to avoid a visible seam.
+- **Splash screen:** `expo-splash-screen` background is `--bg-deepest` (#060A1A). No logo flash, no brand moment — the parent opens the app in a dark room and the first thing they see is the home screen, not a splash.
 
 ## 7. Anti-Patterns
 

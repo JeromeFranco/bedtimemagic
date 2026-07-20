@@ -3,7 +3,7 @@ import { Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
-import { GlassView } from 'expo-glass-effect';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { BreathingCircle } from '@/components/breathing-circle';
 import { CalmingCopy } from '@/components/calming-copy';
@@ -12,6 +12,8 @@ import { generateStory } from '@/api/stories';
 import { useSelectedChild } from '@/contexts/SelectedChildContext';
 import { Colors, Spacing } from '@/constants/theme';
 import type { ChallengeCategory, ChallengeTrigger } from '@/types';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function GenerateScreen() {
   const { category, trigger } = useLocalSearchParams<{
@@ -49,25 +51,7 @@ export default function GenerateScreen() {
 
   if (mutation.isError) {
     return (
-      <SafeAreaView style={[styles.container, styles.background]}>
-        <ThemedText style={styles.errorText}>
-          Hmm, something went wrong.{"\n"}Let&apos;s try again.
-        </ThemedText>
-        <Pressable
-          onPress={() => mutation.mutate()}
-          style={({ pressed }) => [
-            styles.button,
-            pressed && { opacity: 0.85 },
-          ]}
-        >
-          <GlassView glassEffectStyle="regular" style={styles.buttonGlass}>
-            <ThemedText style={styles.buttonText}>Try Again</ThemedText>
-          </GlassView>
-        </Pressable>
-        <Pressable onPress={() => router.back()}>
-          <ThemedText style={styles.backText}>Go Back</ThemedText>
-        </Pressable>
-      </SafeAreaView>
+      <ErrorState onRetry={() => mutation.mutate()} onBack={() => router.back()} />
     );
   }
 
@@ -75,6 +59,38 @@ export default function GenerateScreen() {
     <SafeAreaView style={[styles.container, styles.background]}>
       <BreathingCircle />
       <CalmingCopy />
+    </SafeAreaView>
+  );
+}
+
+function ErrorState({ onRetry, onBack }: { onRetry: () => void; onBack: () => void }) {
+  const retryBgColor = useSharedValue<string>(Colors.dark.bgElement);
+  const retryAnimatedStyle = useAnimatedStyle(() => ({
+    backgroundColor: retryBgColor.value,
+  }));
+
+  return (
+    <SafeAreaView style={[styles.container, styles.background]}>
+      <ThemedText style={styles.errorText}>
+        Hmm, something went wrong.{"\n"}Let&apos;s try again.
+      </ThemedText>
+      <AnimatedPressable
+        onPress={onRetry}
+        onPressIn={() => {
+          // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
+          retryBgColor.value = withTiming(Colors.dark.bgElementHover, { duration: 150 });
+        }}
+        onPressOut={() => {
+          // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
+          retryBgColor.value = withTiming(Colors.dark.bgElement, { duration: 150 });
+        }}
+        style={[styles.button, retryAnimatedStyle]}
+      >
+        <ThemedText style={styles.buttonText}>Try Again</ThemedText>
+      </AnimatedPressable>
+      <Pressable onPress={onBack}>
+        <ThemedText style={styles.backText}>Go Back</ThemedText>
+      </Pressable>
     </SafeAreaView>
   );
 }
@@ -87,7 +103,7 @@ const styles = StyleSheet.create({
     gap: Spacing.five,
   },
   background: {
-    backgroundColor: Colors.dark.loadingBackground,
+    backgroundColor: Colors.dark.bgDeepest,
   },
   errorText: {
     color: Colors.dark.textSecondary,
@@ -96,18 +112,15 @@ const styles = StyleSheet.create({
     lineHeight: 28,
   },
   button: {
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  buttonGlass: {
+    borderRadius: 12,
     paddingVertical: Spacing.three,
     paddingHorizontal: Spacing.five,
-    borderRadius: 16,
+    alignItems: 'center',
   },
   buttonText: {
-    color: Colors.dark.text,
-    fontWeight: '600',
-    fontSize: 16,
+    color: Colors.dark.textPrimary,
+    fontWeight: '500',
+    fontSize: 17,
   },
   backText: {
     color: Colors.dark.textSecondary,
