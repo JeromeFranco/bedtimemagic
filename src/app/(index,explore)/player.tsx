@@ -535,10 +535,8 @@ function PillowTalkBridge({
   }));
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
-    overlayOpacity.value = withTiming(0.7, { duration: 1000, easing: Easing.out(Easing.ease) });
-    // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
-    screenBrightness.value = withTiming(1, { duration: 2000, easing: Easing.out(Easing.ease) });
+    overlayOpacity.set(withTiming(0.7, { duration: 1000, easing: Easing.out(Easing.ease) }));
+    screenBrightness.set(withTiming(1, { duration: 2000, easing: Easing.out(Easing.ease) }));
     bridgeHideTimerRef.current = setTimeout(() => {
       setBridgeControlsVisible(false);
     }, BRIDGE_HIDE_DELAY);

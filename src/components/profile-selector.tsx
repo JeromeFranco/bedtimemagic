@@ -27,12 +27,10 @@ export function ProfileSelector() {
         style={[styles.selector, animatedStyle]}
         onPress={() => setSheetVisible(true)}
         onPressIn={() => {
-          // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
-          bgColor.value = withTiming(Colors.dark.bgElementHover, { duration: 150 });
+          bgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }));
         }}
         onPressOut={() => {
-          // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
-          bgColor.value = withTiming(Colors.dark.bgElement, { duration: 150 });
+          bgColor.set(withTiming(Colors.dark.bgElement, { duration: 150 }));
         }}
       >
         <ProfileAvatar emoji={selectedProfile.emoji} size={40} />

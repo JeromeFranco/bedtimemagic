@@ -46,8 +46,7 @@ export default function GenerateScreen() {
     if (selectedProfile && category && trigger) {
       mutation.mutate();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProfile, category, trigger]);
+  }, [selectedProfile, category, trigger, mutation.mutate]);
 
   if (mutation.isError) {
     return (
@@ -77,12 +76,10 @@ function ErrorState({ onRetry, onBack }: { onRetry: () => void; onBack: () => vo
       <AnimatedPressable
         onPress={onRetry}
         onPressIn={() => {
-          // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
-          retryBgColor.value = withTiming(Colors.dark.bgElementHover, { duration: 150 });
+          retryBgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }));
         }}
         onPressOut={() => {
-          // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
-          retryBgColor.value = withTiming(Colors.dark.bgElement, { duration: 150 });
+          retryBgColor.set(withTiming(Colors.dark.bgElement, { duration: 150 }));
         }}
         style={[styles.button, retryAnimatedStyle]}
       >

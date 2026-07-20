@@ -2,7 +2,7 @@
 
 ## 1. Objective
 
-The design should feel like a calm, trustworthy tool that gets out of the way. A parent holding a phone at 8pm, running on fumes, should be able to get from "my kid had a rough day" to a story playing in under 60 seconds with zero friction. The visual system should read as *quiet confidence* — dark, warm, low-stimulus — not as a toy store or a wellness app trying too hard. Quality bar: something a thoughtful indie developer would be proud to ship, not a template.
+The design should feel like a calm, trustworthy tool that gets out of the way. A parent holding a phone at 8pm, running on fumes, should be able to get from "my kid had a rough day" to a story playing in under 60 seconds with zero friction. The visual system should read as _quiet confidence_ — dark, warm, low-stimulus — not as a toy store or a wellness app trying too hard. Quality bar: something a thoughtful indie developer would be proud to ship, not a template.
 
 ## 2. Product Context
 
@@ -20,47 +20,48 @@ The app operates in **dark mode exclusively**. There is no light mode. The palet
 
 **Neutral scale (backgrounds and surfaces):**
 
-| Token | Hex | Role |
-|---|---|---|
-| `--bg-deepest` | `#060A1A` | Sleep mode screen, true dark |
-| `--bg-base` | `#0F1328` | Primary screen background — warm indigo, not cold navy |
-| `--bg-surface` | `#171C38` | Elevated surfaces (cards, modals) |
-| `--bg-element` | `#1F2545` | Interactive elements (chips, inputs) |
-| `--bg-element-hover` | `#282F55` | Hover/press state |
-| `--bg-selected` | `#2D345C` | Selected/active state |
-| `--border-subtle` | `#232848` | Subtle dividers, card borders |
-| `--border-default` | `#2E3560` | Visible borders |
+| Token                | Hex       | Role                                                   |
+| -------------------- | --------- | ------------------------------------------------------ |
+| `--bg-deepest`       | `#060A1A` | Sleep mode screen, true dark                           |
+| `--bg-base`          | `#0F1328` | Primary screen background — warm indigo, not cold navy |
+| `--bg-surface`       | `#171C38` | Elevated surfaces (cards, modals)                      |
+| `--bg-element`       | `#1F2545` | Interactive elements (chips, inputs)                   |
+| `--bg-element-hover` | `#282F55` | Hover/press state                                      |
+| `--bg-selected`      | `#2D345C` | Selected/active state                                  |
+| `--border-subtle`    | `#232848` | Subtle dividers, card borders                          |
+| `--border-default`   | `#2E3560` | Visible borders                                        |
 
 The key shift: every neutral has a warm indigo undertone (`#0F1328` vs the previous cold `#0A0E27`). This gives the app a cohesive "night sky" feeling instead of a generic dark-mode dashboard.
 
 **Text scale:**
 
-| Token | Hex | Role |
-|---|---|---|
-| `--text-primary` | `#E2E0F0` | Headlines, primary body — slightly warm white, not clinical pure white |
-| `--text-secondary` | `#8E8AA8` | Captions, secondary info — warm gray-lavender, not blue-gray |
-| `--text-muted` | `#5C5878` | Disabled, tertiary |
+| Token              | Hex       | Role                                                                   |
+| ------------------ | --------- | ---------------------------------------------------------------------- |
+| `--text-primary`   | `#E2E0F0` | Headlines, primary body — slightly warm white, not clinical pure white |
+| `--text-secondary` | `#8E8AA8` | Captions, secondary info — warm gray-lavender, not blue-gray           |
+| `--text-muted`     | `#5C5878` | Disabled, tertiary                                                     |
 
 **Category accents (challenge chips, post-story feedback):**
 
-| Category | Primary | Tint (12% opacity) | Mood |
-|---|---|---|---|
-| Screen Time | `#7EB8E0` | `rgba(126,184,224,0.12)` | Moonlight through a window — cool but gentle |
-| Big Emotions | `#D4A06A` | `rgba(212,160,106,0.12)` | Warm candlelight — amber, not electric yellow |
-| Bedtime Friction | `#A07BD4` | `rgba(160,123,212,0.12)` | Lavender dusk — soft purple, not neon violet |
-| Social Skills | `#7BC4A8` | `rgba(123,196,168,0.12)` | Sage after rain — muted green, not emerald |
+| Category         | Primary   | Tint (12% opacity)       | Mood                                          |
+| ---------------- | --------- | ------------------------ | --------------------------------------------- |
+| Screen Time      | `#7EB8E0` | `rgba(126,184,224,0.12)` | Moonlight through a window — cool but gentle  |
+| Big Emotions     | `#D4A06A` | `rgba(212,160,106,0.12)` | Warm candlelight — amber, not electric yellow |
+| Bedtime Friction | `#A07BD4` | `rgba(160,123,212,0.12)` | Lavender dusk — soft purple, not neon violet  |
+| Social Skills    | `#7BC4A8` | `rgba(123,196,168,0.12)` | Sage after rain — muted green, not emerald    |
 
 Category colors are desaturated and shifted toward warmth. They glow softly against the indigo background like stained glass in a dim room, not like neon signs. Each color is used ONLY for challenge selection chips, their tints, and post-story lesson-log feedback. Never as section backgrounds, button fills, or decorative elements.
 
 **Semantic colors:**
 
-| Token | Hex | Usage |
-|---|---|---|
-| `--success` | `#7BC4A8` | Positive feedback emoji, confirmed actions |
-| `--warning` | `#D4A06A` | Usage caps approaching, gentle alerts |
-| `--error` | `#D47A6A` | Auth failures, critical errors — muted coral, not aggressive red |
+| Token       | Hex       | Usage                                                            |
+| ----------- | --------- | ---------------------------------------------------------------- |
+| `--success` | `#7BC4A8` | Positive feedback emoji, confirmed actions                       |
+| `--warning` | `#D4A06A` | Usage caps approaching, gentle alerts                            |
+| `--error`   | `#D47A6A` | Auth failures, critical errors — muted coral, not aggressive red |
 
 **Usage rules:**
+
 - Accent/category color appears once per screen — on the active chip or the single most important interactive element. Never as a background fill.
 - Backgrounds are always in the warm-indigo-to-dark range. No cold blues, no pure blacks, no gradients.
 - Text is always light on dark. No inverted (dark on light) text anywhere.
@@ -147,16 +148,3 @@ When design principles conflict, resolve in this order:
 4. **Tap-first, always.** If a flow requires keyboard input (except nickname and auth), redesign the flow. Choice chips, toggles, and selection sheets replace every text field.
 5. **Restraint over completeness.** The app does one thing well: it generates a bedtime story. Every screen should reinforce that single purpose. Features that don't directly serve tonight's story belong in V2.
 6. **Platform-native over brand-consistent.** Use native navigation patterns (iOS back swipe, Android back button) even if they differ from the "ideal" brand layout. The parent shouldn't have to learn a new interaction model at 8pm.
-
-## 9. Workflow
-
-When producing a new screen or feature for Bedtime Magic:
-
-1. Read the PRD section that defines the feature. Identify the 90% state (what the user does most of the time on this screen).
-2. Write the screen's content hierarchy in plain text — what the user needs to know, in what order, before any visual work.
-3. Map the hierarchy to the component seeds: which elements are chips, which are buttons, which are cards, which are inline text.
-4. Apply the dark palette: `--bg-base` background, `--bg-surface` for elevated elements, category accent only on the active/selected element.
-5. Test text contrast for every text/background pair against WCAG AA.
-6. Anti-pattern pass: check against the refusals list. Flag any gradient, emoji decoration, bright fill, or keyboard input.
-7. Verify touch targets: every interactive element is ≥44pt. Chip spacing is ≥8px.
-8. Ship.

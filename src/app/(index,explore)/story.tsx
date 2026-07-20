@@ -116,12 +116,10 @@ export default function StoryScreen() {
         <AnimatedPressable
           onPress={handlePlay}
           onPressIn={() => {
-            // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
-            playBgColor.value = withTiming(Colors.dark.bgElementHover, { duration: 150 });
+            playBgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }));
           }}
           onPressOut={() => {
-            // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
-            playBgColor.value = withTiming(Colors.dark.bgElement, { duration: 150 });
+            playBgColor.set(withTiming(Colors.dark.bgElement, { duration: 150 }));
           }}
           style={[styles.playButton, playAnimatedStyle]}
         >

@@ -64,12 +64,10 @@ export default function HistoryVaultScreen() {
             <AnimatedPressable
               onPress={handleGenerate}
               onPressIn={() => {
-                // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
-                generateBgColor.value = withTiming(Colors.dark.bgElementHover, { duration: 150 });
+                generateBgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }));
               }}
               onPressOut={() => {
-                // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
-                generateBgColor.value = withTiming(Colors.dark.bgElement, { duration: 150 });
+                generateBgColor.set(withTiming(Colors.dark.bgElement, { duration: 150 }));
               }}
               style={[styles.generateButton, generateAnimatedStyle]}
             >

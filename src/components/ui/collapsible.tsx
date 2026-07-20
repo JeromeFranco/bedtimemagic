@@ -22,12 +22,10 @@ export function Collapsible({ children, title }: PropsWithChildren & { title: st
         style={[styles.heading, animatedStyle]}
         onPress={() => setIsOpen((value) => !value)}
         onPressIn={() => {
-          // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
-          bgColor.value = withTiming(Colors.dark.bgElementHover, { duration: 150 });
+          bgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }));
         }}
         onPressOut={() => {
-          // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
-          bgColor.value = withTiming(Colors.dark.bgBase, { duration: 150 });
+          bgColor.set(withTiming(Colors.dark.bgBase, { duration: 150 }));
         }}
       >
         <ThemedView type="bgElement" style={styles.button}>

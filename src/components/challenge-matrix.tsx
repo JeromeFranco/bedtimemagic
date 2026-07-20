@@ -44,14 +44,12 @@ function CategoryCard({ label, isSelected, categoryId, onPress }: CategoryCardPr
       onPress={onPress}
       onPressIn={() => {
         if (!isSelected) {
-          // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
-          bgColor.value = withTiming(Colors.dark.bgElementHover, { duration: 150 });
+          bgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }));
         }
       }}
       onPressOut={() => {
         if (!isSelected) {
-          // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
-          bgColor.value = withTiming(Colors.dark.bgElement, { duration: 150 });
+          bgColor.set(withTiming(Colors.dark.bgElement, { duration: 150 }));
         }
       }}
       style={[
@@ -72,7 +70,7 @@ function TriggerChip({ label, isSelected, categoryId, onPress }: TriggerChipProp
   const bgColor = useSharedValue<string>(colors.tintLight);
 
   useEffect(() => {
-    bgColor.value = withTiming(isSelected ? colors.tintSelected : colors.tintLight, { duration: 150 });
+    bgColor.set(withTiming(isSelected ? colors.tintSelected : colors.tintLight, { duration: 150 }));
   }, [isSelected, colors.tintSelected, colors.tintLight, bgColor]);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -84,14 +82,12 @@ function TriggerChip({ label, isSelected, categoryId, onPress }: TriggerChipProp
       onPress={onPress}
       onPressIn={() => {
         if (!isSelected) {
-          // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
-          bgColor.value = withTiming(Colors.dark.bgElementHover, { duration: 150 });
+          bgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }));
         }
       }}
       onPressOut={() => {
         if (!isSelected) {
-          // eslint-disable-next-line react-hooks/immutability -- reanimated shared value
-          bgColor.value = withTiming(colors.tintLight, { duration: 150 });
+          bgColor.set(withTiming(colors.tintLight, { duration: 150 }));
         }
       }}
       style={[
