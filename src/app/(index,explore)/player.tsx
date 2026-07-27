@@ -16,7 +16,7 @@ import { BreathingCircle } from '@/components/breathing-circle';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { usePlayer } from '@/contexts/PlayerContext';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Spacing } from '@/theme';
 import { PROTAGONISTS } from '@/types';
 import { useStory } from '@/hooks/use-story';
 import { formatDuration } from '@/lib/utils';
@@ -319,8 +319,8 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.one,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.xs,
   },
   topButton: {
     width: 44,
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
   },
   titleArea: {
     alignItems: 'center',
-    paddingHorizontal: Spacing.four,
+    paddingHorizontal: Spacing.xl,
     opacity: 0.8,
   },
   storyTitle: {
@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
   protagonistLabel: {
     color: Colors.dark.textSecondary,
     fontSize: 14,
-    marginTop: Spacing.half,
+    marginTop: Spacing.xxs,
   },
   centerArea: {
     alignItems: 'center',
@@ -370,11 +370,11 @@ const styles = StyleSheet.create({
     color: Colors.dark.textPrimary,
   },
   bottomArea: {
-    paddingHorizontal: Spacing.four,
-    paddingBottom: Spacing.three,
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.lg,
   },
   seekBarContainer: {
-    gap: Spacing.one,
+    gap: Spacing.xs,
   },
   seekBarTrack: {
     height: 4,
@@ -422,7 +422,7 @@ const styles = StyleSheet.create({
   backText: {
     color: Colors.dark.textSecondary,
     fontSize: 14,
-    marginTop: Spacing.two,
+    marginTop: Spacing.sm,
   },
   bridgeDimmingOverlay: {
     ...StyleSheet.absoluteFill,
@@ -451,8 +451,8 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: Spacing.four,
-    paddingHorizontal: Spacing.five,
+    gap: Spacing.xl,
+    paddingHorizontal: Spacing['2xl'],
   },
   pillowTalkText: {
     color: Colors.dark.textPrimary,
@@ -470,15 +470,15 @@ const styles = StyleSheet.create({
   },
   bridgeButtons: {
     width: '100%',
-    paddingHorizontal: Spacing.five,
-    paddingBottom: Spacing.three,
-    gap: Spacing.two,
+    paddingHorizontal: Spacing['2xl'],
+    paddingBottom: Spacing.lg,
+    gap: Spacing.sm,
     alignItems: 'center',
   },
   primaryButton: {
     backgroundColor: Colors.dark.bgElement,
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.seven,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing['4xl'],
     borderRadius: 12,
     width: '100%',
     alignItems: 'center',
@@ -491,8 +491,8 @@ const styles = StyleSheet.create({
   ghostButton: {
     borderWidth: 1,
     borderColor: 'rgba(139, 92, 246, 0.5)',
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.five,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing['2xl'],
     borderRadius: 28,
     width: '100%',
     alignItems: 'center',

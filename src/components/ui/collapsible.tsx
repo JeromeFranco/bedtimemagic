@@ -5,7 +5,7 @@ import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withTiming } from '
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Spacing } from '@/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -55,20 +55,20 @@ const styles = StyleSheet.create({
   heading: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
+    gap: Spacing.sm,
   },
 
   button: {
-    width: Spacing.four,
-    height: Spacing.four,
+    width: Spacing.xl,
+    height: Spacing.xl,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
   content: {
-    marginTop: Spacing.three,
-    borderRadius: Spacing.three,
-    marginLeft: Spacing.four,
-    padding: Spacing.four,
+    marginTop: Spacing.lg,
+    borderRadius: Spacing.lg,
+    marginLeft: Spacing.xl,
+    padding: Spacing.xl,
   },
 });

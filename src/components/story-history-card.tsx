@@ -3,8 +3,7 @@ import { useEffect, useState } from 'react';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Spacing } from '@/theme';
 import { getCachedCoverPath } from '@/lib/audio-cache';
 import { CHALLENGE_TRIGGERS, PROTAGONISTS, type Story } from '@/types';
 
@@ -94,7 +93,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderRadius: 16,
     overflow: 'hidden',
-    gap: Spacing.three,
+    gap: Spacing.lg,
   },
 
   coverContainer: {
@@ -102,7 +101,7 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 12,
     overflow: 'hidden',
-    margin: Spacing.three,
+    margin: Spacing.lg,
   },
   coverImage: {
     width: '100%',
@@ -119,10 +118,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingVertical: Spacing.three,
-    paddingRight: Spacing.three,
+    paddingVertical: Spacing.lg,
+    paddingRight: Spacing.lg,
     justifyContent: 'center',
-    gap: Spacing.one,
+    gap: Spacing.xs,
   },
   title: {
     color: Colors.dark.textPrimary,
@@ -132,7 +131,7 @@ const styles = StyleSheet.create({
   metadata: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.two,
+    gap: Spacing.sm,
   },
   metaText: {
     fontSize: 13,

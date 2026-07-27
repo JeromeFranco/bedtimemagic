@@ -6,7 +6,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Spacing } from '@/theme';
 import { PROTAGONISTS } from '@/types';
 import { preFetchAudio } from '@/lib/audio-utils';
 import { useCoverImage } from '@/hooks/use-cover-image';
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: Colors.dark.bgDeepest,
-    gap: Spacing.three,
+    gap: Spacing.lg,
   },
   placeholderEmoji: {
     fontSize: 64,
@@ -168,10 +168,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   content: {
-    paddingHorizontal: Spacing.four,
-    paddingBottom: Spacing.five,
-    paddingTop: Spacing.three,
-    gap: Spacing.two,
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing['2xl'],
+    paddingTop: Spacing.lg,
+    gap: Spacing.sm,
   },
   protagonist: {
     color: Colors.dark.textSecondary,
@@ -186,14 +186,14 @@ const styles = StyleSheet.create({
     color: Colors.dark.textSecondary,
     fontSize: 15,
     lineHeight: 22,
-    marginBottom: Spacing.two,
+    marginBottom: Spacing.sm,
   },
   playButton: {
     borderRadius: 12,
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.five,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing['2xl'],
     alignItems: 'center',
-    marginTop: Spacing.one,
+    marginTop: Spacing.xs,
   },
   playButtonText: {
     color: Colors.dark.textPrimary,
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
   center: {
     justifyContent: 'center',
     alignItems: 'center',
-    gap: Spacing.three,
+    gap: Spacing.lg,
   },
   loadingText: {
     color: Colors.dark.textSecondary,
@@ -217,6 +217,6 @@ const styles = StyleSheet.create({
   backText: {
     color: Colors.dark.textSecondary,
     fontSize: 14,
-    marginTop: Spacing.two,
+    marginTop: Spacing.sm,
   },
 });

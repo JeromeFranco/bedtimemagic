@@ -4,7 +4,7 @@ import Animated, { FadeInDown, FadeOut, useAnimatedStyle, useSharedValue, withTi
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { CATEGORY_COLORS, Colors, Spacing } from "@/constants/theme";
+import { CATEGORY_COLORS, Colors, Spacing } from "@/theme";
 import { CHALLENGE_CATEGORIES, CHALLENGE_TRIGGERS, ChallengeCategory, ChallengeTrigger } from "@/types";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -199,7 +199,7 @@ export function ChallengeMatrix({ onGenerate, showHeading = false }: ChallengeMa
 
 const styles = StyleSheet.create({
   container: {
-    gap: Spacing.four,
+    gap: Spacing.xl,
     backgroundColor: 'transparent',
   },
   heading: {
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
   categoryGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: Spacing.two,
+    gap: Spacing.sm,
     justifyContent: "space-between",
     backgroundColor: 'transparent',
   },
@@ -223,8 +223,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
   },
   categoryLabel: {
     textAlign: "center",
@@ -233,13 +233,13 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   triggersContainer: {
-    marginTop: Spacing.one,
+    marginTop: Spacing.xs,
     backgroundColor: 'transparent',
   },
   triggerRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: Spacing.two,
+    gap: Spacing.sm,
     justifyContent: "flex-start",
     backgroundColor: 'transparent',
   },
@@ -253,17 +253,17 @@ const styles = StyleSheet.create({
   triggerLabel: {
     fontWeight: "400",
     fontSize: 15,
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
   },
   generateButton: {
     alignSelf: "stretch",
     backgroundColor: Colors.dark.bgElement,
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     borderRadius: 12,
     alignItems: "center",
-    marginTop: Spacing.two,
+    marginTop: Spacing.sm,
     minHeight: 48,
     justifyContent: "center",
   },

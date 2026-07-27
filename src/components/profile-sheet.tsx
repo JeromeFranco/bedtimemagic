@@ -4,7 +4,7 @@ import { ProfileAvatar } from '@/components/profile-avatar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useSelectedChild } from '@/contexts/SelectedChildContext';
-import { Spacing, Colors } from '@/constants/theme';
+import { Spacing, Colors } from '@/theme';
 import type { ChildProfile } from '@/types';
 import { DEVELOPMENTAL_STAGES } from '@/types';
 
@@ -82,9 +82,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dark.bgElement,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingTop: Spacing.two,
-    paddingBottom: Spacing.five,
-    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing['2xl'],
+    paddingHorizontal: Spacing.xl,
   },
   handle: {
     width: 40,
@@ -92,19 +92,19 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: Colors.dark.textMuted,
     alignSelf: 'center',
-    marginBottom: Spacing.three,
+    marginBottom: Spacing.lg,
   },
   title: {
-    marginBottom: Spacing.three,
+    marginBottom: Spacing.lg,
   },
   profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.three,
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.two,
-    borderRadius: Spacing.two,
-    marginBottom: Spacing.one,
+    gap: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   profileRowSelected: {
     backgroundColor: Colors.dark.bgSelected,
@@ -123,9 +123,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.two,
-    marginTop: Spacing.two,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.sm,
+    marginTop: Spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: Colors.dark.borderSubtle,
   },

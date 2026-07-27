@@ -7,7 +7,7 @@ import { StoryHistoryCard } from '@/components/story-history-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useStories } from '@/hooks/use-story';
-import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/theme';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -98,9 +98,9 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.three,
-    paddingTop: Spacing.three,
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: BottomTabInset + Spacing.lg,
+    paddingTop: Spacing.lg,
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     width: '100%',
@@ -108,16 +108,16 @@ const styles = StyleSheet.create({
   center: {
     justifyContent: 'center',
     alignItems: 'center',
-    gap: Spacing.three,
+    gap: Spacing.lg,
   },
   heading: {
     color: Colors.dark.textPrimary,
     fontSize: 32,
     fontWeight: '700',
-    marginBottom: Spacing.four,
+    marginBottom: Spacing.xl,
   },
   list: {
-    gap: Spacing.three,
+    gap: Spacing.lg,
   },
   loadingText: {
     fontSize: 16,
@@ -133,13 +133,13 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 15,
     textAlign: 'center',
-    paddingHorizontal: Spacing.five,
+    paddingHorizontal: Spacing['2xl'],
   },
   generateButton: {
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.lg,
     borderRadius: 12,
-    marginTop: Spacing.two,
+    marginTop: Spacing.sm,
   },
   generateButtonText: {
     color: Colors.dark.textPrimary,

@@ -10,7 +10,7 @@ import { CalmingCopy } from '@/components/calming-copy';
 import { ThemedText } from '@/components/themed-text';
 import { generateStory } from '@/api/stories';
 import { useSelectedChild } from '@/contexts/SelectedChildContext';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Spacing } from '@/theme';
 import type { ChallengeCategory, ChallengeTrigger } from '@/types';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: Spacing.five,
+    gap: Spacing['2xl'],
   },
   background: {
     backgroundColor: Colors.dark.bgDeepest,
@@ -110,8 +110,8 @@ const styles = StyleSheet.create({
   },
   button: {
     borderRadius: 12,
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.five,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing['2xl'],
     alignItems: 'center',
   },
   buttonText: {

@@ -7,7 +7,7 @@ import { ChallengeMatrix } from '@/components/challenge-matrix';
 import { ProfileSelector } from '@/components/profile-selector';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/theme';
 import { useSelectedChild } from '@/contexts/SelectedChildContext';
 import { useStories } from '@/hooks/use-story';
 import { PROTAGONISTS, ChallengeCategory, ChallengeTrigger } from '@/types';
@@ -99,22 +99,22 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   scrollContent: {
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.four,
-    gap: Spacing.four,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl,
+    paddingBottom: BottomTabInset + Spacing.xl,
+    gap: Spacing.xl,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    gap: Spacing.three,
+    gap: Spacing.lg,
     backgroundColor: 'transparent',
-    marginTop: Spacing.one,
+    marginTop: Spacing.xs,
   },
   headerTextSection: {
     flex: 1,
-    gap: Spacing.one,
+    gap: Spacing.xs,
     backgroundColor: 'transparent',
   },
   headline: {
@@ -131,10 +131,10 @@ const styles = StyleSheet.create({
   },
   replayButton: {
     alignSelf: 'center',
-    paddingVertical: Spacing.twoHalf,
-    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     borderRadius: 8,
-    marginTop: Spacing.two,
+    marginTop: Spacing.sm,
     minHeight: 44,
     justifyContent: 'center',
   },
