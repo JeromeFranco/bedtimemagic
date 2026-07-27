@@ -4,19 +4,17 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { ProfileSheet } from '@/components/profile-sheet';
-import { ThemedText } from '@/components/themed-text';
 import { useSelectedChild } from '@/contexts/SelectedChildContext';
-import { Colors, Spacing } from '@/constants/theme';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function ProfileSelector() {
   const { selectedProfile } = useSelectedChild();
   const [sheetVisible, setSheetVisible] = useState(false);
-  const bgColor = useSharedValue<string>(Colors.dark.bgElement);
+  const opacity = useSharedValue<number>(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: bgColor.value,
+    opacity: opacity.value,
   }));
 
   if (!selectedProfile) return null;
@@ -24,20 +22,18 @@ export function ProfileSelector() {
   return (
     <>
       <AnimatedPressable
-        style={[styles.selector, animatedStyle]}
+        style={[styles.avatarButton, animatedStyle]}
         onPress={() => setSheetVisible(true)}
         onPressIn={() => {
-          bgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }));
+          opacity.set(withTiming(0.7, { duration: 150 }));
         }}
         onPressOut={() => {
-          bgColor.set(withTiming(Colors.dark.bgElement, { duration: 150 }));
+          opacity.set(withTiming(1, { duration: 150 }));
         }}
+        accessibilityLabel={`Profile: ${selectedProfile.name}`}
+        accessibilityRole="button"
       >
         <ProfileAvatar emoji={selectedProfile.emoji} size={40} />
-        <ThemedText type="default" style={styles.name}>
-          {selectedProfile.name}
-        </ThemedText>
-        <ThemedText style={styles.chevron}>›</ThemedText>
       </AnimatedPressable>
 
       <ProfileSheet visible={sheetVisible} onClose={() => setSheetVisible(false)} />
@@ -46,20 +42,11 @@ export function ProfileSelector() {
 }
 
 const styles = StyleSheet.create({
-  selector: {
-    flexDirection: 'row',
+  avatarButton: {
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: Spacing.two,
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    borderRadius: 12,
-  },
-  name: {
-    flex: 1,
-    fontWeight: '500',
-  },
-  chevron: {
-    fontSize: 24,
-    color: Colors.dark.textMuted,
+    borderRadius: 22,
   },
 });
