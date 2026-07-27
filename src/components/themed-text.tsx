@@ -1,10 +1,10 @@
-import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
+import { StyleSheet, Text, type TextProps } from 'react-native';
 
-import { Colors, Fonts, ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { Colors, ThemeColor, Typography, TypographyPreset } from '@/theme';
 
 export type ThemedTextProps = TextProps & {
-  type?: 'default' | 'title' | 'small' | 'smallBold' | 'subtitle' | 'link' | 'linkPrimary' | 'code';
+  type?: TypographyPreset;
   themeColor?: ThemeColor;
 };
 
@@ -15,14 +15,8 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
     <Text
       style={[
         { color: theme[themeColor ?? 'textPrimary'] },
-        type === 'default' && styles.default,
-        type === 'title' && styles.title,
-        type === 'small' && styles.small,
-        type === 'smallBold' && styles.smallBold,
-        type === 'subtitle' && styles.subtitle,
-        type === 'link' && styles.link,
         type === 'linkPrimary' && styles.linkPrimary,
-        type === 'code' && styles.code,
+        styles[type],
         style,
       ]}
       {...rest}
@@ -31,45 +25,20 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
 }
 
 const styles = StyleSheet.create({
-  small: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: 400,
-  },
-  smallBold: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: 700,
-  },
-  default: {
-    fontSize: 17,
-    lineHeight: 24,
-    fontWeight: 400,
-  },
-  title: {
-    fontSize: 40,
-    fontWeight: 700,
-    lineHeight: 44,
-    letterSpacing: -0.4,
-  },
-  subtitle: {
-    fontSize: 32,
-    lineHeight: 40,
-    fontWeight: 700,
-    letterSpacing: -0.32,
-  },
-  link: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
+  hero: Typography.hero,
+  subtitle: Typography.subtitle,
+  title: Typography.title,
+  heading: Typography.heading,
+  body: Typography.body,
+  default: Typography.default,
+  small: Typography.small,
+  smallBold: Typography.smallBold,
+  caption: Typography.caption,
+  link: Typography.link,
   linkPrimary: {
-    fontSize: 15,
-    lineHeight: 22,
+    ...Typography.linkPrimary,
     color: Colors.dark.textPrimary,
   },
-  code: {
-    fontFamily: Fonts.mono,
-    fontWeight: Platform.select({ android: 700 }) ?? 500,
-    fontSize: 12,
-  },
+  code: Typography.code,
 });
+
