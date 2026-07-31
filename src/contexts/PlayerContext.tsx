@@ -150,11 +150,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }, FADE_INTERVAL);
   }, [startAmbient]);
 
+  const playNextSegmentFromQueueRef = useRef<(gen: number, nextIndex: number) => void>(() => {});
+
   const playNextSegmentFromQueue = useCallback(
     (gen: number, nextIndex: number) => {
       if (failedSegmentsRef.current.has(nextIndex)) {
-        setIsBuffering(false);
-        setIsPlaying(false);
+        const segments = segmentsRef.current;
+        const skipIndex = nextIndex + 1;
+        if (skipIndex < segments.length) {
+          playNextSegmentFromQueueRef.current(gen, skipIndex);
+        } else {
+          setIsBuffering(false);
+          setIsPlaying(false);
+        }
         return;
       }
 
@@ -289,6 +297,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     attachListenerRef.current = attachSegmentListener;
   }, [attachSegmentListener]);
 
+  useEffect(() => {
+    playNextSegmentFromQueueRef.current = playNextSegmentFromQueue;
+  }, [playNextSegmentFromQueue]);
+
   const playStory = useCallback(
     async (story: Story) => {
       playbackGenerationRef.current += 1;
@@ -348,6 +360,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           })
           .catch(() => {
             if (playbackGenerationRef.current !== gen) return;
+            failedSegmentsRef.current.add(1);
           });
       }
     },

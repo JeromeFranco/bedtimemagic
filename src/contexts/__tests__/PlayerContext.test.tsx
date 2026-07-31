@@ -429,6 +429,114 @@ describe('PlayerContext', () => {
     expect(getByTestId('isPlaying').props.children).toBe('true');
   });
 
+  it('skips failed segments and plays the next one at boundary', async () => {
+    mockSplitStoryIntoSegments.mockImplementation(() => ['seg-0-text', 'seg-1-text', 'seg-2-text']);
+
+    mockStreamStorySegment.mockImplementation(
+      (storyId: string, segmentIndex: number, text: string) => {
+        if (segmentIndex === 0) {
+          return Promise.resolve({
+            storyId,
+            segmentIndex,
+            text,
+            uri: `file://seg-${storyId}-${segmentIndex}.mp3`,
+          });
+        }
+        if (segmentIndex === 1) {
+          return Promise.reject(new Error('segment 1 failed'));
+        }
+        return Promise.resolve({
+          storyId,
+          segmentIndex,
+          text,
+          uri: `file://seg-${storyId}-${segmentIndex}.mp3`,
+        });
+      },
+    );
+
+    const statusCallbacks: ((status: any) => void)[] = [];
+    mockAddListener.mockImplementation((_event: string, cb: (status: any) => void) => {
+      statusCallbacks.push(cb);
+      return { remove: jest.fn() };
+    });
+
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+
+    expect(getByTestId('isPlaying').props.children).toBe('true');
+
+    await act(async () => {
+      statusCallbacks[statusCallbacks.length - 1]({
+        currentTime: 120,
+        duration: 120,
+        playing: false,
+        isBuffering: false,
+        didJustFinish: true,
+      });
+    });
+
+    await act(async () => {});
+
+    expect(getByTestId('isPlaying').props.children).toBe('true');
+    expect(getByTestId('isBuffering').props.children).toBe('false');
+  });
+
+  it('records initial lookahead segment failure in failedSegmentsRef', async () => {
+    mockSplitStoryIntoSegments.mockImplementation(() => ['seg-0-text', 'seg-1-text', 'seg-2-text']);
+
+    let seg2Resolve: ((value: any) => void) | undefined;
+    mockStreamStorySegment.mockImplementation(
+      (storyId: string, segmentIndex: number, text: string) => {
+        if (segmentIndex === 0) {
+          return Promise.resolve({
+            storyId,
+            segmentIndex,
+            text,
+            uri: `file://seg-${storyId}-${segmentIndex}.mp3`,
+          });
+        }
+        if (segmentIndex === 1) {
+          return Promise.reject(new Error('lookahead failed'));
+        }
+        return new Promise((resolve) => {
+          seg2Resolve = () =>
+            resolve({
+              storyId,
+              segmentIndex,
+              text,
+              uri: `file://seg-${storyId}-${segmentIndex}.mp3`,
+            });
+        });
+      },
+    );
+
+    const statusCallbacks: ((status: any) => void)[] = [];
+    mockAddListener.mockImplementation((_event: string, cb: (status: any) => void) => {
+      statusCallbacks.push(cb);
+      return { remove: jest.fn() };
+    });
+
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+
+    expect(getByTestId('isPlaying').props.children).toBe('true');
+
+    await act(async () => {
+      statusCallbacks[statusCallbacks.length - 1]({
+        currentTime: 120,
+        duration: 120,
+        playing: false,
+        isBuffering: false,
+        didJustFinish: true,
+      });
+    });
+
+    await act(async () => seg2Resolve!(undefined));
+
+    expect(getByTestId('isPlaying').props.children).toBe('true');
+    expect(getByTestId('isBuffering').props.children).toBe('false');
+  });
+
   it('buffers at a segment boundary until the next segment is ready', async () => {
     let seg1Resolve: (() => void) | undefined;
 
