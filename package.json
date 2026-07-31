@@ -6,6 +6,7 @@
     "@ai-sdk/google": "^3.0.82",
     "@ai-sdk/openai-compatible": "^2.0.50",
     "@expo/ui": "~56.0.22",
+    "@inworld/tts": "1.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "^2.108.1",
     "@tanstack/react-query": "^5.101.0",
