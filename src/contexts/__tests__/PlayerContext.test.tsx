@@ -265,13 +265,19 @@ describe('PlayerContext', () => {
     expect(getByTestId('isSleepMode').props.children).toBe('false');
   });
 
-  it('didJustFinish transitions directly to final post-story phase', async () => {
+  it('didJustFinish transitions to pillow_talk after fade completes', async () => {
+    jest.useFakeTimers();
     const { getByTestId } = await renderProvider();
     await act(async () => fireEvent.press(getByTestId('play')));
     await act(async () => statusCallback({ currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true }));
     expect(getByTestId('isPlaying').props.children).toBe('false');
+    expect(getByTestId('postStoryPhase').props.children).toBe('fading');
+
+    await act(async () => { jest.advanceTimersByTime(3100); });
+
     expect(getByTestId('currentStory').props.children).toBe('Test Story');
     expect(getByTestId('postStoryPhase').props.children).toBe('pillow_talk');
+    jest.useRealTimers();
   });
 
   it('initializes postStoryPhase as idle', async () => {
@@ -280,65 +286,84 @@ describe('PlayerContext', () => {
   });
 
   it('transitions to pillow_talk when didJustFinish fires and has prompt', async () => {
+    jest.useFakeTimers();
     const { getByTestId } = await renderProvider();
     await act(async () => fireEvent.press(getByTestId('play')));
     await act(async () => statusCallback({
       currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
     }));
+    await act(async () => { jest.advanceTimersByTime(3100); });
     expect(getByTestId('postStoryPhase').props.children).toBe('pillow_talk');
     expect(getByTestId('currentStory').props.children).toBe('Test Story');
+    jest.useRealTimers();
   });
 
   it('skipPillowTalk transitions from pillow_talk to affirmation', async () => {
+    jest.useFakeTimers();
     const { getByTestId } = await renderProvider();
     await act(async () => fireEvent.press(getByTestId('play')));
     await act(async () => statusCallback({
       currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
     }));
+    await act(async () => { jest.advanceTimersByTime(3100); });
     await act(async () => fireEvent.press(getByTestId('skipPillowTalk')));
     expect(getByTestId('postStoryPhase').props.children).toBe('affirmation');
+    jest.useRealTimers();
   });
 
   it('confirmAffirmation transitions to done', async () => {
+    jest.useFakeTimers();
     const { getByTestId } = await renderProvider();
     await act(async () => fireEvent.press(getByTestId('play')));
     await act(async () => statusCallback({
       currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
     }));
+    await act(async () => { jest.advanceTimersByTime(3100); });
     await act(async () => fireEvent.press(getByTestId('confirmAffirmation')));
     expect(getByTestId('postStoryPhase').props.children).toBe('done');
+    jest.useRealTimers();
   });
 
   it('stopStory resets postStoryPhase to idle', async () => {
+    jest.useFakeTimers();
     const { getByTestId } = await renderProvider();
     await act(async () => fireEvent.press(getByTestId('play')));
     await act(async () => statusCallback({
       currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
     }));
+    await act(async () => { jest.advanceTimersByTime(3100); });
     expect(getByTestId('postStoryPhase').props.children).toBe('pillow_talk');
     await act(async () => fireEvent.press(getByTestId('stop')));
     expect(getByTestId('postStoryPhase').props.children).toBe('idle');
+    jest.useRealTimers();
   });
 
   it('skips pillow talk when prompt is empty', async () => {
+    jest.useFakeTimers();
     const { getByTestId } = await renderProvider();
     await act(async () => fireEvent.press(getByTestId('playNoPrompt')));
     await act(async () => statusCallback({
       currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
     }));
+    await act(async () => { jest.advanceTimersByTime(3100); });
     expect(getByTestId('postStoryPhase').props.children).toBe('affirmation');
+    jest.useRealTimers();
   });
 
   it('transitions to done when no prompt and no affirmation', async () => {
+    jest.useFakeTimers();
     const { getByTestId } = await renderProvider();
     await act(async () => fireEvent.press(getByTestId('playNoPromptNoAffirmation')));
     await act(async () => statusCallback({
       currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
     }));
+    await act(async () => { jest.advanceTimersByTime(3100); });
     expect(getByTestId('postStoryPhase').props.children).toBe('done');
+    jest.useRealTimers();
   });
 
   it('starts ambient audio when entering pillow_talk phase', async () => {
+    jest.useFakeTimers();
     (createAudioPlayer as jest.Mock).mockImplementation(() => mockPlayer);
     const { getByTestId } = await renderProvider();
     await act(async () => fireEvent.press(getByTestId('play')));
@@ -348,15 +373,18 @@ describe('PlayerContext', () => {
     await act(async () => statusCallback({
       currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
     }));
+    await act(async () => { jest.advanceTimersByTime(3100); });
     expect(getByTestId('postStoryPhase').props.children).toBe('pillow_talk');
     expect(getAmbientAudioSource).toHaveBeenCalled();
     expect(createAudioPlayer).toHaveBeenCalledWith({ uri: 'ambient-rain' });
     expect(mockAmbientPlayer.volume).toBe(0.15);
     expect(mockAmbientPlayer.loop).toBe(true);
     expect(mockAmbientPlay).toHaveBeenCalled();
+    jest.useRealTimers();
   });
 
   it('skipPillowTalk stops ambient player before transitioning', async () => {
+    jest.useFakeTimers();
     (createAudioPlayer as jest.Mock).mockImplementation(() => mockPlayer);
     const { getByTestId } = await renderProvider();
     await act(async () => fireEvent.press(getByTestId('play')));
@@ -366,11 +394,13 @@ describe('PlayerContext', () => {
     await act(async () => statusCallback({
       currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
     }));
+    await act(async () => { jest.advanceTimersByTime(3100); });
     expect(getByTestId('postStoryPhase').props.children).toBe('pillow_talk');
 
     await act(async () => fireEvent.press(getByTestId('skipPillowTalk')));
     expect(mockAmbientRemove).toHaveBeenCalled();
     expect(getByTestId('postStoryPhase').props.children).toBe('affirmation');
+    jest.useRealTimers();
   });
 
   it('starts the first segment when it is ready and streams later segments sequentially', async () => {

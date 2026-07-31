@@ -20,10 +20,25 @@ let tokenExpiresAt = 0;
 let ttsClient: InworldTTSClient | null = null;
 let tokenPromise: Promise<{ token: string; expiresAt: number }> | null = null;
 
+export function resetTokenCache(): void {
+  cachedToken = null;
+  tokenExpiresAt = 0;
+  ttsClient = null;
+  tokenPromise = null;
+}
+
 async function getInworldToken(): Promise<{ token: string; expiresAt: number }> {
+  if (cachedToken && Date.now() < tokenExpiresAt - 60_000) {
+    return { token: cachedToken, expiresAt: tokenExpiresAt };
+  }
+
   if (tokenPromise) return tokenPromise;
 
   tokenPromise = (async () => {
+    if (cachedToken && Date.now() < tokenExpiresAt - 60_000) {
+      return { token: cachedToken, expiresAt: tokenExpiresAt };
+    }
+
     const {
       data: { session },
     } = await supabase.auth.getSession();
@@ -35,7 +50,9 @@ async function getInworldToken(): Promise<{ token: string; expiresAt: number }> 
     }
 
     cachedToken = data.token;
-    tokenExpiresAt = data.expiresAt ?? Date.now() + 3_600_000;
+    tokenExpiresAt = data.expirationTime
+      ? new Date(data.expirationTime).getTime()
+      : Date.now() + 3_600_000;
     return { token: cachedToken!, expiresAt: tokenExpiresAt };
   })();
 
@@ -59,6 +76,8 @@ function getOrCreateTTSClient(): InworldTTSClient {
   return ttsClient;
 }
 
+const inflightSegments = new Map<string, Promise<StoryAudioSegment>>();
+
 export async function streamStorySegment(
   storyId: string,
   segmentIndex: number,
@@ -69,31 +88,44 @@ export async function streamStorySegment(
     return { storyId, segmentIndex, text, uri: cached };
   }
 
-  await getInworldToken();
-  const tts = getOrCreateTTSClient();
+  const dedupeKey = `${storyId}:${segmentIndex}`;
+  const existing = inflightSegments.get(dedupeKey);
+  if (existing) return existing;
 
-  const chunks: Uint8Array[] = [];
-  for await (const chunk of tts.stream({
-    text,
-    voice: 'Ashley',
-    model: 'inworld-tts-1.5-mini',
-    encoding: 'MP3',
-  })) {
-    chunks.push(new Uint8Array(chunk));
-  }
+  const promise = (async () => {
+    try {
+      await getInworldToken();
+      const tts = getOrCreateTTSClient();
 
-  const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
-  const merged = new Uint8Array(totalLength);
-  let offset = 0;
-  for (const chunk of chunks) {
-    merged.set(chunk, offset);
-    offset += chunk.length;
-  }
+      const chunks: Uint8Array[] = [];
+      for await (const chunk of tts.stream({
+        text,
+        voice: 'Ashley',
+        model: 'inworld-tts-1.5-mini',
+        encoding: 'MP3',
+      })) {
+        chunks.push(new Uint8Array(chunk));
+      }
 
-  const uri = await writeAudioSegmentToCache(storyId, segmentIndex, merged);
-  await enforceFifoEviction();
+      const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
+      const merged = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        merged.set(chunk, offset);
+        offset += chunk.length;
+      }
 
-  return { storyId, segmentIndex, text, uri };
+      const uri = await writeAudioSegmentToCache(storyId, segmentIndex, merged);
+      await enforceFifoEviction();
+
+      return { storyId, segmentIndex, text, uri };
+    } finally {
+      inflightSegments.delete(dedupeKey);
+    }
+  })();
+
+  inflightSegments.set(dedupeKey, promise);
+  return promise;
 }
 
 const inflightPrefetches = new Map<string, Promise<void>>();

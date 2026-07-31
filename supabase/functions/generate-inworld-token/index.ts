@@ -5,9 +5,13 @@ export function formatInworldDate(date: Date): string {
 }
 
 export function decodeInworldApiKey(value: string): { key: string; secret: string } {
-  const colonIndex = value.indexOf(":");
+  const decoded = atob(value);
+  const colonIndex = decoded.indexOf(":");
   if (colonIndex === -1) throw new Error("Invalid IN_WORLD_API_KEY format");
-  return { key: value.slice(0, colonIndex), secret: value.slice(colonIndex + 1) };
+  const key = decoded.slice(0, colonIndex);
+  const secret = decoded.slice(colonIndex + 1);
+  if (!key || !secret) throw new Error("Invalid IN_WORLD_API_KEY format");
+  return { key, secret };
 }
 
 async function hmacSha256(key: string, data: string): Promise<string> {

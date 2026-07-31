@@ -44,16 +44,40 @@ Deno.test("formatInworldDate preserves whole seconds", () => {
   assertEquals(formatInworldDate(date), "2026-07-31T12:00:45Z");
 });
 
-Deno.test("decodeInworldApiKey splits on first colon", () => {
-  const result = decodeInworldApiKey("my-key:my-secret");
+Deno.test("decodeInworldApiKey decodes Base64 and splits on first colon", () => {
+  const encoded = btoa("my-key:my-secret");
+  const result = decodeInworldApiKey(encoded);
   assertEquals(result.key, "my-key");
   assertEquals(result.secret, "my-secret");
 });
 
-Deno.test("decodeInworldApiKey throws on missing colon", () => {
+Deno.test("decodeInworldApiKey throws on missing colon in decoded value", () => {
+  const encoded = btoa("no-colon-here");
   let threw = false;
   try {
-    decodeInworldApiKey("no-colon-here");
+    decodeInworldApiKey(encoded);
+  } catch {
+    threw = true;
+  }
+  assertEquals(threw, true);
+});
+
+Deno.test("decodeInworldApiKey throws when key part is empty", () => {
+  const encoded = btoa(":my-secret");
+  let threw = false;
+  try {
+    decodeInworldApiKey(encoded);
+  } catch {
+    threw = true;
+  }
+  assertEquals(threw, true);
+});
+
+Deno.test("decodeInworldApiKey throws when secret part is empty", () => {
+  const encoded = btoa("my-key:");
+  let threw = false;
+  try {
+    decodeInworldApiKey(encoded);
   } catch {
     threw = true;
   }
@@ -86,7 +110,7 @@ Deno.test("createInworldAuthorization signature is deterministic", async () => {
 
 Deno.test("successful token exchange returns only approved fields", async () => {
   configureAuth();
-  Deno.env.set("IN_WORLD_API_KEY", "my-key:my-secret");
+  Deno.env.set("IN_WORLD_API_KEY", btoa("my-key:my-secret"));
 
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (
@@ -137,7 +161,7 @@ Deno.test("successful token exchange returns only approved fields", async () => 
 
 Deno.test("upstream 503 returns 502 to client", async () => {
   configureAuth();
-  Deno.env.set("IN_WORLD_API_KEY", "my-key:my-secret");
+  Deno.env.set("IN_WORLD_API_KEY", btoa("my-key:my-secret"));
 
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (): Promise<Response> => {

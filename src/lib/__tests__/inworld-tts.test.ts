@@ -1,7 +1,7 @@
 jest.mock('../audio-cache', () => ({
   getCachedAudioSegmentPath: jest.fn(),
   writeAudioSegmentToCache: jest.fn(),
-  enforceFifoEviction: jest.fn(),
+  enforceFifoEviction: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('../story-segments', () => ({
@@ -33,7 +33,7 @@ import { getCachedAudioSegmentPath, writeAudioSegmentToCache, enforceFifoEvictio
 import { splitStoryIntoSegments } from '../story-segments';
 import { supabase } from '../supabase';
 import { InworldTTS } from '@inworld/tts';
-import { streamStorySegment, prefetchStoryAudio } from '../inworld-tts';
+import { streamStorySegment, prefetchStoryAudio, resetTokenCache } from '../inworld-tts';
 import type { StoryAudioSegment } from '../inworld-tts';
 
 const mockedGetCachedAudioSegmentPath = getCachedAudioSegmentPath as jest.Mock;
@@ -59,8 +59,9 @@ async function* asyncGenerator(chunks: Uint8Array[]) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetTokenCache();
   mockedInvoke.mockResolvedValue({
-    data: { token: 'test-jwt-token', expiresAt: Date.now() + 3600_000 },
+    data: { token: 'test-jwt-token', expirationTime: new Date(Date.now() + 3600_000).toISOString() },
     error: null,
   });
 });
@@ -144,23 +145,55 @@ describe('streamStorySegment', () => {
       'Not authenticated'
     );
   });
+
+  it('reuses cached token until near expiry', async () => {
+    mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
+    mockStream.mockReturnValue(asyncGenerator([new Uint8Array([1])]));
+    mockedWriteAudioSegmentToCache.mockResolvedValue('/cache/audio_story-1_0.mp3');
+
+    await streamStorySegment('story-1', 0, 'Hello');
+    await streamStorySegment('story-1', 1, 'World');
+
+    expect(mockedInvoke).toHaveBeenCalledTimes(1);
+  });
+
+  it('deduplicates concurrent requests for the same segment', async () => {
+    mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
+
+    let resolveStream!: () => void;
+    const streamStarted = new Promise<void>((resolve) => {
+      resolveStream = resolve;
+    });
+    let iterationCount = 0;
+    mockStream.mockImplementation(async function* () {
+      iterationCount++;
+      await streamStarted;
+      yield new Uint8Array([1]);
+    });
+    mockedWriteAudioSegmentToCache.mockResolvedValue('/cache/audio_story-1_0.mp3');
+
+    const promise1 = streamStorySegment('story-1', 0, 'Hello');
+    await new Promise((r) => process.nextTick(r));
+    const promise2 = streamStorySegment('story-1', 0, 'Hello');
+
+    resolveStream();
+
+    const [result1, result2] = await Promise.all([promise1, promise2]);
+    expect(iterationCount).toBe(1);
+    expect(result1.uri).toBe(result2.uri);
+  });
 });
 
 describe('prefetchStoryAudio', () => {
-  beforeEach(() => {
-    mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
-    const audioData = new Uint8Array([1, 2, 3]);
-    mockStream.mockReturnValue(asyncGenerator([audioData]));
-    mockedWriteAudioSegmentToCache.mockResolvedValue('/cache/audio_story-1_0.mp3');
-  });
-
   it('streams segments sequentially', async () => {
+    mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
+    mockedWriteAudioSegmentToCache.mockResolvedValue('/cache/audio_story-1_0.mp3');
     mockedSplitStoryIntoSegments.mockReturnValue(['First.', 'Second.', 'Third.']);
-    const streamOrder: number[] = [];
+
+    let callCount = 0;
     mockStream.mockImplementation(async function* () {
-      streamOrder.push(mockStream.mock.calls.length);
-      await new Promise((r) => setTimeout(r, 10));
-      yield new Uint8Array([1]);
+      callCount++;
+      yield new Uint8Array([callCount]);
     });
 
     await prefetchStoryAudio('story-1', 'First. Second. Third.');
@@ -173,27 +206,35 @@ describe('prefetchStoryAudio', () => {
   });
 
   it('deduplicates concurrent prefetch calls for the same story', async () => {
+    mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
+    mockedWriteAudioSegmentToCache.mockResolvedValue('/cache/audio_story-1_0.mp3');
     mockedSplitStoryIntoSegments.mockReturnValue(['Hello.']);
 
     let resolveStream!: () => void;
+    const streamStarted = new Promise<void>((resolve) => {
+      resolveStream = resolve;
+    });
+    let iterationCount = 0;
     mockStream.mockImplementation(async function* () {
-      await new Promise<void>((resolve) => { resolveStream = resolve; });
+      iterationCount++;
+      await streamStarted;
       yield new Uint8Array([1]);
     });
 
     const promise1 = prefetchStoryAudio('story-1', 'Hello.');
-    await new Promise((r) => setTimeout(r, 0));
-
+    await new Promise((r) => process.nextTick(r));
     const promise2 = prefetchStoryAudio('story-1', 'Hello.');
 
     resolveStream();
 
     await Promise.all([promise1, promise2]);
 
-    expect(mockStream).toHaveBeenCalledTimes(1);
+    expect(iterationCount).toBe(1);
   });
 
   it('stops later segments when a segment stream rejects', async () => {
+    mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
+    mockedWriteAudioSegmentToCache.mockResolvedValue('/cache/audio_story-1_0.mp3');
     mockedSplitStoryIntoSegments.mockReturnValue(['First.', 'Second.', 'Third.']);
     let callCount = 0;
     mockStream.mockImplementation(async function* () {
@@ -212,6 +253,8 @@ describe('prefetchStoryAudio', () => {
   });
 
   it('clears dedup entry after completion', async () => {
+    mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
+    mockedWriteAudioSegmentToCache.mockResolvedValue('/cache/audio_story-1_0.mp3');
     mockedSplitStoryIntoSegments.mockReturnValue(['Hello.']);
     mockStream.mockReturnValue(asyncGenerator([new Uint8Array([1])]));
 

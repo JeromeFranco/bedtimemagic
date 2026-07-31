@@ -69,6 +69,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const segmentsRef = useRef<string[]>([]);
   const segmentQueueRef = useRef<ActiveSegment[]>([]);
   const nextSegmentIndexRef = useRef(0);
+  const failedSegmentsRef = useRef<Set<number>>(new Set());
   const attachListenerRef = useRef<(gen: number) => void>(() => {});
 
   const cleanupAmbient = useCallback(() => {
@@ -151,6 +152,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const playNextSegmentFromQueue = useCallback(
     (gen: number, nextIndex: number) => {
+      if (failedSegmentsRef.current.has(nextIndex)) {
+        setIsBuffering(false);
+        setIsPlaying(false);
+        return;
+      }
+
       const segments = segmentsRef.current;
       const alreadyQueued = segmentQueueRef.current.find(
         (s) => s.index === nextIndex,
@@ -169,7 +176,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         player.play();
 
         const lookaheadIndex = nextIndex + 1;
-        if (lookaheadIndex < segments.length) {
+        if (lookaheadIndex < segments.length && !failedSegmentsRef.current.has(lookaheadIndex)) {
           const segText = segments[lookaheadIndex];
           streamStorySegment(activeStoryRef.current!.id, lookaheadIndex, segText)
             .then((seg) => {
@@ -184,6 +191,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             })
             .catch(() => {
               if (playbackGenerationRef.current !== gen) return;
+              failedSegmentsRef.current.add(lookaheadIndex);
               setIsBuffering(false);
               setIsPlaying(false);
             });
@@ -203,7 +211,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             player.play();
 
             const lookaheadIndex = nextIndex + 1;
-            if (lookaheadIndex < segments.length) {
+            if (lookaheadIndex < segments.length && !failedSegmentsRef.current.has(lookaheadIndex)) {
               const lookaheadText = segments[lookaheadIndex];
               streamStorySegment(
                 activeStoryRef.current!.id,
@@ -222,11 +230,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
                 })
                 .catch(() => {
                   if (playbackGenerationRef.current !== gen) return;
+                  failedSegmentsRef.current.add(lookaheadIndex);
                 });
             }
           })
           .catch(() => {
             if (playbackGenerationRef.current !== gen) return;
+            failedSegmentsRef.current.add(nextIndex);
             setIsBuffering(false);
             setIsPlaying(false);
           });
@@ -250,15 +260,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             listenerRef.current.remove();
             listenerRef.current = null;
           }
-          if (playerRef.current) {
-            playerRef.current.remove();
-            playerRef.current = null;
-          }
 
           const nextIndex = nextSegmentIndexRef.current;
           const segments = segmentsRef.current;
 
           if (nextIndex < segments.length) {
+            if (playerRef.current) {
+              playerRef.current.remove();
+              playerRef.current = null;
+            }
             setIsPlaying(false);
             setIsBuffering(true);
             playNextSegmentFromQueue(gen, nextIndex);
@@ -289,12 +299,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       activeStoryRef.current = story;
       segmentQueueRef.current = [];
       nextSegmentIndexRef.current = 0;
+      failedSegmentsRef.current = new Set();
 
       await setAudioModeAsync({
         playsInSilentMode: true,
         shouldPlayInBackground: true,
         interruptionMode: 'doNotMix',
       });
+
+      if (playbackGenerationRef.current !== gen) return;
 
       const segments = splitStoryIntoSegments(story.story_text);
       segmentsRef.current = segments;
@@ -400,7 +413,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [cleanupPlayer]);
 
   useEffect(() => {
-    return () => cleanupPlayer();
+    return () => {
+      playbackGenerationRef.current += 1;
+      cleanupPlayer();
+    };
   }, [cleanupPlayer]);
 
   return (
