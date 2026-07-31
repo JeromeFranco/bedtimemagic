@@ -8,8 +8,20 @@ function audioPath(storyId: string): string {
   return new File(Paths.cache, `${AUDIO_CACHE_PREFIX}${storyId}.mp3`).uri;
 }
 
+function audioSegmentPath(storyId: string, segmentIndex: number): string {
+  return new File(Paths.cache, `${AUDIO_CACHE_PREFIX}${storyId}_${segmentIndex}.mp3`).uri;
+}
+
 function coverPath(storyId: string): string {
   return new File(Paths.cache, `${COVER_CACHE_PREFIX}${storyId}.jpg`).uri;
+}
+
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
 export async function getCachedAudioPath(storyId: string): Promise<string | null> {
@@ -26,6 +38,37 @@ export async function writeAudioToCache(
   return file.uri;
 }
 
+export async function getCachedAudioSegmentPath(
+  storyId: string,
+  segmentIndex: number
+): Promise<string | null> {
+  const file = new File(audioSegmentPath(storyId, segmentIndex));
+  return file.exists ? file.uri : null;
+}
+
+export async function writeAudioSegmentToCache(
+  storyId: string,
+  segmentIndex: number,
+  audio: Uint8Array
+): Promise<string> {
+  const base64 = uint8ArrayToBase64(audio);
+  const file = new File(audioSegmentPath(storyId, segmentIndex));
+  file.write(base64, { encoding: EncodingType.Base64 });
+  return file.uri;
+}
+
+export async function getCachedAudioSegmentPaths(
+  storyId: string,
+  segmentCount: number
+): Promise<(string | null)[]> {
+  const results: (string | null)[] = [];
+  for (let i = 0; i < segmentCount; i++) {
+    const file = new File(audioSegmentPath(storyId, i));
+    results.push(file.exists ? file.uri : null);
+  }
+  return results;
+}
+
 export async function getCachedCoverPath(storyId: string): Promise<string | null> {
   const file = new File(coverPath(storyId));
   return file.exists ? file.uri : null;
@@ -38,16 +81,21 @@ export async function cacheCoverImage(storyId: string, imageUrl: string): Promis
 }
 
 export async function evictStory(storyId: string): Promise<void> {
-  const audio = new File(audioPath(storyId));
+  if (!Paths.cache.exists) return;
+
+  const files = Paths.cache.list();
+  const storyPrefix = `${AUDIO_CACHE_PREFIX}${storyId}_`;
+  for (const f of files) {
+    if (f instanceof File && f.name.startsWith(storyPrefix) && f.name.endsWith('.mp3')) {
+      if (f.exists) f.delete();
+    }
+  }
+
+  const legacyAudio = new File(audioPath(storyId));
+  if (legacyAudio.exists) legacyAudio.delete();
+
   const cover = new File(coverPath(storyId));
-
-  if (audio.exists) {
-    audio.delete();
-  }
-
-  if (cover.exists) {
-    cover.delete();
-  }
+  if (cover.exists) cover.delete();
 }
 
 export async function enforceFifoEviction(): Promise<void> {
@@ -58,18 +106,29 @@ export async function enforceFifoEviction(): Promise<void> {
     .filter((f): f is File => f instanceof File)
     .filter((f) => f.name.startsWith(AUDIO_CACHE_PREFIX) && f.name.endsWith('.mp3'));
 
-  if (audioFiles.length <= MAX_CACHED_STORIES) return;
+  const storyGroups = new Map<string, { files: File[]; oldestModified: number }>();
+  for (const f of audioFiles) {
+    const base = f.name.slice(AUDIO_CACHE_PREFIX.length, f.name.length - '.mp3'.length);
+    const lastUnderscore = base.lastIndexOf('_');
+    const storyId = lastUnderscore > 0 ? base.slice(0, lastUnderscore) : base;
+    const mod = f.lastModified ?? 0;
+    const group = storyGroups.get(storyId);
+    if (group) {
+      group.files.push(f);
+      if (mod < group.oldestModified) group.oldestModified = mod;
+    } else {
+      storyGroups.set(storyId, { files: [f], oldestModified: mod });
+    }
+  }
 
-  const withTimes = audioFiles.map((file) => ({
-    file,
-    modificationTime: file.lastModified ?? 0,
-  }));
+  if (storyGroups.size <= MAX_CACHED_STORIES) return;
 
-  withTimes.sort((a, b) => a.modificationTime - b.modificationTime);
+  const sorted = Array.from(storyGroups.entries()).sort(
+    ([, a], [, b]) => a.oldestModified - b.oldestModified
+  );
 
-  const toEvict = withTimes.slice(0, audioFiles.length - MAX_CACHED_STORIES);
-  for (const { file } of toEvict) {
-    const storyId = file.name.replace(AUDIO_CACHE_PREFIX, '').replace('.mp3', '');
+  const toEvict = sorted.slice(0, storyGroups.size - MAX_CACHED_STORIES);
+  for (const [storyId] of toEvict) {
     await evictStory(storyId);
   }
 }
