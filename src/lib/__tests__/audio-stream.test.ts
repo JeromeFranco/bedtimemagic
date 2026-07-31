@@ -1,94 +1,99 @@
 jest.mock('../audio-cache', () => ({
-  writeAudioToCache: jest.fn(),
-  enforceFifoEviction: jest.fn(),
+  getCachedAudioSegmentPaths: jest.fn(),
 }));
 
-jest.mock('../supabase', () => ({
-  supabase: {
-    auth: {
-      getSession: jest.fn().mockResolvedValue({
-        data: { session: { access_token: 'test-access-token' } },
-      }),
-    },
-  },
+jest.mock('../inworld-tts', () => ({
+  streamStorySegment: jest.fn(),
+  prefetchStoryAudio: jest.fn(),
 }));
 
-process.env.EXPO_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
+import { getCachedAudioSegmentPaths } from '../audio-cache';
+import { streamStorySegment, prefetchStoryAudio } from '../inworld-tts';
+import { getSegmentAudioSources, preFetchAudio } from '../audio-stream';
 
-import { writeAudioToCache, enforceFifoEviction } from '../audio-cache';
-import { supabase } from '../supabase';
-import { fetchStoryAudio } from '../audio-stream';
-
-const mockedWriteAudioToCache = writeAudioToCache as jest.Mock;
-const mockedEnforceFifoEviction = enforceFifoEviction as jest.Mock;
-const mockedGetSession = supabase.auth.getSession as jest.Mock;
-
-const originalFetch = globalThis.fetch;
+const mockedGetCachedAudioSegmentPaths = getCachedAudioSegmentPaths as jest.Mock;
+const mockedStreamStorySegment = streamStorySegment as jest.Mock;
+const mockedPrefetchStoryAudio = prefetchStoryAudio as jest.Mock;
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockedGetSession.mockResolvedValue({ data: { session: { access_token: 'test-access-token' } } });
-  globalThis.fetch = jest.fn() as typeof fetch;
 });
 
-afterEach(() => {
-  globalThis.fetch = originalFetch;
+describe('getSegmentAudioSources', () => {
+  it('returns all cached segment URIs without streaming', async () => {
+    mockedGetCachedAudioSegmentPaths.mockResolvedValue([
+      '/cache/audio_story-1_0.mp3',
+      '/cache/audio_story-1_1.mp3',
+    ]);
+
+    const result = await getSegmentAudioSources('story-1', 2);
+
+    expect(result).toEqual([
+      { uri: '/cache/audio_story-1_0.mp3' },
+      { uri: '/cache/audio_story-1_1.mp3' },
+    ]);
+    expect(mockedStreamStorySegment).not.toHaveBeenCalled();
+  });
+
+  it('streams missing segments and returns all URIs', async () => {
+    mockedGetCachedAudioSegmentPaths.mockResolvedValue([
+      '/cache/audio_story-1_0.mp3',
+      null,
+    ]);
+
+    mockedStreamStorySegment.mockResolvedValue({
+      storyId: 'story-1',
+      segmentIndex: 1,
+      text: 'Second',
+      uri: '/cache/audio_story-1_1.mp3',
+    });
+
+    const result = await getSegmentAudioSources('story-1', 2, ['First', 'Second']);
+
+    expect(result).toEqual([
+      { uri: '/cache/audio_story-1_0.mp3' },
+      { uri: '/cache/audio_story-1_1.mp3' },
+    ]);
+    expect(mockedStreamStorySegment).toHaveBeenCalledTimes(1);
+    expect(mockedStreamStorySegment).toHaveBeenCalledWith('story-1', 1, 'Second');
+  });
 });
 
-describe('fetchStoryAudio', () => {
-  it('fetches mp3 audio and writes to cache', async () => {
-    (globalThis.fetch as jest.Mock).mockResolvedValue(
-      new Response(JSON.stringify({ audio: 'aGVsbG8=' }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    );
-    mockedWriteAudioToCache.mockResolvedValue('/cache/audio_story-1.mp3');
+describe('preFetchAudio', () => {
+  it('calls prefetchStoryAudio with story text', async () => {
+    mockedPrefetchStoryAudio.mockResolvedValue(undefined);
 
-    const result = await fetchStoryAudio('story-1', 'Hello world');
+    await preFetchAudio('story-1', 'Hello world');
 
-    expect(globalThis.fetch).toHaveBeenCalledWith(
-      'https://test.supabase.co/functions/v1/generate-story-audio',
-      expect.objectContaining({
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer test-access-token',
-        },
-        body: JSON.stringify({ story_text: 'Hello world' }),
-      })
-    );
-    expect(mockedWriteAudioToCache).toHaveBeenCalledWith('story-1', 'aGVsbG8=');
-    expect(mockedEnforceFifoEviction).toHaveBeenCalledTimes(1);
-    expect(result).toBe('/cache/audio_story-1.mp3');
+    expect(mockedPrefetchStoryAudio).toHaveBeenCalledWith('story-1', 'Hello world');
   });
 
-  it('throws on non-ok response', async () => {
-    (globalThis.fetch as jest.Mock).mockResolvedValue(
-      new Response('Internal Server Error', { status: 500 })
+  it('deduplicates concurrent calls for the same storyId', async () => {
+    let resolvePrefetch!: () => void;
+    mockedPrefetchStoryAudio.mockImplementation(
+      () => new Promise<void>((resolve) => { resolvePrefetch = resolve; })
     );
 
-    await expect(fetchStoryAudio('story-1', 'Hello')).rejects.toThrow(
-      'Edge function returned 500'
-    );
+    const promise1 = preFetchAudio('story-1', 'Hello');
+    await new Promise((r) => setTimeout(r, 0));
+
+    const promise2 = preFetchAudio('story-1', 'Hello');
+
+    expect(mockedPrefetchStoryAudio).toHaveBeenCalledTimes(1);
+
+    resolvePrefetch();
+
+    await Promise.all([promise1, promise2]);
   });
 
-  it('throws when response has no audio data', async () => {
-    (globalThis.fetch as jest.Mock).mockResolvedValue(
-      new Response(JSON.stringify({ error: 'TTS failed' }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    );
+  it('removes inflight entry after rejection', async () => {
+    mockedPrefetchStoryAudio.mockRejectedValueOnce(new Error('TTS failed'));
 
-    await expect(fetchStoryAudio('story-1', 'Hello')).rejects.toThrow(
-      'No audio data in response'
-    );
-  });
+    await expect(preFetchAudio('story-1', 'Hello')).rejects.toThrow('TTS failed');
 
-  it('throws when session is null', async () => {
-    mockedGetSession.mockResolvedValueOnce({ data: { session: null } });
+    mockedPrefetchStoryAudio.mockResolvedValue(undefined);
+    await preFetchAudio('story-1', 'Hello');
 
-    await expect(fetchStoryAudio('story-1', 'Hello')).rejects.toThrow('Not authenticated');
+    expect(mockedPrefetchStoryAudio).toHaveBeenCalledTimes(2);
   });
 });

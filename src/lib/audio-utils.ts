@@ -1,47 +1,37 @@
-import { getCachedAudioPath } from './audio-cache';
-import { fetchStoryAudio } from './audio-stream';
+import { getCachedAudioPath, getCachedAudioSegmentPaths } from './audio-cache';
+import { getSegmentAudioSources, preFetchAudio as streamPreFetchAudio } from './audio-stream';
+import { splitStoryIntoSegments } from './story-segments';
 import type { Story } from '@/types';
 
 const SAMPLE_AUDIO = require('../../assets/audio/sample-story.mp3');
 const AMBIENT_RAIN = require('../../assets/audio/ambient-rain.mp3');
 
-const inflightPrefetches = new Map<string, Promise<string>>();
-
-export async function preFetchAudio(
-  storyId: string,
-  storyText: string
-): Promise<string> {
-  const existing = inflightPrefetches.get(storyId);
-  if (existing) return existing;
-
-  const cachedPath = await getCachedAudioPath(storyId);
-  if (cachedPath) return cachedPath;
-
-  const promise = fetchStoryAudio(storyId, storyText)
-    .finally(() => inflightPrefetches.delete(storyId));
-  inflightPrefetches.set(storyId, promise);
-  return promise;
-}
+export { streamPreFetchAudio as preFetchAudio };
 
 export async function getAudioSource(story: Story): Promise<{ uri: string }> {
-  const inflight = inflightPrefetches.get(story.id);
-  if (inflight) {
-    const path = await inflight;
-    return { uri: path };
+  const segments = splitStoryIntoSegments(story.story_text);
+  const segmentCount = segments.length;
+
+  const cachedPaths = await getCachedAudioSegmentPaths(story.id, segmentCount);
+  const allCached = cachedPaths.every((p) => p !== null);
+
+  if (allCached && cachedPaths.length > 0) {
+    return { uri: cachedPaths[0]! };
   }
 
-  const cachedPath = await getCachedAudioPath(story.id);
-  if (cachedPath) {
-    return { uri: cachedPath };
+  if (cachedPaths.length === 0) {
+    const legacyPath = await getCachedAudioPath(story.id);
+    if (legacyPath) return { uri: legacyPath };
   }
-  const localPath = await fetchStoryAudio(story.id, story.story_text);
-  return { uri: localPath };
-}
 
-export function getSampleAudioSource(): { uri: string } {
-  return { uri: SAMPLE_AUDIO };
+  const sources = await getSegmentAudioSources(story.id, segmentCount, segments);
+  return sources[0];
 }
 
 export function getAmbientAudioSource(): { uri: string } {
   return { uri: AMBIENT_RAIN };
+}
+
+export function getSampleAudioSource(): { uri: string } {
+  return { uri: SAMPLE_AUDIO };
 }
