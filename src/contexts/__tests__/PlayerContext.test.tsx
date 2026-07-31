@@ -2,11 +2,11 @@ import React from 'react';
 import { render, act, fireEvent } from '@testing-library/react-native';
 import { Text, Pressable, View } from 'react-native';
 
-const mockAddListener = jest.fn();
 const mockPlay = jest.fn();
 const mockPause = jest.fn();
 const mockSeekTo = jest.fn();
 const mockRemove = jest.fn();
+const mockAddListener = jest.fn();
 
 const mockPlayer = {
   play: mockPlay,
@@ -33,14 +33,24 @@ jest.mock('expo-audio', () => ({
   setAudioModeAsync: jest.fn(() => Promise.resolve()),
 }));
 
+const mockStreamStorySegment = jest.fn();
+const mockSplitStoryIntoSegments = jest.fn((text: string) => [text]);
+
+jest.mock('@/lib/inworld-tts', () => ({
+  streamStorySegment: (...args: [string, number, string]) => mockStreamStorySegment(...args),
+}));
+
+jest.mock('@/lib/story-segments', () => ({
+  splitStoryIntoSegments: (...args: [string]) => mockSplitStoryIntoSegments(...args),
+}));
+
 jest.mock('@/lib/audio-utils', () => ({
-  getAudioSource: jest.fn(async () => ({ uri: 42 })),
   getAmbientAudioSource: jest.fn(() => ({ uri: 'ambient-rain' })),
 }));
 
 import { PlayerProvider, usePlayer } from '../PlayerContext';
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
-import { getAudioSource, getAmbientAudioSource } from '@/lib/audio-utils';
+import { getAmbientAudioSource } from '@/lib/audio-utils';
 import type { Story } from '@/types';
 
 const MOCK_STORY: Story = {
@@ -134,6 +144,17 @@ describe('PlayerContext', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useRealTimers();
+    (createAudioPlayer as jest.Mock).mockImplementation(() => mockPlayer);
+    mockSplitStoryIntoSegments.mockImplementation((text: string) => [text]);
+    mockStreamStorySegment.mockImplementation(
+      async (storyId: string, segmentIndex: number, text: string) => ({
+        storyId,
+        segmentIndex,
+        text,
+        uri: `file://seg-${storyId}-${segmentIndex}.mp3`,
+      }),
+    );
     mockAddListener.mockImplementation((_event: string, cb: (status: any) => void) => {
       statusCallback = cb;
       return { remove: jest.fn() };
@@ -155,8 +176,8 @@ describe('PlayerContext', () => {
     await act(async () => fireEvent.press(getByTestId('play')));
     expect(getByTestId('currentStory').props.children).toBe('Test Story');
     expect(getByTestId('isPlaying').props.children).toBe('true');
-    expect(getAudioSource).toHaveBeenCalledWith(MOCK_STORY);
-    expect(createAudioPlayer).toHaveBeenCalledWith({ uri: 42 });
+    expect(mockStreamStorySegment).toHaveBeenCalledWith('story-1', 0, 'Once upon a time...');
+    expect(createAudioPlayer).toHaveBeenCalledWith({ uri: 'file://seg-story-1-0.mp3' });
     expect(mockPlay).toHaveBeenCalled();
   });
 
@@ -244,13 +265,13 @@ describe('PlayerContext', () => {
     expect(getByTestId('isSleepMode').props.children).toBe('false');
   });
 
-  it('didJustFinish transitions to fading without clearing story', async () => {
+  it('didJustFinish transitions directly to final post-story phase', async () => {
     const { getByTestId } = await renderProvider();
     await act(async () => fireEvent.press(getByTestId('play')));
     await act(async () => statusCallback({ currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true }));
     expect(getByTestId('isPlaying').props.children).toBe('false');
     expect(getByTestId('currentStory').props.children).toBe('Test Story');
-    expect(getByTestId('postStoryPhase').props.children).toBe('fading');
+    expect(getByTestId('postStoryPhase').props.children).toBe('pillow_talk');
   });
 
   it('initializes postStoryPhase as idle', async () => {
@@ -258,13 +279,13 @@ describe('PlayerContext', () => {
     expect(getByTestId('postStoryPhase').props.children).toBe('idle');
   });
 
-  it('transitions to fading when didJustFinish fires', async () => {
+  it('transitions to pillow_talk when didJustFinish fires and has prompt', async () => {
     const { getByTestId } = await renderProvider();
     await act(async () => fireEvent.press(getByTestId('play')));
     await act(async () => statusCallback({
       currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
     }));
-    expect(getByTestId('postStoryPhase').props.children).toBe('fading');
+    expect(getByTestId('postStoryPhase').props.children).toBe('pillow_talk');
     expect(getByTestId('currentStory').props.children).toBe('Test Story');
   });
 
@@ -273,10 +294,6 @@ describe('PlayerContext', () => {
     await act(async () => fireEvent.press(getByTestId('play')));
     await act(async () => statusCallback({
       currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
-    }));
-    await act(async () => statusCallback({
-      currentTime: 0, duration: 0, playing: false, isBuffering: false, didJustFinish: false,
-      _postStoryPhase: 'pillow_talk',
     }));
     await act(async () => fireEvent.press(getByTestId('skipPillowTalk')));
     expect(getByTestId('postStoryPhase').props.children).toBe('affirmation');
@@ -298,7 +315,7 @@ describe('PlayerContext', () => {
     await act(async () => statusCallback({
       currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
     }));
-    expect(getByTestId('postStoryPhase').props.children).toBe('fading');
+    expect(getByTestId('postStoryPhase').props.children).toBe('pillow_talk');
     await act(async () => fireEvent.press(getByTestId('stop')));
     expect(getByTestId('postStoryPhase').props.children).toBe('idle');
   });
@@ -309,89 +326,151 @@ describe('PlayerContext', () => {
     await act(async () => statusCallback({
       currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
     }));
-    expect(getByTestId('postStoryPhase').props.children).toBe('fading');
-  });
-
-  it('fade completes to affirmation when no prompt but has affirmation', async () => {
-    jest.useFakeTimers();
-    const { getByTestId } = await renderProvider();
-    await act(async () => fireEvent.press(getByTestId('playNoPrompt')));
-    await act(async () => statusCallback({
-      currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
-    }));
-    expect(getByTestId('postStoryPhase').props.children).toBe('fading');
-    await act(async () => jest.advanceTimersByTime(3000));
     expect(getByTestId('postStoryPhase').props.children).toBe('affirmation');
-    expect(mockRemove).toHaveBeenCalled();
-    jest.useRealTimers();
   });
 
-  it('fade completes to done when no prompt and no affirmation', async () => {
-    jest.useFakeTimers();
+  it('transitions to done when no prompt and no affirmation', async () => {
     const { getByTestId } = await renderProvider();
     await act(async () => fireEvent.press(getByTestId('playNoPromptNoAffirmation')));
     await act(async () => statusCallback({
       currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
     }));
-    expect(getByTestId('postStoryPhase').props.children).toBe('fading');
-    await act(async () => jest.advanceTimersByTime(3000));
     expect(getByTestId('postStoryPhase').props.children).toBe('done');
-    expect(mockRemove).toHaveBeenCalled();
-    jest.useRealTimers();
   });
 
-  it('fade completes to pillow_talk when has prompt', async () => {
-    jest.useFakeTimers();
-    const { getByTestId } = await renderProvider();
-    await act(async () => fireEvent.press(getByTestId('play')));
-    await act(async () => statusCallback({
-      currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
-    }));
-    expect(getByTestId('postStoryPhase').props.children).toBe('fading');
-    await act(async () => jest.advanceTimersByTime(3000));
-    expect(getByTestId('postStoryPhase').props.children).toBe('pillow_talk');
-    expect(mockRemove).toHaveBeenCalled();
-    jest.useRealTimers();
-  });
-
-  it('starts ambient audio after fade completes for pillow_talk phase', async () => {
-    jest.useFakeTimers();
+  it('starts ambient audio when entering pillow_talk phase', async () => {
     (createAudioPlayer as jest.Mock).mockImplementation(() => mockPlayer);
     const { getByTestId } = await renderProvider();
     await act(async () => fireEvent.press(getByTestId('play')));
-    await act(async () => statusCallback({
-      currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
-    }));
 
     (createAudioPlayer as jest.Mock).mockImplementation(() => mockAmbientPlayer);
 
-    await act(async () => jest.advanceTimersByTime(3000));
+    await act(async () => statusCallback({
+      currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
+    }));
     expect(getByTestId('postStoryPhase').props.children).toBe('pillow_talk');
     expect(getAmbientAudioSource).toHaveBeenCalled();
     expect(createAudioPlayer).toHaveBeenCalledWith({ uri: 'ambient-rain' });
     expect(mockAmbientPlayer.volume).toBe(0.15);
     expect(mockAmbientPlayer.loop).toBe(true);
     expect(mockAmbientPlay).toHaveBeenCalled();
-    jest.useRealTimers();
   });
 
   it('skipPillowTalk stops ambient player before transitioning', async () => {
-    jest.useFakeTimers();
     (createAudioPlayer as jest.Mock).mockImplementation(() => mockPlayer);
     const { getByTestId } = await renderProvider();
     await act(async () => fireEvent.press(getByTestId('play')));
-    await act(async () => statusCallback({
-      currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
-    }));
 
     (createAudioPlayer as jest.Mock).mockImplementation(() => mockAmbientPlayer);
 
-    await act(async () => jest.advanceTimersByTime(3000));
+    await act(async () => statusCallback({
+      currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
+    }));
     expect(getByTestId('postStoryPhase').props.children).toBe('pillow_talk');
 
     await act(async () => fireEvent.press(getByTestId('skipPillowTalk')));
     expect(mockAmbientRemove).toHaveBeenCalled();
     expect(getByTestId('postStoryPhase').props.children).toBe('affirmation');
-    jest.useRealTimers();
+  });
+
+  it('starts the first segment when it is ready and streams later segments sequentially', async () => {
+    mockStreamStorySegment.mockImplementation(
+      (storyId: string, segmentIndex: number, text: string) => {
+        if (segmentIndex === 0) {
+          return Promise.resolve({
+            storyId,
+            segmentIndex,
+            text,
+            uri: `file://seg-${storyId}-${segmentIndex}.mp3`,
+          });
+        }
+        return new Promise(() => {});
+      },
+    );
+    mockSplitStoryIntoSegments.mockImplementation(() => ['seg-0-text', 'seg-1-text']);
+
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+
+    expect(mockStreamStorySegment).toHaveBeenCalledTimes(2);
+    expect(mockStreamStorySegment).toHaveBeenCalledWith('story-1', 0, 'seg-0-text');
+    expect(mockStreamStorySegment).toHaveBeenCalledWith('story-1', 1, 'seg-1-text');
+    expect(createAudioPlayer).toHaveBeenCalledWith({ uri: 'file://seg-story-1-0.mp3' });
+    expect(getByTestId('isPlaying').props.children).toBe('true');
+  });
+
+  it('buffers at a segment boundary until the next segment is ready', async () => {
+    let seg1Resolve: (() => void) | undefined;
+
+    mockStreamStorySegment.mockImplementation(
+      (storyId: string, segmentIndex: number, text: string) => {
+        if (segmentIndex === 0) {
+          return Promise.resolve({
+            storyId,
+            segmentIndex,
+            text,
+            uri: `file://seg-${storyId}-${segmentIndex}.mp3`,
+          });
+        }
+        return new Promise((resolve) => {
+          seg1Resolve = () =>
+            resolve({
+              storyId,
+              segmentIndex,
+              text,
+              uri: `file://seg-${storyId}-${segmentIndex}.mp3`,
+            });
+        });
+      },
+    );
+    mockSplitStoryIntoSegments.mockImplementation(() => ['seg-0-text', 'seg-1-text']);
+
+    const statusCallbacks: ((status: any) => void)[] = [];
+    mockAddListener.mockImplementation((_event: string, cb: (status: any) => void) => {
+      statusCallbacks.push(cb);
+      return { remove: jest.fn() };
+    });
+
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+
+    expect(getByTestId('isPlaying').props.children).toBe('true');
+
+    await act(async () => {
+      statusCallbacks[statusCallbacks.length - 1]({
+        currentTime: 120,
+        duration: 120,
+        playing: false,
+        isBuffering: false,
+        didJustFinish: true,
+      });
+    });
+
+    expect(getByTestId('isBuffering').props.children).toBe('true');
+
+    await act(async () => seg1Resolve!());
+
+    expect(getByTestId('isPlaying').props.children).toBe('true');
+    expect(getByTestId('isBuffering').props.children).toBe('false');
+  });
+
+  it('ignores stale segment completions after switching stories', async () => {
+    mockStreamStorySegment.mockImplementation(
+      (storyId: string, segmentIndex: number, text: string) =>
+        Promise.resolve({
+          storyId,
+          segmentIndex,
+          text,
+          uri: `file://seg-${storyId}-${segmentIndex}.mp3`,
+        }),
+    );
+    mockSplitStoryIntoSegments.mockImplementation(() => ['single-segment']);
+
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+    expect(getByTestId('currentStory').props.children).toBe('Test Story');
+
+    await act(async () => fireEvent.press(getByTestId('play2')));
+    expect(getByTestId('currentStory').props.children).toBe('Another Story');
   });
 });
