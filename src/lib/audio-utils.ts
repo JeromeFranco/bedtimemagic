@@ -1,12 +1,12 @@
 import { getCachedAudioPath, getCachedAudioSegmentPaths } from './audio-cache';
-import { getSegmentAudioSources, preFetchAudio as streamPreFetchAudio } from './audio-stream';
+import { getSegmentAudioSources, prefetchStoryAudio } from './audio-stream';
 import { splitStoryIntoSegments } from './story-segments';
 import type { Story } from '@/types';
 
 const SAMPLE_AUDIO = require('../../assets/audio/sample-story.mp3');
 const AMBIENT_RAIN = require('../../assets/audio/ambient-rain.mp3');
 
-export { streamPreFetchAudio as preFetchAudio };
+export { prefetchStoryAudio };
 
 export async function getAudioSource(story: Story): Promise<{ uri: string }> {
   const segments = splitStoryIntoSegments(story.story_text);

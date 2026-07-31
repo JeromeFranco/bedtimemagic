@@ -8,7 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing } from '@/theme';
 import { PROTAGONISTS } from '@/types';
-import { preFetchAudio } from '@/lib/audio-utils';
+import { prefetchStoryAudio } from '@/lib/audio-utils';
 import { useCoverImage } from '@/hooks/use-cover-image';
 import { useStory } from '@/hooks/use-story';
 import { getCachedCoverPath, cacheCoverImage } from '@/lib/audio-cache';
@@ -43,7 +43,7 @@ export default function StoryScreen() {
 
   useEffect(() => {
     if (story?.id && story?.story_text) {
-      preFetchAudio(story.id, story.story_text).catch(() => {});
+      prefetchStoryAudio(story.id, story.story_text).catch(() => {});
     }
   }, [story?.id, story?.story_text]);
 

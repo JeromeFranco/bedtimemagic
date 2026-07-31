@@ -31,7 +31,7 @@ jest.mock('@/lib/audio-cache', () => ({
 }));
 
 jest.mock('@/lib/audio-utils', () => ({
-  preFetchAudio: jest.fn(() => Promise.resolve()),
+  prefetchStoryAudio: jest.fn(() => Promise.resolve()),
 }));
 
 import StoryScreen from '../(index,explore)/story';
@@ -135,5 +135,18 @@ describe('StoryScreen', () => {
     const { getByText } = await render(<StoryScreen />);
     expect(getByText('Failed to load story')).toBeTruthy();
     expect(getByText('Go Back')).toBeTruthy();
+  });
+
+  it('calls prefetchStoryAudio with story id and text', async () => {
+    const { prefetchStoryAudio } = require('@/lib/audio-utils');
+    await render(<StoryScreen />);
+    expect(prefetchStoryAudio).toHaveBeenCalledTimes(1);
+    expect(prefetchStoryAudio).toHaveBeenCalledWith('story-1', 'Once upon a time...');
+  });
+
+  it('does not import or invoke the old proxy function', () => {
+    const audioUtils = require('@/lib/audio-utils');
+    expect(audioUtils.preFetchAudio).toBeUndefined();
+    expect(audioUtils.fetchStoryAudio).toBeUndefined();
   });
 });
