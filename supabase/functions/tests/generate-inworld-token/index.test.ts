@@ -34,14 +34,14 @@ Deno.test("rejects fake Supabase tokens before reading Inworld configuration", a
   assertEquals(response.status, 401);
 });
 
-Deno.test("formatInworldDate strips milliseconds", () => {
+Deno.test("formatInworldDate returns YYYYMMDDHHMMSS in UTC", () => {
   const date = new Date("2026-07-31T12:00:00.123Z");
-  assertEquals(formatInworldDate(date), "2026-07-31T12:00:00Z");
+  assertEquals(formatInworldDate(date), "20260731120000");
 });
 
 Deno.test("formatInworldDate preserves whole seconds", () => {
   const date = new Date("2026-07-31T12:00:45.000Z");
-  assertEquals(formatInworldDate(date), "2026-07-31T12:00:45Z");
+  assertEquals(formatInworldDate(date), "20260731120045");
 });
 
 Deno.test("decodeInworldApiKey decodes Base64 and splits on first colon", () => {
@@ -93,19 +93,22 @@ Deno.test("createInworldAuthorization produces IW1-HMAC-SHA256 prefix", async ()
   });
   assertEquals(auth.startsWith("IW1-HMAC-SHA256 "), true);
   assertEquals(auth.includes("ApiKey=test-key"), true);
+  assertEquals(auth.includes("DateTime="), true);
   assertEquals(auth.includes("Nonce=test-nonce"), true);
 });
 
-Deno.test("createInworldAuthorization signature is deterministic", async () => {
-  const params = {
+Deno.test("createInworldAuthorization matches the official IW1 reference exactly", async () => {
+  const auth = await createInworldAuthorization({
     apiKey: { key: "k", secret: "s" },
     now: new Date("2026-01-01T00:00:00Z"),
     nonce: "n",
     engineHost: "h",
-  };
-  const a = await createInworldAuthorization(params);
-  const b = await createInworldAuthorization(params);
-  assertEquals(a, b);
+  });
+  assertEquals(
+    auth,
+    "IW1-HMAC-SHA256 ApiKey=k,DateTime=20260101000000,Nonce=n," +
+      "Signature=54a4e39cf0e2264d752ed607be0a53b7dc427b9219ff9b28043af9d252e82319",
+  );
 });
 
 Deno.test("successful token exchange returns only approved fields", async () => {

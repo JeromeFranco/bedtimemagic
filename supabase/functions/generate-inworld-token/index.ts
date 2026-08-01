@@ -1,7 +1,8 @@
 import { withSupabase, type SupabaseContext } from "@supabase/server";
 
 export function formatInworldDate(date: Date): string {
-  return date.toISOString().replace(/\.\d{3}Z$/, "Z");
+  const iso = date.toISOString();
+  return iso.slice(0, 10).replace(/-/g, "") + iso.slice(11, 19).replace(/:/g, "");
 }
 
 export function decodeInworldApiKey(value: string): { key: string; secret: string } {
@@ -14,17 +15,21 @@ export function decodeInworldApiKey(value: string): { key: string; secret: strin
   return { key, secret };
 }
 
-async function hmacSha256(key: string, data: string): Promise<string> {
+async function hmacSha256(key: string | ArrayBuffer, data: string): Promise<ArrayBuffer> {
   const encoder = new TextEncoder();
+  const keyData = typeof key === "string" ? encoder.encode(key) : key;
   const cryptoKey = await crypto.subtle.importKey(
     "raw",
-    encoder.encode(key),
+    keyData,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],
   );
-  const signature = await crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(data));
-  return Array.from(new Uint8Array(signature))
+  return crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(data));
+}
+
+function toHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
@@ -37,13 +42,15 @@ export async function createInworldAuthorization(params: {
 }): Promise<string> {
   const { apiKey, now, nonce, engineHost } = params;
   const dateStr = formatInworldDate(now);
+  const method = "ai.inworld.engine.WorldEngine/GenerateToken";
 
-  let intermediate = await hmacSha256(`IW1${apiKey.secret}`, dateStr);
-  intermediate = await hmacSha256(intermediate, nonce);
-  intermediate = await hmacSha256(intermediate, engineHost);
-  const signature = await hmacSha256(intermediate, "iw1_request");
+  let signature = await hmacSha256(`IW1${apiKey.secret}`, dateStr);
+  signature = await hmacSha256(signature, engineHost.replace(":443", ""));
+  signature = await hmacSha256(signature, method);
+  signature = await hmacSha256(signature, nonce);
+  signature = await hmacSha256(signature, "iw1_request");
 
-  return `IW1-HMAC-SHA256 ApiKey=${apiKey.key},Date=${dateStr},Nonce=${nonce},Signature=${signature}`;
+  return `IW1-HMAC-SHA256 ApiKey=${apiKey.key},DateTime=${dateStr},Nonce=${nonce},Signature=${toHex(new Uint8Array(signature))}`;
 }
 
 export async function handler(req: Request, _ctx: SupabaseContext): Promise<Response> {
@@ -60,7 +67,11 @@ export async function handler(req: Request, _ctx: SupabaseContext): Promise<Resp
   }
 
   const now = new Date();
-  const nonce = crypto.randomUUID();
+  const nonceBytes = crypto.getRandomValues(new Uint8Array(16));
+  const nonce = Array.from(nonceBytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(1, 12);
   const engineHost = "api-engine.inworld.ai";
   const authorization = await createInworldAuthorization({
     apiKey,
