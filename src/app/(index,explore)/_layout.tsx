@@ -13,7 +13,6 @@ export default function Layout({ segment }: { segment: string }) {
       <Stack.Screen name={activeTab} />
       <Stack.Screen name="generate" />
       <Stack.Screen name="story" />
-      <Stack.Screen name="player" />
     </Stack>
   );
 }
