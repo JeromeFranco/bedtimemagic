@@ -20,7 +20,7 @@ describe('PillowTalk', () => {
   const defaultProps = {
     story: MOCK_STORY,
     protagonistEmoji: '🐻',
-    showPlaceholder: false,
+    imageSource: { uri: 'https://example.com/cover.png' },
     onSkip: jest.fn(),
     onImageError: jest.fn(),
   };

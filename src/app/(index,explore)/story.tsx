@@ -91,14 +91,13 @@ export default function StoryScreen() {
     : coverUrl
     ? { uri: coverUrl }
     : null;
-  const showPlaceholder = !imageSource;
 
   if (postStoryPhase === 'pillow_talk') {
     return (
       <PillowTalk
         story={story}
         protagonistEmoji={protagonist?.emoji ?? '📖'}
-        showPlaceholder={showPlaceholder}
+        imageSource={imageSource}
         onSkip={skipPillowTalk}
         onImageError={() => {}}
       />

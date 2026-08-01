@@ -164,7 +164,7 @@ export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPl
         <Animated.View style={[styles.controls, controlsAnimatedStyle]} pointerEvents="box-none">
           <SafeAreaView style={styles.controlsInner} pointerEvents="box-none">
             <View style={styles.topBar}>
-              <Pressable testID="player-back-button" onPress={onBack} style={styles.iconButton}>
+              <Pressable testID="player-back-button" accessibilityLabel="Go back" onPress={onBack} style={styles.iconButton}>
                 <SymbolView
                   name={{ ios: 'chevron.backward', android: 'arrow_back' }}
                   size={24}

@@ -13,14 +13,16 @@ const HIDE_DELAY = 15000;
 interface PillowTalkProps {
   story: Story;
   protagonistEmoji: string;
-  showPlaceholder: boolean;
+  imageSource: { uri: string } | null;
   onSkip: () => void;
   onImageError: () => void;
 }
 
-export function PillowTalk({ story, protagonistEmoji, showPlaceholder, onSkip, onImageError }: PillowTalkProps) {
+export function PillowTalk({ story, protagonistEmoji, imageSource, onSkip, onImageError }: PillowTalkProps) {
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showPlaceholder = !imageSource;
 
   const overlayOpacity = useSharedValue(0.9);
   const overlayAnimatedStyle = useAnimatedStyle(() => ({ opacity: overlayOpacity.value }));
@@ -57,7 +59,7 @@ export function PillowTalk({ story, protagonistEmoji, showPlaceholder, onSkip, o
           </View>
         ) : (
           <Image
-            source={{ uri: story.cover_image_url! }}
+            source={imageSource}
             style={styles.backgroundImage}
             resizeMode="cover"
             onError={onImageError}

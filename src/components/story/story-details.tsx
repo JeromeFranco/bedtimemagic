@@ -67,7 +67,7 @@ export function StoryDetails({ story, protagonist, imageSource, onBack, onPlay }
             </ThemedText>
           </View>
         )}
-        <Pressable testID="back-button" onPress={onBack} style={styles.backButton}>
+        <Pressable testID="back-button" accessibilityLabel="Go back" onPress={onBack} style={styles.backButton}>
           <SymbolView
             name={{ ios: 'chevron.backward', android: 'arrow_back' }}
             size={24}
