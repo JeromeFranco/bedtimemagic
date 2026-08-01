@@ -86,3 +86,14 @@ jest.mock('react-native-reanimated', () => {
     KeyboardState: {},
   };
 });
+
+jest.mock('expo-symbols', () => {
+  const React = require('react');
+  const { Text } = require('react-native');
+  return {
+    SymbolView: ({ name, ...props }) => {
+      const label = typeof name === 'string' ? name : (name && name.ios) || 'symbol';
+      return React.createElement(Text, props, label);
+    },
+  };
+});
