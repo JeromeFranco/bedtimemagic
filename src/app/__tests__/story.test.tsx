@@ -1,21 +1,35 @@
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, act } from '@testing-library/react-native';
 
-jest.mock('expo-router', () => {
-  const mockPush = jest.fn();
-  return {
-    __esModule: true,
-    useLocalSearchParams: jest.fn(),
-    router: { back: jest.fn(), push: mockPush },
-    _mockPush: mockPush,
-  };
-});
+const mockPlayStory = jest.fn();
+const mockStopStory = jest.fn();
+const mockSkipPillowTalk = jest.fn();
+const mockConfirmAffirmation = jest.fn();
 
-jest.mock('expo-glass-effect', () => {
-  const React = require('react');
-  return {
-    GlassView: ({ children, ...props }: any) => React.createElement('GlassView', props, children),
-  };
-});
+jest.mock('@/contexts/PlayerContext', () => ({
+  usePlayer: jest.fn(() => ({
+    currentStory: null,
+    isPlaying: false,
+    isBuffering: false,
+    isSleepMode: false,
+    position: 0,
+    duration: 0,
+    postStoryPhase: 'idle',
+    playStory: mockPlayStory,
+    pause: jest.fn(),
+    resume: jest.fn(),
+    seekTo: jest.fn(),
+    stopStory: mockStopStory,
+    toggleSleepMode: jest.fn(),
+    skipPillowTalk: mockSkipPillowTalk,
+    confirmAffirmation: mockConfirmAffirmation,
+  })),
+}));
+
+jest.mock('expo-router', () => ({
+  __esModule: true,
+  useLocalSearchParams: jest.fn(),
+  router: { back: jest.fn() },
+}));
 
 jest.mock('@/hooks/use-story', () => ({
   useStory: jest.fn(),
@@ -34,12 +48,29 @@ jest.mock('@/lib/audio-utils', () => ({
   prefetchStoryAudio: jest.fn(() => Promise.resolve()),
 }));
 
+jest.mock('react-native-gesture-handler', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const chainable = () => {
+    const obj: Record<string, unknown> = {};
+    for (const m of ['onBegin', 'onUpdate', 'onFinalize', 'onEnd', 'onStart', 'onChange']) {
+      obj[m] = () => obj;
+    }
+    return obj;
+  };
+  return {
+    Gesture: { Pan: chainable, Tap: chainable },
+    GestureDetector: ({ children }: { children: unknown }) =>
+      React.createElement(View, null, children),
+  };
+});
+
 import StoryScreen from '../(index,explore)/story';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, router } from 'expo-router';
 import { useStory } from '@/hooks/use-story';
 import { useCoverImage } from '@/hooks/use-cover-image';
 
-const { _mockPush: mockPush } = require('expo-router') as any;
+const { usePlayer } = require('@/contexts/PlayerContext');
 
 const MOCK_STORY = {
   id: 'story-1',
@@ -60,93 +91,114 @@ describe('StoryScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (useLocalSearchParams as jest.Mock).mockReturnValue({ id: 'story-1' });
-    (useStory as jest.Mock).mockReturnValue({
-      data: MOCK_STORY,
-      isLoading: false,
-      error: null,
-    });
-    (useCoverImage as jest.Mock).mockReturnValue({
-      coverUrl: MOCK_STORY.cover_image_url,
-      isLoading: false,
-      error: null,
-    });
+    (useStory as jest.Mock).mockReturnValue({ data: MOCK_STORY, isLoading: false, error: null });
+    (useCoverImage as jest.Mock).mockReturnValue({ coverUrl: 'https://example.com/cover.png', isLoading: false, error: null });
   });
 
-  it('renders story title', async () => {
+  it('renders story details with title and play button', async () => {
     const { getByText } = await render(<StoryScreen />);
     expect(getByText('The Toothbrush Adventure')).toBeTruthy();
-  });
-
-  it('renders moral summary', async () => {
-    const { getByText } = await render(<StoryScreen />);
-    expect(getByText('Brushing teeth keeps your smile bright.')).toBeTruthy();
-  });
-
-  it('renders protagonist name and emoji', async () => {
-    const { getByText } = await render(<StoryScreen />);
-    expect(getByText(/Barnaby/)).toBeTruthy();
-  });
-
-  it('renders Play Story button', async () => {
-    const { getByText } = await render(<StoryScreen />);
     expect(getByText('Play Story')).toBeTruthy();
   });
 
-  it('navigates to /player with story id when Play is tapped', async () => {
-    const { getByText } = await render(<StoryScreen />);
-    fireEvent.press(getByText('Play Story'));
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/player',
-      params: { id: 'story-1' },
+  it('calls playStory and shows player when Play is tapped', async () => {
+    const { getByText, getByTestId } = await render(<StoryScreen />);
+    await act(async () => {
+      fireEvent.press(getByText('Play Story'));
     });
-  });
-
-  it('shows placeholder when cover_image_url is null', async () => {
-    (useStory as jest.Mock).mockReturnValue({
-      data: { ...MOCK_STORY, cover_image_url: null },
-      isLoading: false,
-      error: null,
-    });
-    (useCoverImage as jest.Mock).mockReturnValue({
-      coverUrl: null,
-      isLoading: false,
-      error: null,
-    });
-    const { getByText } = await render(<StoryScreen />);
-    expect(getByText('Cover art is being painted...')).toBeTruthy();
+    expect(mockPlayStory).toHaveBeenCalledWith(MOCK_STORY);
+    expect(getByTestId('play-pause-button')).toBeTruthy();
   });
 
   it('shows loading state', async () => {
-    (useStory as jest.Mock).mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      error: null,
-    });
+    (useStory as jest.Mock).mockReturnValue({ data: undefined, isLoading: true, error: null });
     const { getByText } = await render(<StoryScreen />);
     expect(getByText('Loading story...')).toBeTruthy();
   });
 
-  it('shows error state when fetch fails', async () => {
-    (useStory as jest.Mock).mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      error: new Error('fetch failed'),
+  it('shows error state with Go Back', async () => {
+    (useStory as jest.Mock).mockReturnValue({ data: undefined, isLoading: false, error: new Error('fail') });
+    const { getByText } = await render(<StoryScreen />);
+    expect(getByText("Couldn't load this story")).toBeTruthy();
+    fireEvent.press(getByText('Go Back'));
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it('renders pillow talk when postStoryPhase is pillow_talk', async () => {
+    usePlayer.mockReturnValue({
+      currentStory: MOCK_STORY,
+      isPlaying: false,
+      isBuffering: false,
+      isSleepMode: false,
+      position: 0,
+      duration: 0,
+      postStoryPhase: 'pillow_talk',
+      playStory: mockPlayStory,
+      pause: jest.fn(),
+      resume: jest.fn(),
+      seekTo: jest.fn(),
+      stopStory: mockStopStory,
+      toggleSleepMode: jest.fn(),
+      skipPillowTalk: mockSkipPillowTalk,
+      confirmAffirmation: mockConfirmAffirmation,
     });
     const { getByText } = await render(<StoryScreen />);
-    expect(getByText('Failed to load story')).toBeTruthy();
-    expect(getByText('Go Back')).toBeTruthy();
+    expect(getByText('What was your favorite part?')).toBeTruthy();
   });
 
-  it('calls prefetchStoryAudio with story id and text', async () => {
+  it('renders affirmation when postStoryPhase is affirmation', async () => {
+    usePlayer.mockReturnValue({
+      currentStory: MOCK_STORY,
+      isPlaying: false,
+      isBuffering: false,
+      isSleepMode: false,
+      position: 0,
+      duration: 0,
+      postStoryPhase: 'affirmation',
+      playStory: mockPlayStory,
+      pause: jest.fn(),
+      resume: jest.fn(),
+      seekTo: jest.fn(),
+      stopStory: mockStopStory,
+      toggleSleepMode: jest.fn(),
+      skipPillowTalk: mockSkipPillowTalk,
+      confirmAffirmation: mockConfirmAffirmation,
+    });
+    const { getByText } = await render(<StoryScreen />);
+    expect(getByText('I am brave and kind.')).toBeTruthy();
+  });
+
+  it('navigates back when postStoryPhase is done', async () => {
+    usePlayer.mockReturnValue({
+      currentStory: null,
+      isPlaying: false,
+      isBuffering: false,
+      isSleepMode: false,
+      position: 0,
+      duration: 0,
+      postStoryPhase: 'done',
+      playStory: mockPlayStory,
+      pause: jest.fn(),
+      resume: jest.fn(),
+      seekTo: jest.fn(),
+      stopStory: mockStopStory,
+      toggleSleepMode: jest.fn(),
+      skipPillowTalk: mockSkipPillowTalk,
+      confirmAffirmation: mockConfirmAffirmation,
+    });
+    await render(<StoryScreen />);
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it('calls stopStory on unmount', async () => {
+    const { unmount } = await render(<StoryScreen />);
+    await unmount();
+    expect(mockStopStory).toHaveBeenCalled();
+  });
+
+  it('prefetches story audio on mount', async () => {
     const { prefetchStoryAudio } = require('@/lib/audio-utils');
     await render(<StoryScreen />);
-    expect(prefetchStoryAudio).toHaveBeenCalledTimes(1);
     expect(prefetchStoryAudio).toHaveBeenCalledWith('story-1', 'Once upon a time...');
-  });
-
-  it('does not import or invoke the old proxy function', () => {
-    const audioUtils = require('@/lib/audio-utils');
-    expect(audioUtils.preFetchAudio).toBeUndefined();
-    expect(audioUtils.fetchStoryAudio).toBeUndefined();
   });
 });

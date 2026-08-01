@@ -1,30 +1,30 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import { StoryDetails } from '@/components/story/story-details';
+import { StoryPlayer } from '@/components/story/story-player';
+import { PillowTalk } from '@/components/story/pillow-talk';
+import { Affirmation } from '@/components/story/affirmation';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing } from '@/theme';
 import { PROTAGONISTS } from '@/types';
-import { prefetchStoryAudio } from '@/lib/audio-utils';
-import { useCoverImage } from '@/hooks/use-cover-image';
+import { usePlayer } from '@/contexts/PlayerContext';
 import { useStory } from '@/hooks/use-story';
+import { useCoverImage } from '@/hooks/use-cover-image';
+import { prefetchStoryAudio } from '@/lib/audio-utils';
 import { getCachedCoverPath, cacheCoverImage } from '@/lib/audio-cache';
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function StoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: story, isLoading, error } = useStory(id!);
-  const [localCoverPath, setLocalCoverPath] = useState<string | null>(null);
-  const [imageError, setImageError] = useState(false);
+  const { postStoryPhase, playStory, stopStory, skipPillowTalk, confirmAffirmation } = usePlayer();
 
-  const { coverUrl } = useCoverImage(
-    story?.id ?? '',
-    story?.title ?? ''
-  );
+  const [phase, setPhase] = useState<'details' | 'playing'>('details');
+  const [localCoverPath, setLocalCoverPath] = useState<string | null>(null);
+
+  const { coverUrl } = useCoverImage(story?.id ?? '', story?.title ?? '');
 
   useEffect(() => {
     if (!story) return;
@@ -47,10 +47,17 @@ export default function StoryScreen() {
     }
   }, [story?.id, story?.story_text]);
 
-  const playBgColor = useSharedValue<string>(Colors.dark.bgElement);
-  const playAnimatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: playBgColor.value,
-  }));
+  useEffect(() => {
+    if (postStoryPhase === 'done') {
+      router.back();
+    }
+  }, [postStoryPhase]);
+
+  useEffect(() => {
+    return () => {
+      stopStory();
+    };
+  }, []);
 
   if (isLoading) {
     return (
@@ -64,9 +71,15 @@ export default function StoryScreen() {
   if (error || !story) {
     return (
       <ThemedView style={[styles.container, styles.center]}>
-        <ThemedText style={styles.errorText}>Failed to load story</ThemedText>
-        <Pressable onPress={() => router.back()}>
-          <ThemedText style={styles.backText}>Go Back</ThemedText>
+        <ThemedText style={styles.errorText}>{"Couldn't load this story"}</ThemedText>
+        <Pressable
+          onPress={() => router.back()}
+          style={({ pressed }) => [
+            styles.secondaryButton,
+            pressed && { backgroundColor: Colors.dark.bgElement },
+          ]}
+        >
+          <ThemedText style={styles.secondaryButtonText}>Go Back</ThemedText>
         </Pressable>
       </ThemedView>
     );
@@ -78,55 +91,54 @@ export default function StoryScreen() {
     : coverUrl
     ? { uri: coverUrl }
     : null;
+  const showPlaceholder = !imageSource;
 
-  const handlePlay = () => {
-    router.push({ pathname: '/player', params: { id: story.id } });
-  };
+  if (postStoryPhase === 'pillow_talk') {
+    return (
+      <PillowTalk
+        story={story}
+        protagonistEmoji={protagonist?.emoji ?? '📖'}
+        showPlaceholder={showPlaceholder}
+        onSkip={skipPillowTalk}
+        onImageError={() => {}}
+      />
+    );
+  }
+
+  if (postStoryPhase === 'affirmation') {
+    return (
+      <Affirmation
+        text={story.sleepy_affirmation}
+        onConfirm={confirmAffirmation}
+      />
+    );
+  }
+
+  if (phase === 'playing') {
+    return (
+      <StoryPlayer
+        story={story}
+        protagonist={protagonist}
+        imageSource={imageSource}
+        onBack={() => {
+          stopStory();
+          router.back();
+        }}
+      />
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ThemedView style={styles.imageContainer}>
-        {imageSource && !imageError ? (
-          <Image
-            source={imageSource}
-            style={styles.coverImage}
-            resizeMode="cover"
-            onError={() => setImageError(true)}
-          />
-        ) : (
-          <ThemedView style={styles.placeholder}>
-            <ThemedText style={styles.placeholderEmoji}>
-              {protagonist?.emoji ?? '📖'}
-            </ThemedText>
-            <ThemedText style={styles.placeholderText}>
-              Cover art is being painted...
-            </ThemedText>
-          </ThemedView>
-        )}
-        <ThemedView style={styles.gradientOverlay} />
-      </ThemedView>
-
-      <ThemedView style={styles.content}>
-        <ThemedText style={styles.protagonist}>
-          {protagonist?.emoji ?? '📖'} {protagonist?.name ?? 'Friend'}
-        </ThemedText>
-        <ThemedText style={styles.title}>{story.title}</ThemedText>
-        <ThemedText style={styles.moral}>{story.moral}</ThemedText>
-
-        <AnimatedPressable
-          onPress={handlePlay}
-          onPressIn={() => {
-            playBgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }));
-          }}
-          onPressOut={() => {
-            playBgColor.set(withTiming(Colors.dark.bgElement, { duration: 150 }));
-          }}
-          style={[styles.playButton, playAnimatedStyle]}
-        >
-          <ThemedText style={styles.playButtonText}>Play Story</ThemedText>
-        </AnimatedPressable>
-      </ThemedView>
-    </SafeAreaView>
+    <StoryDetails
+      story={story}
+      protagonist={protagonist}
+      imageSource={imageSource}
+      onBack={() => router.back()}
+      onPlay={() => {
+        playStory(story);
+        setPhase('playing');
+      }}
+    />
   );
 }
 
@@ -135,71 +147,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.dark.bgBase,
   },
-  imageContainer: {
-    flex: 1,
-    position: 'relative',
-  },
-  coverImage: {
-    width: '100%',
-    height: '100%',
-  },
-  gradientOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'transparent',
-    borderBottomColor: Colors.dark.bgBase,
-    borderBottomWidth: 80,
-  },
-  placeholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.dark.bgDeepest,
-    gap: Spacing.lg,
-  },
-  placeholderEmoji: {
-    fontSize: 64,
-  },
-  placeholderText: {
-    color: Colors.dark.textSecondary,
-    fontSize: 16,
-  },
-  content: {
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing['2xl'],
-    paddingTop: Spacing.lg,
-    gap: Spacing.sm,
-  },
-  protagonist: {
-    color: Colors.dark.textSecondary,
-    fontSize: 14,
-  },
-  title: {
-    color: Colors.dark.textPrimary,
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  moral: {
-    color: Colors.dark.textSecondary,
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: Spacing.sm,
-  },
-  playButton: {
-    borderRadius: 12,
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing['2xl'],
-    alignItems: 'center',
-    marginTop: Spacing.xs,
-  },
-  playButtonText: {
-    color: Colors.dark.textPrimary,
-    fontWeight: '500',
-    fontSize: 17,
-  },
   center: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -207,16 +154,24 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: Colors.dark.textSecondary,
-    fontSize: 16,
+    fontSize: 15,
   },
   errorText: {
     color: Colors.dark.textSecondary,
-    fontSize: 18,
+    fontSize: 17,
     textAlign: 'center',
   },
-  backText: {
-    color: Colors.dark.textSecondary,
-    fontSize: 14,
+  secondaryButton: {
+    borderWidth: 1,
+    borderColor: Colors.dark.borderDefault,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: 12,
     marginTop: Spacing.sm,
+  },
+  secondaryButtonText: {
+    color: Colors.dark.textSecondary,
+    fontSize: 15,
+    fontWeight: '500',
   },
 });
