@@ -39,13 +39,13 @@ export function StoryDetails({ story, protagonist, imageSource, onBack, onPlay }
   }, [reduceMotion]);
 
   const contentAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: contentOpacity.value,
-    transform: [{ translateY: contentTranslateY.value }],
+    opacity: contentOpacity.get(),
+    transform: [{ translateY: contentTranslateY.get() }],
   }));
 
   const playBgColor = useSharedValue<string>(Colors.dark.bgElement);
   const playAnimatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: playBgColor.value,
+    backgroundColor: playBgColor.get(),
   }));
 
   const showPlaceholder = !imageSource || imageError;

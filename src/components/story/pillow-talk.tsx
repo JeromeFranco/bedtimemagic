@@ -25,10 +25,10 @@ export function PillowTalk({ story, protagonistEmoji, imageSource, onSkip, onIma
   const showPlaceholder = !imageSource;
 
   const overlayOpacity = useSharedValue(0.9);
-  const overlayAnimatedStyle = useAnimatedStyle(() => ({ opacity: overlayOpacity.value }));
+  const overlayAnimatedStyle = useAnimatedStyle(() => ({ opacity: overlayOpacity.get() }));
 
   const screenBrightness = useSharedValue(0.3);
-  const screenBrightnessStyle = useAnimatedStyle(() => ({ opacity: screenBrightness.value }));
+  const screenBrightnessStyle = useAnimatedStyle(() => ({ opacity: screenBrightness.get() }));
 
   useEffect(() => {
     overlayOpacity.set(withTiming(0.7, { duration: 1000, easing: Easing.out(Easing.ease) }));

@@ -37,7 +37,7 @@ function CategoryCard({ label, isSelected, categoryId, onPress }: CategoryCardPr
   }, [isSelected, colors.tintSelected, bgColor]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: bgColor.value,
+    backgroundColor: bgColor.get(),
   }));
 
   return (
@@ -77,7 +77,7 @@ function TriggerChip({ label, isSelected, categoryId, onPress }: TriggerChipProp
   }, [isSelected, colors.tintSelected, bgColor]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: bgColor.value,
+    backgroundColor: bgColor.get(),
   }));
 
   return (

@@ -19,12 +19,12 @@ export function SeekBar({ progress, position, duration, onSeek }: SeekBarProps) 
   const thumbScale = useSharedValue(1);
 
   const thumbAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: thumbScale.value }],
+    transform: [{ scale: thumbScale.get() }],
   }));
 
   const handleSeek = useCallback(
     (locationX: number) => {
-      const fraction = Math.max(0, Math.min(1, locationX / trackWidth.value));
+      const fraction = Math.max(0, Math.min(1, locationX / trackWidth.get()));
       onSeek(fraction * duration);
     },
     [duration, onSeek, trackWidth],
@@ -35,7 +35,7 @@ export function SeekBar({ progress, position, duration, onSeek }: SeekBarProps) 
       thumbScale.set(withTiming(18 / 14, { duration: 150 }));
     })
     .onUpdate((event) => {
-      const fraction = Math.max(0, Math.min(1, event.x / trackWidth.value));
+      const fraction = Math.max(0, Math.min(1, event.x / trackWidth.get()));
       onSeek(fraction * duration);
     })
     .onFinalize(() => {

@@ -31,7 +31,7 @@ export function StoryHistoryCard({ story, onPress }: StoryHistoryCardProps) {
   const bgColor = useSharedValue<string>(Colors.dark.bgElement);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: bgColor.value,
+    backgroundColor: bgColor.get(),
   }));
 
   const protagonist = PROTAGONISTS.find((p) => p.id === story.protagonist);

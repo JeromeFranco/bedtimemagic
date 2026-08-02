@@ -65,7 +65,7 @@ export default function GenerateScreen() {
 function ErrorState({ onRetry, onBack }: { onRetry: () => void; onBack: () => void }) {
   const retryBgColor = useSharedValue<string>(Colors.dark.bgElement);
   const retryAnimatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: retryBgColor.value,
+    backgroundColor: retryBgColor.get(),
   }));
 
   return (

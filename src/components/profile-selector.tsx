@@ -14,7 +14,7 @@ export function ProfileSelector() {
   const opacity = useSharedValue<number>(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
+    opacity: opacity.get(),
   }));
 
   if (!selectedProfile) return null;

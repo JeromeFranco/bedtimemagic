@@ -24,7 +24,7 @@ export default function HistoryVaultScreen() {
 
   const generateBgColor = useSharedValue<string>(Colors.dark.bgElement);
   const generateAnimatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: generateBgColor.value,
+    backgroundColor: generateBgColor.get(),
   }));
 
   if (isLoading) {

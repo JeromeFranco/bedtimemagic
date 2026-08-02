@@ -28,16 +28,20 @@ export function BreathingCircle({
   const opacity = useSharedValue(0.3);
 
   useEffect(() => {
-    scale.value = withRepeat(
-      withTiming(1.15, { duration: DURATION / 2, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true
+    scale.set(
+      withRepeat(
+        withTiming(1.15, { duration: DURATION / 2, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        true
+      )
     );
 
-    opacity.value = withRepeat(
-      withTiming(0.6, { duration: DURATION / 2, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true
+    opacity.set(
+      withRepeat(
+        withTiming(0.6, { duration: DURATION / 2, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        true
+      )
     );
 
     return () => {
@@ -47,8 +51,8 @@ export function BreathingCircle({
   }, [scale, opacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
+    transform: [{ scale: scale.get() }],
+    opacity: opacity.get(),
   }));
 
   const dynamicStyles = {

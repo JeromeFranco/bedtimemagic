@@ -48,17 +48,17 @@ export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPl
 
   const imageScale = useSharedValue(1);
   const imageAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: imageScale.value }],
+    transform: [{ scale: imageScale.get() }],
   }));
 
   const controlsOpacity = useSharedValue(1);
   const controlsAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: controlsOpacity.value,
+    opacity: controlsOpacity.get(),
   }));
 
   const sleepOverlayOpacity = useSharedValue(0);
   const sleepOverlayStyle = useAnimatedStyle(() => ({
-    opacity: sleepOverlayOpacity.value,
+    opacity: sleepOverlayOpacity.get(),
   }));
 
   useEffect(() => {

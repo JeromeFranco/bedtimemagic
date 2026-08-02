@@ -14,7 +14,7 @@ export function Collapsible({ children, title }: PropsWithChildren & { title: st
   const [isOpen, setIsOpen] = useState(false);
   const theme = useTheme();
   const bgColor = useSharedValue<string>(Colors.dark.bgBase);
-  const animatedStyle = useAnimatedStyle(() => ({ backgroundColor: bgColor.value }));
+  const animatedStyle = useAnimatedStyle(() => ({ backgroundColor: bgColor.get() }));
 
   return (
     <ThemedView>

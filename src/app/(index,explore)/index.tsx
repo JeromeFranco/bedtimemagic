@@ -35,7 +35,7 @@ export default function HomeScreen() {
 
   const replayBgColor = useSharedValue<string>('transparent');
   const replayAnimatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: replayBgColor.value,
+    backgroundColor: replayBgColor.get(),
   }));
 
   const childName = selectedProfile?.name ?? 'your child';

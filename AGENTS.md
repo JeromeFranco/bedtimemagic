@@ -32,4 +32,5 @@ These rules override convenience, speed, inferred intent, and pressure to finish
 - Use expo-ui skill when working with expo ui components and prefer universal components over jetpack-compose and swiftui
 - Use ai-sdk skill when working with ai sdk
 - Run `npm run lint` and `npm run typecheck` after every code change and fix any errors before committing
+- When using react-native-reanimated (React Compiler is enabled), always read/write shared values via `.get()`/`.set()` methods — never access `.value` directly (triggers the "Reading from `value` during component render" warning)
 - Never suppress lint rules (`// eslint-disable`, `// @ts-ignore`) without asking permission first. If you assess that fixing the issue adds complexity without enough benefit, explain the tradeoff and ask before suppressing.
