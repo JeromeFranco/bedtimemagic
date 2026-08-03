@@ -436,7 +436,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       fadeIntervalRef.current = null;
     }
     const ambient = ambientPlayerRef.current;
-    ambientPlayerRef.current = null;
     if (!ambient) {
       playbackGenerationRef.current += 1;
       segmentQueueRef.current = [];
@@ -464,7 +463,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           clearInterval(fadeIntervalRef.current);
           fadeIntervalRef.current = null;
         }
-        ambient.remove();
+        cleanupAmbient();
         playbackGenerationRef.current += 1;
         segmentQueueRef.current = [];
         nextSegmentIndexRef.current = 0;
@@ -478,7 +477,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setPostStoryPhase('done');
       }
     }, AMBIENT_FADE_INTERVAL);
-  }, [cleanupPlayer]);
+  }, [cleanupAmbient, cleanupPlayer]);
 
   useEffect(() => {
     return () => {

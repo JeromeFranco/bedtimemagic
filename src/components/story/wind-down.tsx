@@ -25,12 +25,13 @@ interface WindDownContentProps {
   postStoryPhase: PostStoryPhase;
 }
 
-export function WindDownContent({ text }: WindDownContentProps) {
+export function WindDownContent({ text, postStoryPhase }: WindDownContentProps) {
+  const circleSize = postStoryPhase === 'pillow_talk' ? 120 : 160;
   return (
     <View style={styles.contentContainer}>
       <ThemedText style={styles.windDownText}>{text}</ThemedText>
       <View style={styles.breathingContainer}>
-        <BreathingCircle size={140} testID="breathing-circle" />
+        <BreathingCircle size={circleSize} testID="breathing-circle" />
       </View>
     </View>
   );

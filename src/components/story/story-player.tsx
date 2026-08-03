@@ -11,6 +11,8 @@ import Animated, {
   cancelAnimation,
   Easing,
   runOnJS,
+  FadeInRight,
+  FadeOutLeft,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
@@ -423,7 +425,12 @@ export function StoryPlayer({
           ) : (
             <View style={styles.windDownArea}>
               {phase === 'pillow_talk' && (
-                <>
+                <Animated.View
+                  key="pillow_talk"
+                  entering={FadeInRight?.duration ? FadeInRight.duration(400) : undefined}
+                  exiting={FadeOutLeft?.duration ? FadeOutLeft.duration(400) : undefined}
+                  style={styles.phaseContentWrapper}
+                >
                   <PillowTalkContent prompt={story.pillow_talk_prompt ?? ''} />
                   <GestureHintCue phase="pillow_talk" hintStyle={swipeHintAnimatedStyle} />
                   {controlsVisible && (
@@ -448,11 +455,16 @@ export function StoryPlayer({
                       </Pressable>
                     </View>
                   )}
-                </>
+                </Animated.View>
               )}
 
               {phase === 'affirmation' && (
-                <>
+                <Animated.View
+                  key="affirmation"
+                  entering={FadeInRight?.duration ? FadeInRight.duration(400) : undefined}
+                  exiting={FadeOutLeft?.duration ? FadeOutLeft.duration(400) : undefined}
+                  style={styles.phaseContentWrapper}
+                >
                   <AffirmationContent text={story.sleepy_affirmation ?? ''} />
                   <GestureHintCue phase="affirmation" hintStyle={swipeHintAnimatedStyle} />
                   {controlsVisible && (
@@ -468,7 +480,7 @@ export function StoryPlayer({
                       </Pressable>
                     </View>
                   )}
-                </>
+                </Animated.View>
               )}
 
               {phase === 'fade_to_black' && <View style={styles.blankWindDown} />}
@@ -580,6 +592,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
     alignItems: 'stretch',
+  },
+  phaseContentWrapper: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   blankWindDown: {
     flex: 1,
