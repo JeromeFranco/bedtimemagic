@@ -1,5 +1,5 @@
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, { type AnimatedStyle } from 'react-native-reanimated';
 
 import { BreathingCircle } from '@/components/breathing-circle';
 import { ThemedText } from '@/components/themed-text';
@@ -8,7 +8,7 @@ import { Spacing } from '@/theme';
 
 interface GestureHintCueProps {
   phase: PostStoryPhase;
-  hintStyle?: StyleProp<ViewStyle>;
+  hintStyle?: StyleProp<AnimatedStyle<ViewStyle>>;
 }
 
 export function GestureHintCue({ phase, hintStyle }: GestureHintCueProps) {
