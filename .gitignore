@@ -48,3 +48,8 @@ coverage/
 
 # test output
 output/
+
+# superpowers & worktrees
+.worktrees/
+.superpowers/
+
