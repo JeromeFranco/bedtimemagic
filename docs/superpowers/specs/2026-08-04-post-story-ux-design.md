@@ -75,6 +75,13 @@ This spec defines a **Single-Surface Interactive Wind-Down Experience**:
 - `swipeHintOpacity`: Shared value animating gesture hint `1.0` -> `0.0` (3s delay + 1000ms fade out).
 - Strictly uses `.get()` and `.set()` methods per React Compiler rules in `AGENTS.md`. All curves use `withTiming` with `Easing.out(Easing.ease)` (no springs/bounce).
 
+### 3.3 Directional Motion Matching & Touch Priority
+- **Swipe Left (Pillow Talk → Affirmation)**: Text transition uses a slight horizontal crossfade offset (slide left / enter right) matching the drag direction.
+- **Swipe Up (Goodnight → Fade-to-Black)**: Dimming overlay deepens upward to 100% pitch black over 4000ms like a drawn night curtain.
+- **Gesture Threshold**: Pan gesture enforces `Math.abs(translationX) > 50` or `Math.abs(translationY) > 50` to prevent accidental triggers.
+- **Touch Layering**: Explicit pill buttons ("Next", "Skip for tonight", "Goodnight") sit in a higher touch layer above the pan gesture backdrop, guaranteeing instant tap responsiveness.
+
+
 ---
 
 ## 4. State Machine & Audio Cleanup (`PlayerContext`)
