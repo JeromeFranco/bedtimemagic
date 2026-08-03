@@ -59,7 +59,9 @@
     ],
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "/supabase/functions/"
+      "/supabase/functions/",
+      "<rootDir>/.worktrees/",
+      "<rootDir>/worktrees/"
     ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/src/$1"
