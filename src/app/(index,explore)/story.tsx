@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 
-import { StoryDetails } from '@/components/story/story-details';
 import { StoryPlayer } from '@/components/story/story-player';
 import { PillowTalk } from '@/components/story/pillow-talk';
 import { Affirmation } from '@/components/story/affirmation';
@@ -19,9 +18,8 @@ import { getCachedCoverPath, cacheCoverImage } from '@/lib/audio-cache';
 export default function StoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: story, isLoading, error } = useStory(id!);
-  const { postStoryPhase, playStory, stopStory, skipPillowTalk, confirmAffirmation } = usePlayer();
+  const { postStoryPhase, stopStory, skipPillowTalk, confirmAffirmation } = usePlayer();
 
-  const [phase, setPhase] = useState<'details' | 'playing'>('details');
   const [localCoverPath, setLocalCoverPath] = useState<string | null>(null);
 
   const { coverUrl } = useCoverImage(story?.id ?? '', story?.title ?? '');
@@ -113,29 +111,14 @@ export default function StoryScreen() {
     );
   }
 
-  if (phase === 'playing') {
-    return (
-      <StoryPlayer
-        story={story}
-        protagonist={protagonist}
-        imageSource={imageSource}
-        onBack={() => {
-          stopStory();
-          router.back();
-        }}
-      />
-    );
-  }
-
   return (
-    <StoryDetails
+    <StoryPlayer
       story={story}
       protagonist={protagonist}
       imageSource={imageSource}
-      onBack={() => router.back()}
-      onPlay={() => {
-        playStory(story);
-        setPhase('playing');
+      onBack={() => {
+        stopStory();
+        router.back();
       }}
     />
   );

@@ -95,19 +95,18 @@ describe('StoryScreen', () => {
     (useCoverImage as jest.Mock).mockReturnValue({ coverUrl: 'https://example.com/cover.png', isLoading: false, error: null });
   });
 
-  it('renders story details with title and play button', async () => {
-    const { getByText } = await render(<StoryScreen />);
+  it('renders spotify player layout directly with title and play button', async () => {
+    const { getByText, getByTestId } = await render(<StoryScreen />);
     expect(getByText('The Toothbrush Adventure')).toBeTruthy();
-    expect(getByText('Play Story')).toBeTruthy();
+    expect(getByTestId('play-pause-button')).toBeTruthy();
   });
 
-  it('calls playStory and shows player when Play is tapped', async () => {
-    const { getByText, getByTestId } = await render(<StoryScreen />);
+  it('calls playStory when play button is pressed', async () => {
+    const { getByTestId } = await render(<StoryScreen />);
     await act(async () => {
-      fireEvent.press(getByText('Play Story'));
+      fireEvent.press(getByTestId('play-pause-button'));
     });
     expect(mockPlayStory).toHaveBeenCalledWith(MOCK_STORY);
-    expect(getByTestId('play-pause-button')).toBeTruthy();
   });
 
   it('shows loading state', async () => {
