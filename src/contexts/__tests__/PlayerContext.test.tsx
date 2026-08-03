@@ -643,4 +643,30 @@ describe('PlayerContext', () => {
     expect(getByTestId('postStoryPhase').props.children).toBe('done');
     jest.useRealTimers();
   });
+
+  it('stopStory during startFadeToBlack clears interval ref', async () => {
+    jest.useFakeTimers();
+    (createAudioPlayer as jest.Mock).mockImplementation(() => mockPlayer);
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+
+    (createAudioPlayer as jest.Mock).mockImplementation(() => mockAmbientPlayer);
+
+    await act(async () => statusCallback({
+      currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
+    }));
+    await act(async () => { jest.advanceTimersByTime(3100); });
+    expect(getByTestId('postStoryPhase').props.children).toBe('pillow_talk');
+
+    await act(async () => fireEvent.press(getByTestId('startFadeToBlack')));
+    expect(getByTestId('postStoryPhase').props.children).toBe('fade_to_black');
+
+    await act(async () => fireEvent.press(getByTestId('stop')));
+    expect(getByTestId('postStoryPhase').props.children).toBe('idle');
+
+    const volBefore = mockAmbientPlayer.volume;
+    await act(async () => { jest.advanceTimersByTime(4000); });
+    expect(mockAmbientPlayer.volume).toBe(volBefore);
+    jest.useRealTimers();
+  });
 });

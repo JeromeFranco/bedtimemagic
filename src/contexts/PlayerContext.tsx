@@ -431,6 +431,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const startFadeToBlack = useCallback(() => {
     setPostStoryPhase('fade_to_black');
+    if (fadeIntervalRef.current) {
+      clearInterval(fadeIntervalRef.current);
+      fadeIntervalRef.current = null;
+    }
     const ambient = ambientPlayerRef.current;
     ambientPlayerRef.current = null;
     if (!ambient) {
@@ -452,11 +456,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const startVolume = ambient.volume;
     let step = 0;
 
-    const interval = setInterval(() => {
+    fadeIntervalRef.current = setInterval(() => {
       step++;
       ambient.volume = Math.max(0, startVolume * (1 - step / steps));
       if (step >= steps) {
-        clearInterval(interval);
+        if (fadeIntervalRef.current) {
+          clearInterval(fadeIntervalRef.current);
+          fadeIntervalRef.current = null;
+        }
         ambient.remove();
         playbackGenerationRef.current += 1;
         segmentQueueRef.current = [];
