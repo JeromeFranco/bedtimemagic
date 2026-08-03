@@ -1,4 +1,4 @@
-import { render, fireEvent, act, screen } from '@testing-library/react-native';
+import { render, fireEvent, act, cleanup } from '@testing-library/react-native';
 
 const mockPlayStory = jest.fn();
 const mockPause = jest.fn();
@@ -26,37 +26,6 @@ jest.mock('@/contexts/PlayerContext', () => ({
   })),
 }));
 
-jest.mock('react-native-reanimated', () => {
-  const React = require('react');
-  const { View, Text, Image, ScrollView } = require('react-native');
-  return {
-    __esModule: true,
-    default: {
-      createAnimatedComponent: (Component: any) => Component,
-      View: View,
-      Text: Text,
-      Image: Image,
-      ScrollView: ScrollView,
-    },
-    withTiming: (toValue: any) => toValue,
-    withRepeat: (anim: any) => anim,
-    Easing: {
-      inOut: () => {},
-      out: () => {},
-      ease: () => {},
-    },
-    useSharedValue: (init: any) => {
-      let val = init;
-      return {
-        get: () => val,
-        set: (v: any) => { val = v; },
-        value: val,
-      };
-    },
-    useAnimatedStyle: (cb: () => any) => cb(),
-  };
-});
-
 jest.mock('react-native-gesture-handler', () => {
   const React = require('react');
   const { View } = require('react-native');
@@ -75,6 +44,9 @@ jest.mock('react-native-gesture-handler', () => {
 });
 
 import { StoryPlayer } from '../story-player';
+import { usePlayer } from '@/contexts/PlayerContext';
+
+const mockUsePlayer = usePlayer as jest.Mock;
 
 const MOCK_STORY = {
   id: 'story-1',
@@ -109,10 +81,8 @@ describe('StoryPlayer', () => {
   };
 
   beforeEach(() => {
-    jest.useFakeTimers();
     jest.clearAllMocks();
-    const { usePlayer } = require('@/contexts/PlayerContext');
-    usePlayer.mockReturnValue({
+    mockUsePlayer.mockReturnValue({
       currentStory: null,
       isPlaying: false,
       isBuffering: false,
@@ -131,8 +101,9 @@ describe('StoryPlayer', () => {
     });
   });
 
-  afterEach(() => {
-    jest.useRealTimers();
+  afterEach(async () => {
+    await act(async () => {});
+    cleanup();
   });
 
   it('renders story title and moral', async () => {
@@ -152,9 +123,20 @@ describe('StoryPlayer', () => {
     expect(mockPlayStory).toHaveBeenCalledWith(MOCK_STORY);
   });
 
+  it('calls onBack when back button pressed', async () => {
+    const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
+    fireEvent.press(getByTestId('player-back-button'));
+    expect(defaultProps.onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls toggleSleepMode when sleep button pressed', async () => {
+    const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
+    fireEvent.press(getByTestId('sleep-mode-button'));
+    expect(mockToggleSleepMode).toHaveBeenCalledTimes(1);
+  });
+
   it('calls pause when Play is pressed while playing', async () => {
-    const { usePlayer } = require('@/contexts/PlayerContext');
-    usePlayer.mockReturnValue({
+    mockUsePlayer.mockReturnValue({
       currentStory: MOCK_STORY,
       isPlaying: true,
       isBuffering: false,
@@ -175,8 +157,7 @@ describe('StoryPlayer', () => {
   });
 
   it('calls seekTo when -15s or +15s buttons are pressed', async () => {
-    const { usePlayer } = require('@/contexts/PlayerContext');
-    usePlayer.mockReturnValue({
+    mockUsePlayer.mockReturnValue({
       currentStory: MOCK_STORY,
       isPlaying: true,
       isBuffering: false,
@@ -198,48 +179,7 @@ describe('StoryPlayer', () => {
     fireEvent.press(getByTestId('seek-forward-button'));
     expect(mockSeekTo).toHaveBeenCalledWith(45);
   });
-
-  it('calls onBack when back button pressed', async () => {
-    const { usePlayer } = require('@/contexts/PlayerContext');
-    usePlayer.mockReturnValue({
-      currentStory: null,
-      isPlaying: false,
-      isBuffering: false,
-      isSleepMode: false,
-      position: 0,
-      duration: 60,
-      postStoryPhase: 'idle',
-      playStory: mockPlayStory,
-      pause: mockPause,
-      resume: mockResume,
-      seekTo: mockSeekTo,
-      stopStory: jest.fn(),
-      toggleSleepMode: mockToggleSleepMode,
-    });
-    const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
-    fireEvent.press(getByTestId('player-back-button'));
-    expect(defaultProps.onBack).toHaveBeenCalledTimes(1);
-  });
-
-  it('calls toggleSleepMode when sleep button pressed', async () => {
-    const { usePlayer } = require('@/contexts/PlayerContext');
-    usePlayer.mockReturnValue({
-      currentStory: null,
-      isPlaying: false,
-      isBuffering: false,
-      isSleepMode: false,
-      position: 0,
-      duration: 60,
-      postStoryPhase: 'idle',
-      playStory: mockPlayStory,
-      pause: mockPause,
-      resume: mockResume,
-      seekTo: mockSeekTo,
-      stopStory: jest.fn(),
-      toggleSleepMode: mockToggleSleepMode,
-    });
-    const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
-    fireEvent.press(getByTestId('sleep-mode-button'));
-    expect(mockToggleSleepMode).toHaveBeenCalledTimes(1);
-  });
 });
+
+
+
