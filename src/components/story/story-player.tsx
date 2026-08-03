@@ -24,7 +24,7 @@ interface StoryPlayerProps {
 }
 
 export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPlayerProps) {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const {
     currentStory,
     isPlaying,
@@ -119,7 +119,7 @@ export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPl
   };
 
   const showPlaceholder = !imageSource || imageError;
-  const imageSize = Math.min(width - Spacing.xl * 2, 320);
+  const imageSize = Math.min(width - Spacing.xl * 2, (height || 600) * 0.35, 320);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -128,6 +128,7 @@ export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPl
         <Pressable
           testID="player-back-button"
           accessibilityLabel="Go back"
+          accessibilityRole="button"
           onPress={onBack}
           onPressIn={() => backBgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }))}
           onPressOut={() => backBgColor.set(withTiming(Colors.dark.bgElement, { duration: 150 }))}
@@ -144,6 +145,7 @@ export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPl
         <Pressable
           testID="sleep-mode-button"
           accessibilityLabel="Sleep Mode"
+          accessibilityRole="button"
           onPress={toggleSleepMode}
           onPressIn={() => sleepBgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }))}
           onPressOut={() => sleepBgColor.set(withTiming(Colors.dark.bgElement, { duration: 150 }))}
@@ -177,6 +179,7 @@ export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPl
               </View>
             ) : (
               <Image
+                testID="artwork-image"
                 source={imageSource!}
                 style={styles.artworkImage}
                 resizeMode="cover"
@@ -211,6 +214,7 @@ export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPl
           <Pressable
             testID="seek-backward-button"
             accessibilityLabel="Rewind 15 seconds"
+            accessibilityRole="button"
             onPress={() => handleSeekRelative(-15)}
             onPressIn={() => rewindBgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }))}
             onPressOut={() => rewindBgColor.set(withTiming('transparent', { duration: 150 }))}
@@ -227,6 +231,7 @@ export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPl
           <Pressable
             testID="play-pause-button"
             accessibilityLabel={isPlaying && isCurrentStory ? 'Pause' : 'Play'}
+            accessibilityRole="button"
             onPress={handlePlayPause}
             onPressIn={() => playBgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }))}
             onPressOut={() => playBgColor.set(withTiming(Colors.dark.bgElement, { duration: 150 }))}
@@ -251,6 +256,7 @@ export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPl
           <Pressable
             testID="seek-forward-button"
             accessibilityLabel="Forward 15 seconds"
+            accessibilityRole="button"
             onPress={() => handleSeekRelative(15)}
             onPressIn={() => forwardBgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }))}
             onPressOut={() => forwardBgColor.set(withTiming('transparent', { duration: 150 }))}

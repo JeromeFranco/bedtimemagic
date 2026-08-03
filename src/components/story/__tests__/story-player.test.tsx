@@ -117,22 +117,46 @@ describe('StoryPlayer', () => {
     expect(getByText('Barnaby', { exact: false })).toBeTruthy();
   });
 
+  it('renders placeholder emoji when imageSource is null', async () => {
+    const { getByText } = await render(
+      <StoryPlayer {...defaultProps} imageSource={null} />
+    );
+    expect(getByText('🐻')).toBeTruthy();
+  });
+
+  it('renders placeholder emoji when image onError fires', async () => {
+    const { getByText, getByTestId } = await render(<StoryPlayer {...defaultProps} />);
+    await act(async () => {
+      fireEvent(getByTestId('artwork-image'), 'error', { nativeEvent: {} });
+    });
+    expect(getByText('🐻')).toBeTruthy();
+  });
+
   it('calls playStory when Play is pressed while not playing', async () => {
     const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
     fireEvent.press(getByTestId('play-pause-button'));
     expect(mockPlayStory).toHaveBeenCalledWith(MOCK_STORY);
   });
 
-  it('calls onBack when back button pressed', async () => {
+  it('calls resume when Play is pressed while paused on current story', async () => {
+    mockUsePlayer.mockReturnValue({
+      currentStory: MOCK_STORY,
+      isPlaying: false,
+      isBuffering: false,
+      isSleepMode: false,
+      position: 15,
+      duration: 60,
+      postStoryPhase: 'idle',
+      playStory: mockPlayStory,
+      pause: mockPause,
+      resume: mockResume,
+      seekTo: mockSeekTo,
+      stopStory: jest.fn(),
+      toggleSleepMode: mockToggleSleepMode,
+    });
     const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
-    fireEvent.press(getByTestId('player-back-button'));
-    expect(defaultProps.onBack).toHaveBeenCalledTimes(1);
-  });
-
-  it('calls toggleSleepMode when sleep button pressed', async () => {
-    const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
-    fireEvent.press(getByTestId('sleep-mode-button'));
-    expect(mockToggleSleepMode).toHaveBeenCalledTimes(1);
+    fireEvent.press(getByTestId('play-pause-button'));
+    expect(mockResume).toHaveBeenCalledTimes(1);
   });
 
   it('calls pause when Play is pressed while playing', async () => {
@@ -154,6 +178,18 @@ describe('StoryPlayer', () => {
     const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
     fireEvent.press(getByTestId('play-pause-button'));
     expect(mockPause).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onBack when back button pressed', async () => {
+    const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
+    fireEvent.press(getByTestId('player-back-button'));
+    expect(defaultProps.onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls toggleSleepMode when sleep button pressed', async () => {
+    const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
+    fireEvent.press(getByTestId('sleep-mode-button'));
+    expect(mockToggleSleepMode).toHaveBeenCalledTimes(1);
   });
 
   it('calls seekTo when -15s or +15s buttons are pressed', async () => {
