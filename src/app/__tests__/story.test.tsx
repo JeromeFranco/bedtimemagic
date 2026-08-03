@@ -51,15 +51,28 @@ jest.mock('@/lib/audio-utils', () => ({
 jest.mock('react-native-gesture-handler', () => {
   const React = require('react');
   const { View } = require('react-native');
-  const chainable = () => {
+  const makeChainable = () => {
     const obj: Record<string, unknown> = {};
-    for (const m of ['onBegin', 'onUpdate', 'onFinalize', 'onEnd', 'onStart', 'onChange']) {
-      obj[m] = () => obj;
-    }
+    const chain = () => obj;
+    obj.activeOffsetX = chain;
+    obj.activeOffsetY = chain;
+    obj.onBegin = chain;
+    obj.onUpdate = chain;
+    obj.onFinalize = chain;
+    obj.onEnd = (fn: unknown) => {
+      obj._onEndFn = fn;
+      return obj;
+    };
+    obj.onStart = chain;
+    obj.onChange = chain;
     return obj;
   };
   return {
-    Gesture: { Pan: chainable, Tap: chainable },
+    Gesture: {
+      Pan: () => makeChainable(),
+      Tap: () => makeChainable(),
+      Race: (...gestures: unknown[]) => gestures,
+    },
     GestureDetector: ({ children }: { children: unknown }) =>
       React.createElement(View, null, children),
   };

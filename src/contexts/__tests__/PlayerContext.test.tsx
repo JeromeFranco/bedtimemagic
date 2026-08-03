@@ -105,6 +105,7 @@ function TestComponent() {
     toggleSleepMode,
     skipPillowTalk,
     confirmAffirmation,
+    startFadeToBlack,
   } = usePlayer();
 
   return (
@@ -125,6 +126,7 @@ function TestComponent() {
       <Pressable testID="toggleSleep" onPress={toggleSleepMode} />
       <Pressable testID="skipPillowTalk" onPress={skipPillowTalk} />
       <Pressable testID="confirmAffirmation" onPress={confirmAffirmation} />
+      <Pressable testID="startFadeToBlack" onPress={startFadeToBlack} />
       <Pressable testID="playNoPrompt" onPress={() => playStory(MOCK_STORY_NO_PROMPT)} />
       <Pressable testID="playNoPromptNoAffirmation" onPress={() => playStory(MOCK_STORY_NO_PROMPT_NO_AFFIRMATION)} />
     </View>
@@ -610,5 +612,61 @@ describe('PlayerContext', () => {
 
     await act(async () => fireEvent.press(getByTestId('play2')));
     expect(getByTestId('currentStory').props.children).toBe('Another Story');
+  });
+
+  it('startFadeToBlack transitions phase to fade_to_black, ramps ambient volume down over 4s, then transitions to done', async () => {
+    jest.useFakeTimers();
+    (createAudioPlayer as jest.Mock).mockImplementation(() => mockPlayer);
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+
+    (createAudioPlayer as jest.Mock).mockImplementation(() => mockAmbientPlayer);
+
+    await act(async () => statusCallback({
+      currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
+    }));
+    await act(async () => { jest.advanceTimersByTime(3100); });
+    expect(getByTestId('postStoryPhase').props.children).toBe('pillow_talk');
+    mockAmbientPlayer.volume = 0.15;
+
+    await act(async () => fireEvent.press(getByTestId('startFadeToBlack')));
+    expect(getByTestId('postStoryPhase').props.children).toBe('fade_to_black');
+
+    await act(async () => { jest.advanceTimersByTime(2000); });
+    expect(mockAmbientPlayer.volume).toBeLessThan(0.15);
+    expect(mockAmbientPlayer.volume).toBeGreaterThan(0);
+    expect(getByTestId('postStoryPhase').props.children).toBe('fade_to_black');
+
+    await act(async () => { jest.advanceTimersByTime(2100); });
+    expect(mockAmbientPlayer.volume).toBe(0);
+    expect(mockAmbientRemove).toHaveBeenCalledTimes(1);
+    expect(getByTestId('postStoryPhase').props.children).toBe('done');
+    jest.useRealTimers();
+  });
+
+  it('stopStory during startFadeToBlack clears interval ref', async () => {
+    jest.useFakeTimers();
+    (createAudioPlayer as jest.Mock).mockImplementation(() => mockPlayer);
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+
+    (createAudioPlayer as jest.Mock).mockImplementation(() => mockAmbientPlayer);
+
+    await act(async () => statusCallback({
+      currentTime: 120, duration: 120, playing: false, isBuffering: false, didJustFinish: true,
+    }));
+    await act(async () => { jest.advanceTimersByTime(3100); });
+    expect(getByTestId('postStoryPhase').props.children).toBe('pillow_talk');
+
+    await act(async () => fireEvent.press(getByTestId('startFadeToBlack')));
+    expect(getByTestId('postStoryPhase').props.children).toBe('fade_to_black');
+
+    await act(async () => fireEvent.press(getByTestId('stop')));
+    expect(getByTestId('postStoryPhase').props.children).toBe('idle');
+
+    const volBefore = mockAmbientPlayer.volume;
+    await act(async () => { jest.advanceTimersByTime(4000); });
+    expect(mockAmbientPlayer.volume).toBe(volBefore);
+    jest.useRealTimers();
   });
 });

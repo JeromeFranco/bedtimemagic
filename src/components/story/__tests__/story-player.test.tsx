@@ -29,15 +29,28 @@ jest.mock('@/contexts/PlayerContext', () => ({
 jest.mock('react-native-gesture-handler', () => {
   const React = require('react');
   const { View } = require('react-native');
-  const chainable = () => {
+  const makeChainable = () => {
     const obj: Record<string, unknown> = {};
-    for (const m of ['onBegin', 'onUpdate', 'onFinalize', 'onEnd', 'onStart', 'onChange']) {
-      obj[m] = () => obj;
-    }
+    const chain = () => obj;
+    obj.activeOffsetX = chain;
+    obj.activeOffsetY = chain;
+    obj.onBegin = chain;
+    obj.onUpdate = chain;
+    obj.onFinalize = chain;
+    obj.onEnd = (fn: unknown) => {
+      obj._onEndFn = fn;
+      return obj;
+    };
+    obj.onStart = chain;
+    obj.onChange = chain;
     return obj;
   };
   return {
-    Gesture: { Pan: chainable, Tap: chainable },
+    Gesture: {
+      Pan: () => makeChainable(),
+      Tap: () => makeChainable(),
+      Race: (...gestures: unknown[]) => gestures,
+    },
     GestureDetector: ({ children }: { children: unknown }) =>
       React.createElement(View, null, children),
   };
@@ -80,30 +93,114 @@ describe('StoryPlayer', () => {
     onBack: jest.fn(),
   };
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockUsePlayer.mockReturnValue({
-      currentStory: null,
-      isPlaying: false,
-      isBuffering: false,
-      isSleepMode: false,
-      position: 0,
-      duration: 60,
-      postStoryPhase: 'idle',
-      playStory: mockPlayStory,
-      pause: mockPause,
-      resume: mockResume,
-      seekTo: mockSeekTo,
-      stopStory: jest.fn(),
-      toggleSleepMode: mockToggleSleepMode,
-      skipPillowTalk: jest.fn(),
-      confirmAffirmation: jest.fn(),
-    });
+  const basePlayerMock = (overrides = {}) => ({
+    currentStory: null,
+    isPlaying: false,
+    isBuffering: false,
+    isSleepMode: false,
+    position: 0,
+    duration: 60,
+    postStoryPhase: 'idle' as const,
+    playStory: mockPlayStory,
+    pause: mockPause,
+    resume: mockResume,
+    seekTo: mockSeekTo,
+    stopStory: jest.fn(),
+    toggleSleepMode: mockToggleSleepMode,
+    skipPillowTalk: jest.fn(),
+    confirmAffirmation: jest.fn(),
+    startFadeToBlack: jest.fn(),
+    ...overrides,
   });
 
-  afterEach(async () => {
-    await act(async () => {});
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUsePlayer.mockImplementation(() => basePlayerMock());
+  });
+
+  afterEach(() => {
     cleanup();
+  });
+
+  describe('Wind-Down UX in StoryPlayer', () => {
+    it('calls startFadeToBlack when Goodnight button is pressed', async () => {
+      const mockStartFadeToBlack = jest.fn();
+      mockUsePlayer.mockImplementation(() =>
+        basePlayerMock({
+          postStoryPhase: 'affirmation',
+          startFadeToBlack: mockStartFadeToBlack,
+        }),
+      );
+      const queries = await render(<StoryPlayer {...defaultProps} postStoryPhase="affirmation" />);
+      await fireEvent.press(queries.getByText('Goodnight'));
+      expect(mockStartFadeToBlack).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls startFadeToBlack when Skip for tonight button is pressed in pillow_talk phase', async () => {
+      const mockStartFadeToBlack = jest.fn();
+      mockUsePlayer.mockImplementation(() =>
+        basePlayerMock({
+          postStoryPhase: 'pillow_talk',
+          startFadeToBlack: mockStartFadeToBlack,
+        }),
+      );
+      const queries = await render(<StoryPlayer {...defaultProps} postStoryPhase="pillow_talk" />);
+      await fireEvent.press(queries.getByText('Skip for tonight'));
+      expect(mockStartFadeToBlack).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls skipPillowTalk when Next button is pressed in pillow_talk phase', async () => {
+      const mockSkipPillowTalk = jest.fn();
+      mockUsePlayer.mockImplementation(() =>
+        basePlayerMock({
+          postStoryPhase: 'pillow_talk',
+          skipPillowTalk: mockSkipPillowTalk,
+        }),
+      );
+      const queries = await render(<StoryPlayer {...defaultProps} postStoryPhase="pillow_talk" />);
+      await fireEvent.press(queries.getByText('Next'));
+      expect(mockSkipPillowTalk).toHaveBeenCalledTimes(1);
+    });
+
+    it('hides controls after 5 seconds instead of 15 seconds', async () => {
+      jest.useFakeTimers();
+      try {
+        mockUsePlayer.mockImplementation(() =>
+          basePlayerMock({
+            postStoryPhase: 'pillow_talk',
+          }),
+        );
+        const queries = await render(<StoryPlayer {...defaultProps} postStoryPhase="pillow_talk" />);
+        expect(queries.getByText('Next')).toBeTruthy();
+
+        await act(async () => {
+          jest.advanceTimersByTime(5100);
+        });
+        expect(queries.queryByText('Next')).toBeNull();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('renders GestureHintCue text for pillow_talk phase', async () => {
+      mockUsePlayer.mockImplementation(() =>
+        basePlayerMock({
+          postStoryPhase: 'pillow_talk',
+        }),
+      );
+      const queries = await render(<StoryPlayer {...defaultProps} postStoryPhase="pillow_talk" />);
+      expect(queries.getByText('Swipe for Affirmation →')).toBeTruthy();
+    });
+
+    it('renders GestureHintCue text for affirmation phase', async () => {
+      mockUsePlayer.mockImplementation(() =>
+        basePlayerMock({
+          postStoryPhase: 'affirmation',
+        }),
+      );
+      const queries = await render(<StoryPlayer {...defaultProps} postStoryPhase="affirmation" />);
+      expect(queries.getByText('Swipe for Goodnight ↑')).toBeTruthy();
+    });
   });
 
   it('renders story title and moral', async () => {
@@ -139,42 +236,26 @@ describe('StoryPlayer', () => {
   });
 
   it('calls resume when Play is pressed while paused on current story', async () => {
-    mockUsePlayer.mockReturnValue({
-      currentStory: MOCK_STORY,
-      isPlaying: false,
-      isBuffering: false,
-      isSleepMode: false,
-      position: 15,
-      duration: 60,
-      postStoryPhase: 'idle',
-      playStory: mockPlayStory,
-      pause: mockPause,
-      resume: mockResume,
-      seekTo: mockSeekTo,
-      stopStory: jest.fn(),
-      toggleSleepMode: mockToggleSleepMode,
-    });
+    mockUsePlayer.mockImplementation(() =>
+      basePlayerMock({
+        currentStory: MOCK_STORY,
+        isPlaying: false,
+        position: 15,
+      }),
+    );
     const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
     fireEvent.press(getByTestId('play-pause-button'));
     expect(mockResume).toHaveBeenCalledTimes(1);
   });
 
   it('calls pause when Play is pressed while playing', async () => {
-    mockUsePlayer.mockReturnValue({
-      currentStory: MOCK_STORY,
-      isPlaying: true,
-      isBuffering: false,
-      isSleepMode: false,
-      position: 30,
-      duration: 60,
-      postStoryPhase: 'idle',
-      playStory: mockPlayStory,
-      pause: mockPause,
-      resume: mockResume,
-      seekTo: mockSeekTo,
-      stopStory: jest.fn(),
-      toggleSleepMode: mockToggleSleepMode,
-    });
+    mockUsePlayer.mockImplementation(() =>
+      basePlayerMock({
+        currentStory: MOCK_STORY,
+        isPlaying: true,
+        position: 30,
+      }),
+    );
     const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
     fireEvent.press(getByTestId('play-pause-button'));
     expect(mockPause).toHaveBeenCalledTimes(1);
@@ -193,21 +274,13 @@ describe('StoryPlayer', () => {
   });
 
   it('calls seekTo when -15s or +15s buttons are pressed', async () => {
-    mockUsePlayer.mockReturnValue({
-      currentStory: MOCK_STORY,
-      isPlaying: true,
-      isBuffering: false,
-      isSleepMode: false,
-      position: 30,
-      duration: 60,
-      postStoryPhase: 'idle',
-      playStory: mockPlayStory,
-      pause: mockPause,
-      resume: mockResume,
-      seekTo: mockSeekTo,
-      stopStory: jest.fn(),
-      toggleSleepMode: mockToggleSleepMode,
-    });
+    mockUsePlayer.mockImplementation(() =>
+      basePlayerMock({
+        currentStory: MOCK_STORY,
+        isPlaying: true,
+        position: 30,
+      }),
+    );
     const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
     fireEvent.press(getByTestId('seek-backward-button'));
     expect(mockSeekTo).toHaveBeenCalledWith(15);
