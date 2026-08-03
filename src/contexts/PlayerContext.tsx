@@ -5,7 +5,7 @@ import { streamStorySegment } from '@/lib/inworld-tts';
 import { splitStoryIntoSegments } from '@/lib/story-segments';
 import type { Story } from '@/types';
 
-export type PostStoryPhase = 'idle' | 'fading' | 'pillow_talk' | 'affirmation' | 'done';
+export type PostStoryPhase = 'idle' | 'fading' | 'pillow_talk' | 'affirmation' | 'fade_to_black' | 'done';
 
 interface PlayerContextValue {
   currentStory: Story | null;
@@ -23,6 +23,7 @@ interface PlayerContextValue {
   toggleSleepMode: () => void;
   skipPillowTalk: () => void;
   confirmAffirmation: () => void;
+  startFadeToBlack: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextValue>({
@@ -41,10 +42,13 @@ const PlayerContext = createContext<PlayerContextValue>({
   toggleSleepMode: () => {},
   skipPillowTalk: () => {},
   confirmAffirmation: () => {},
+  startFadeToBlack: () => {},
 });
 
 const FADE_DURATION = 3000;
 const FADE_INTERVAL = 50;
+const FADE_TO_BLACK_DURATION = 4000;
+const AMBIENT_FADE_INTERVAL = 50;
 
 type ActiveSegment = {
   index: number;
@@ -425,6 +429,50 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setPostStoryPhase('done');
   }, [cleanupPlayer]);
 
+  const startFadeToBlack = useCallback(() => {
+    setPostStoryPhase('fade_to_black');
+    const ambient = ambientPlayerRef.current;
+    ambientPlayerRef.current = null;
+    if (!ambient) {
+      playbackGenerationRef.current += 1;
+      segmentQueueRef.current = [];
+      nextSegmentIndexRef.current = 0;
+      segmentsRef.current = [];
+      cleanupPlayer();
+      setCurrentStory(null);
+      setIsPlaying(false);
+      setIsBuffering(false);
+      setPosition(0);
+      setDuration(0);
+      setPostStoryPhase('done');
+      return;
+    }
+
+    const steps = FADE_TO_BLACK_DURATION / AMBIENT_FADE_INTERVAL;
+    const startVolume = ambient.volume;
+    let step = 0;
+
+    const interval = setInterval(() => {
+      step++;
+      ambient.volume = Math.max(0, startVolume * (1 - step / steps));
+      if (step >= steps) {
+        clearInterval(interval);
+        ambient.remove();
+        playbackGenerationRef.current += 1;
+        segmentQueueRef.current = [];
+        nextSegmentIndexRef.current = 0;
+        segmentsRef.current = [];
+        cleanupPlayer();
+        setCurrentStory(null);
+        setIsPlaying(false);
+        setIsBuffering(false);
+        setPosition(0);
+        setDuration(0);
+        setPostStoryPhase('done');
+      }
+    }, AMBIENT_FADE_INTERVAL);
+  }, [cleanupPlayer]);
+
   useEffect(() => {
     return () => {
       playbackGenerationRef.current += 1;
@@ -450,6 +498,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         toggleSleepMode,
         skipPillowTalk,
         confirmAffirmation,
+        startFadeToBlack,
       }}
     >
       {children}
