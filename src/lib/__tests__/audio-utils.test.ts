@@ -73,13 +73,13 @@ describe('getAudioSource', () => {
 describe('getAmbientAudioSource', () => {
   it('returns ambient rain source', () => {
     const source = getAmbientAudioSource();
-    expect(source).toEqual({ uri: 'mocked-ambient.mp3' });
+    expect(source).toEqual('mocked-ambient.mp3');
   });
 });
 
 describe('getSampleAudioSource', () => {
   it('returns sample audio source', () => {
     const source = getSampleAudioSource();
-    expect(source).toEqual({ uri: 'mocked-sample.mp3' });
+    expect(source).toEqual('mocked-sample.mp3');
   });
 });

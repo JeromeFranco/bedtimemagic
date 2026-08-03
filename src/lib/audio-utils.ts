@@ -1,3 +1,4 @@
+import type { AudioSource } from 'expo-audio';
 import { getCachedAudioPath, getCachedAudioSegmentPaths } from './audio-cache';
 import { getSegmentAudioSources, prefetchStoryAudio } from './audio-stream';
 import { splitStoryIntoSegments } from './story-segments';
@@ -28,10 +29,10 @@ export async function getAudioSource(story: Story): Promise<{ uri: string }> {
   return sources[0];
 }
 
-export function getAmbientAudioSource(): { uri: string } {
-  return { uri: AMBIENT_RAIN };
+export function getAmbientAudioSource(): AudioSource {
+  return AMBIENT_RAIN;
 }
 
-export function getSampleAudioSource(): { uri: string } {
-  return { uri: SAMPLE_AUDIO };
+export function getSampleAudioSource(): AudioSource {
+  return SAMPLE_AUDIO;
 }

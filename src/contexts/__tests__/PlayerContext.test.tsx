@@ -45,7 +45,7 @@ jest.mock('@/lib/story-segments', () => ({
 }));
 
 jest.mock('@/lib/audio-utils', () => ({
-  getAmbientAudioSource: jest.fn(() => ({ uri: 'ambient-rain' })),
+  getAmbientAudioSource: jest.fn(() => 'ambient-rain'),
 }));
 
 import { PlayerProvider, usePlayer } from '../PlayerContext';
@@ -376,7 +376,7 @@ describe('PlayerContext', () => {
     await act(async () => { jest.advanceTimersByTime(3100); });
     expect(getByTestId('postStoryPhase').props.children).toBe('pillow_talk');
     expect(getAmbientAudioSource).toHaveBeenCalled();
-    expect(createAudioPlayer).toHaveBeenCalledWith({ uri: 'ambient-rain' });
+    expect(createAudioPlayer).toHaveBeenCalledWith('ambient-rain');
     expect(mockAmbientPlayer.volume).toBe(0.15);
     expect(mockAmbientPlayer.loop).toBe(true);
     expect(mockAmbientPlay).toHaveBeenCalled();
