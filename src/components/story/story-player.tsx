@@ -64,6 +64,16 @@ export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPl
     backgroundColor: playBgColor.get(),
   }));
 
+  const rewindBgColor = useSharedValue<string>('transparent');
+  const rewindAnimatedStyle = useAnimatedStyle(() => ({
+    backgroundColor: rewindBgColor.get(),
+  }));
+
+  const forwardBgColor = useSharedValue<string>('transparent');
+  const forwardAnimatedStyle = useAnimatedStyle(() => ({
+    backgroundColor: forwardBgColor.get(),
+  }));
+
   const sleepOverlayOpacity = useSharedValue(0);
   const sleepOverlayStyle = useAnimatedStyle(() => ({
     opacity: sleepOverlayOpacity.get(),
@@ -202,13 +212,16 @@ export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPl
             testID="seek-backward-button"
             accessibilityLabel="Rewind 15 seconds"
             onPress={() => handleSeekRelative(-15)}
-            style={styles.secondaryControlBtn}
+            onPressIn={() => rewindBgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }))}
+            onPressOut={() => rewindBgColor.set(withTiming('transparent', { duration: 150 }))}
           >
-            <SymbolView
-              name={{ ios: 'gobackward.15', android: 'replay_10' }}
-              size={28}
-              tintColor={Colors.dark.textSecondary}
-            />
+            <Animated.View style={[styles.secondaryControlBtn, rewindAnimatedStyle]}>
+              <SymbolView
+                name={{ ios: 'gobackward.15', android: 'replay_10' }}
+                size={28}
+                tintColor={Colors.dark.textSecondary}
+              />
+            </Animated.View>
           </Pressable>
 
           <Pressable
@@ -239,13 +252,16 @@ export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPl
             testID="seek-forward-button"
             accessibilityLabel="Forward 15 seconds"
             onPress={() => handleSeekRelative(15)}
-            style={styles.secondaryControlBtn}
+            onPressIn={() => forwardBgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }))}
+            onPressOut={() => forwardBgColor.set(withTiming('transparent', { duration: 150 }))}
           >
-            <SymbolView
-              name={{ ios: 'goforward.15', android: 'forward_10' }}
-              size={28}
-              tintColor={Colors.dark.textSecondary}
-            />
+            <Animated.View style={[styles.secondaryControlBtn, forwardAnimatedStyle]}>
+              <SymbolView
+                name={{ ios: 'goforward.15', android: 'forward_10' }}
+                size={28}
+                tintColor={Colors.dark.textSecondary}
+              />
+            </Animated.View>
           </Pressable>
         </View>
       </View>
