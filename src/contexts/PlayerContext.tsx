@@ -49,6 +49,15 @@ const FADE_DURATION = 3000;
 const FADE_INTERVAL = 50;
 const FADE_TO_BLACK_DURATION = 4000;
 const AMBIENT_FADE_INTERVAL = 50;
+const ESTIMATED_SECONDS_PER_CHAR = 0.07;
+
+function cumulativeStart(durations: number[], index: number): number {
+  let total = 0;
+  for (let i = 0; i < index; i++) {
+    total += durations[i] ?? 0;
+  }
+  return total;
+}
 
 type ActiveSegment = {
   index: number;
@@ -74,6 +83,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const segmentQueueRef = useRef<ActiveSegment[]>([]);
   const nextSegmentIndexRef = useRef(0);
   const failedSegmentsRef = useRef<Set<number>>(new Set());
+  const segmentDurationsRef = useRef<number[]>([]);
+  const pendingSeekRef = useRef<{ segmentIndex: number; offset: number } | null>(null);
   const attachListenerRef = useRef<(gen: number) => void>(() => {});
 
   const cleanupAmbient = useCallback(() => {
@@ -159,6 +170,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const playNextSegmentFromQueue = useCallback(
     (gen: number, nextIndex: number) => {
       if (failedSegmentsRef.current.has(nextIndex)) {
+        if (pendingSeekRef.current?.segmentIndex === nextIndex) {
+          pendingSeekRef.current = null;
+        }
         const segments = segmentsRef.current;
         const skipIndex = nextIndex + 1;
         if (skipIndex < segments.length) {
@@ -213,6 +227,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         streamStorySegment(activeStoryRef.current!.id, nextIndex, segText)
           .then((seg) => {
             if (playbackGenerationRef.current !== gen) return;
+            if (pendingSeekRef.current && pendingSeekRef.current.segmentIndex !== seg.segmentIndex) {
+              return;
+            }
 
             const player = createAudioPlayer({ uri: seg.uri });
             playerRef.current = player;
@@ -249,6 +266,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           .catch(() => {
             if (playbackGenerationRef.current !== gen) return;
             failedSegmentsRef.current.add(nextIndex);
+            if (pendingSeekRef.current?.segmentIndex === nextIndex) {
+              pendingSeekRef.current = null;
+            }
             setIsBuffering(false);
             setIsPlaying(false);
           });
@@ -262,10 +282,23 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const listener = playerRef.current!.addListener('playbackStatusUpdate', (status) => {
         if (playbackGenerationRef.current !== gen) return;
 
-        setPosition(status.currentTime);
-        setDuration(status.duration);
+        const segmentIndex = nextSegmentIndexRef.current - 1;
+        if (segmentIndex >= 0 && status.duration > 0) {
+          segmentDurationsRef.current[segmentIndex] = status.duration;
+        }
+
+        setPosition(cumulativeStart(segmentDurationsRef.current, segmentIndex) + status.currentTime);
+        setDuration(segmentDurationsRef.current.reduce((a, b) => a + b, 0));
         setIsBuffering(status.isBuffering);
         setIsPlaying(status.playing);
+
+        if (pendingSeekRef.current && status.duration > 0) {
+          const pending = pendingSeekRef.current;
+          if (pending.segmentIndex === segmentIndex) {
+            pendingSeekRef.current = null;
+            playerRef.current?.seekTo(pending.offset);
+          }
+        }
 
         if (status.didJustFinish) {
           if (listenerRef.current) {
@@ -327,6 +360,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
       const segments = splitStoryIntoSegments(story.story_text);
       segmentsRef.current = segments;
+      segmentDurationsRef.current = segments.map((s) => s.length * ESTIMATED_SECONDS_PER_CHAR);
+      pendingSeekRef.current = null;
 
       setIsBuffering(true);
 
@@ -351,7 +386,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setIsPlaying(true);
       setIsSleepMode(false);
       setPosition(0);
-      setDuration(0);
+      setDuration(segmentDurationsRef.current.reduce((a, b) => a + b, 0));
       player.play();
 
       attachSegmentListener(gen);
@@ -386,9 +421,65 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const seekTo = useCallback((seconds: number) => {
-    if (playerRef.current) {
-      playerRef.current.seekTo(seconds);
+    const durations = segmentDurationsRef.current;
+    if (durations.length === 0) return;
+    if (!playerRef.current && !pendingSeekRef.current) return;
+
+    const totalDuration = durations.reduce((a, b) => a + b, 0);
+    const clamped = Math.max(0, Math.min(seconds, totalDuration));
+
+    let offset = clamped;
+    let targetIndex = durations.length - 1;
+    for (let i = 0; i < durations.length; i++) {
+      if (offset < durations[i]) {
+        targetIndex = i;
+        break;
+      }
+      offset -= durations[i];
     }
+
+    // skip segments known to have failed so the jump lands on playable audio
+    while (targetIndex < durations.length && failedSegmentsRef.current.has(targetIndex)) {
+      targetIndex += 1;
+      offset = 0;
+    }
+
+    const currentIndex = nextSegmentIndexRef.current - 1;
+
+    if (targetIndex >= durations.length) {
+      // no playable audio remains ahead - seek to the end of the current
+      // segment and let the natural didJustFinish flow drive the transition
+      pendingSeekRef.current = null;
+      playerRef.current?.seekTo(durations[currentIndex] ?? 0);
+      return;
+    }
+
+    if (!pendingSeekRef.current && targetIndex === currentIndex) {
+      playerRef.current?.seekTo(offset);
+      return;
+    }
+
+    if (pendingSeekRef.current?.segmentIndex === targetIndex) {
+      // retarget the in-flight jump with a new offset (e.g. seek-bar drag)
+      pendingSeekRef.current.offset = offset;
+      return;
+    }
+
+    // cross-segment jump (new, or superseding an in-flight one)
+    if (playerRef.current) {
+      if (listenerRef.current) {
+        listenerRef.current.remove();
+        listenerRef.current = null;
+      }
+      playerRef.current.remove();
+      playerRef.current = null;
+    }
+
+    const gen = playbackGenerationRef.current;
+    pendingSeekRef.current = { segmentIndex: targetIndex, offset };
+    setIsBuffering(true);
+    setIsPlaying(false);
+    playNextSegmentFromQueueRef.current(gen, targetIndex);
   }, []);
 
   const stopStory = useCallback(() => {
@@ -403,6 +494,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setIsSleepMode(false);
     setPosition(0);
     setDuration(0);
+    segmentDurationsRef.current = [];
+    pendingSeekRef.current = null;
     setPostStoryPhase('idle');
   }, [cleanupPlayer]);
 
@@ -426,6 +519,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setIsBuffering(false);
     setPosition(0);
     setDuration(0);
+    segmentDurationsRef.current = [];
+    pendingSeekRef.current = null;
     setPostStoryPhase('done');
   }, [cleanupPlayer]);
 
@@ -447,6 +542,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setIsBuffering(false);
       setPosition(0);
       setDuration(0);
+      segmentDurationsRef.current = [];
+      pendingSeekRef.current = null;
       setPostStoryPhase('done');
       return;
     }
@@ -468,6 +565,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         segmentQueueRef.current = [];
         nextSegmentIndexRef.current = 0;
         segmentsRef.current = [];
+        segmentDurationsRef.current = [];
+        pendingSeekRef.current = null;
         cleanupPlayer();
         setCurrentStory(null);
         setIsPlaying(false);
@@ -482,6 +581,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     return () => {
       playbackGenerationRef.current += 1;
+      segmentDurationsRef.current = [];
+      pendingSeekRef.current = null;
       cleanupPlayer();
     };
   }, [cleanupPlayer]);

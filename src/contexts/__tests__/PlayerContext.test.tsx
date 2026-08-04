@@ -88,6 +88,8 @@ const MOCK_STORY_NO_PROMPT_NO_AFFIRMATION: Story = {
   sleepy_affirmation: '',
 };
 
+let seekSecondsOverride: number | null = null;
+
 function TestComponent() {
   const {
     currentStory,
@@ -122,6 +124,8 @@ function TestComponent() {
       <Pressable testID="pause" onPress={pause} />
       <Pressable testID="resume" onPress={resume} />
       <Pressable testID="seek" onPress={() => seekTo(30)} />
+      <Pressable testID="seekAcross" onPress={() => seekTo(40.5)} />
+      <Pressable testID="seekAny" onPress={() => seekTo(seekSecondsOverride ?? 40.5)} />
       <Pressable testID="stop" onPress={stopStory} />
       <Pressable testID="toggleSleep" onPress={toggleSleepMode} />
       <Pressable testID="skipPillowTalk" onPress={skipPillowTalk} />
@@ -146,6 +150,7 @@ describe('PlayerContext', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    seekSecondsOverride = null;
     jest.useRealTimers();
     (createAudioPlayer as jest.Mock).mockImplementation(() => mockPlayer);
     mockSplitStoryIntoSegments.mockImplementation((text: string) => [text]);
@@ -231,11 +236,340 @@ describe('PlayerContext', () => {
     expect(getByTestId('isPlaying').props.children).toBe('true');
   });
 
-  it('seekTo seeks to position', async () => {
+  it('seekTo resolves to the current segment and calls player.seekTo', async () => {
     const { getByTestId } = await renderProvider();
     await act(async () => fireEvent.press(getByTestId('play')));
+    await act(async () => statusCallback({ currentTime: 15, duration: 120, playing: true, isBuffering: false, didJustFinish: false }));
     await act(async () => fireEvent.press(getByTestId('seek')));
     expect(mockSeekTo).toHaveBeenCalledWith(30);
+  });
+
+  it('estimates total duration before any segment plays', async () => {
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+    // MOCK_STORY story_text is 19 chars -> 19 * 0.07 = 1.33s
+    expect(Number(getByTestId('duration').props.children)).toBeCloseTo(1.33, 5);
+  });
+
+  it('reports cumulative position across segment boundary', async () => {
+    mockSplitStoryIntoSegments.mockImplementation(() => ['seg-0-text', 'seg-1-text']);
+    mockStreamStorySegment.mockImplementation(
+      async (storyId: string, segmentIndex: number, text: string) => ({
+        storyId,
+        segmentIndex,
+        text,
+        uri: `file://seg-${storyId}-${segmentIndex}.mp3`,
+      }),
+    );
+
+    const statusCallbacks: ((status: any) => void)[] = [];
+    mockAddListener.mockImplementation((_event: string, cb: (status: any) => void) => {
+      statusCallbacks.push(cb);
+      return { remove: jest.fn() };
+    });
+
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+
+    // Segment 0 finishes at 40s
+    await act(async () => {
+      statusCallbacks[statusCallbacks.length - 1]({
+        currentTime: 40, duration: 40, playing: false, isBuffering: false, didJustFinish: true,
+      });
+    });
+    await act(async () => {});
+
+    // Segment 1 plays at 5s of its own timeline -> total position 45s
+    await act(async () => {
+      statusCallbacks[statusCallbacks.length - 1]({
+        currentTime: 5, duration: 30, playing: true, isBuffering: false, didJustFinish: false,
+      });
+    });
+
+    expect(Number(getByTestId('position').props.children)).toBe(45);
+    expect(Number(getByTestId('duration').props.children)).toBe(70);
+  });
+
+  it('seek across segments jumps to the target segment and applies the offset once loaded', async () => {
+    mockSplitStoryIntoSegments.mockImplementation(() => ['seg-0-text', 'seg-1-text']);
+    mockStreamStorySegment.mockImplementation(
+      async (storyId: string, segmentIndex: number, text: string) => ({
+        storyId,
+        segmentIndex,
+        text,
+        uri: `file://seg-${storyId}-${segmentIndex}.mp3`,
+      }),
+    );
+
+    const statusCallbacks: ((status: any) => void)[] = [];
+    mockAddListener.mockImplementation((_event: string, cb: (status: any) => void) => {
+      statusCallbacks.push(cb);
+      return { remove: jest.fn() };
+    });
+
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+
+    // Segment 0 reports its real duration (40s); segment 1 is still an estimate (~0.7s)
+    await act(async () => {
+      statusCallbacks[statusCallbacks.length - 1]({
+        currentTime: 40, duration: 40, playing: true, isBuffering: false, didJustFinish: false,
+      });
+    });
+
+    mockRemove.mockClear();
+
+    // Seek to 40.5s -> segment 1 at offset 0.5s
+    await act(async () => fireEvent.press(getByTestId('seekAcross')));
+
+    expect(mockRemove).toHaveBeenCalled();
+    expect(getByTestId('isPlaying').props.children).toBe('true');
+
+    // Target segment loads and reports its duration -> pending offset applied once
+    await act(async () => {
+      statusCallbacks[statusCallbacks.length - 1]({
+        currentTime: 0, duration: 30, playing: true, isBuffering: false, didJustFinish: false,
+      });
+    });
+
+    expect(mockSeekTo).toHaveBeenCalledTimes(1);
+    expect(mockSeekTo).toHaveBeenCalledWith(0.5);
+    expect(Number(getByTestId('position').props.children)).toBe(40);
+    expect(Number(getByTestId('duration').props.children)).toBe(70);
+  });
+
+  it('seek skips segments known to have failed and lands on playable audio', async () => {
+    mockSplitStoryIntoSegments.mockImplementation(() => ['seg-0-text', 'seg-1-text', 'seg-2-text']);
+    mockStreamStorySegment.mockImplementation(
+      (storyId: string, segmentIndex: number, text: string) => {
+        if (segmentIndex === 1) {
+          return Promise.reject(new Error('segment 1 failed'));
+        }
+        return Promise.resolve({
+          storyId,
+          segmentIndex,
+          text,
+          uri: `file://seg-${storyId}-${segmentIndex}.mp3`,
+        });
+      },
+    );
+
+    const statusCallbacks: ((status: any) => void)[] = [];
+    mockAddListener.mockImplementation((_event: string, cb: (status: any) => void) => {
+      statusCallbacks.push(cb);
+      return { remove: jest.fn() };
+    });
+
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+    await act(async () => {}); // flush the segment 1 lookahead failure
+
+    // Segment 0 reports its real duration (40s); segment 1 is marked failed
+    await act(async () => {
+      statusCallbacks[statusCallbacks.length - 1]({
+        currentTime: 40, duration: 40, playing: true, isBuffering: false, didJustFinish: false,
+      });
+    });
+
+    mockSeekTo.mockClear();
+
+    // Seek to 40.5s -> resolves to failed segment 1 -> skips to segment 2
+    await act(async () => fireEvent.press(getByTestId('seekAcross')));
+    await act(async () => {});
+
+    expect(getByTestId('isPlaying').props.children).toBe('true');
+
+    // Segment 2 loads -> pending offset 0 applied exactly once
+    await act(async () => {
+      statusCallbacks[statusCallbacks.length - 1]({
+        currentTime: 0, duration: 30, playing: true, isBuffering: false, didJustFinish: false,
+      });
+    });
+
+    expect(mockSeekTo).toHaveBeenCalledTimes(1);
+    expect(mockSeekTo.mock.calls[0][0]).toBe(0);
+    expect(Number(getByTestId('position').props.children)).toBeCloseTo(40.7, 5);
+  });
+
+  it('seek to a failed final segment falls back to the end of the current segment', async () => {
+    mockSplitStoryIntoSegments.mockImplementation(() => ['seg-0-text', 'seg-1-text']);
+    mockStreamStorySegment.mockImplementation(
+      (storyId: string, segmentIndex: number, text: string) => {
+        if (segmentIndex === 1) {
+          return Promise.reject(new Error('segment 1 failed'));
+        }
+        return Promise.resolve({
+          storyId,
+          segmentIndex,
+          text,
+          uri: `file://seg-${storyId}-${segmentIndex}.mp3`,
+        });
+      },
+    );
+
+    const statusCallbacks: ((status: any) => void)[] = [];
+    mockAddListener.mockImplementation((_event: string, cb: (status: any) => void) => {
+      statusCallbacks.push(cb);
+      return { remove: jest.fn() };
+    });
+
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+    await act(async () => {}); // flush the segment 1 lookahead failure
+
+    await act(async () => {
+      statusCallbacks[statusCallbacks.length - 1]({
+        currentTime: 40, duration: 40, playing: true, isBuffering: false, didJustFinish: false,
+      });
+    });
+
+    mockSeekTo.mockClear();
+
+    // Seek to 40.5s -> resolves to failed segment 1 -> no playable audio ahead
+    await act(async () => fireEvent.press(getByTestId('seekAcross')));
+
+    expect(mockSeekTo).toHaveBeenCalledTimes(1);
+    expect(mockSeekTo.mock.calls[0][0]).toBe(40); // end of the current segment
+    expect(getByTestId('isPlaying').props.children).toBe('true');
+  });
+
+  it('supersedes an in-flight cross-segment jump when seeking to a different segment', async () => {
+    mockSplitStoryIntoSegments.mockImplementation(() => ['seg-0-text', 'seg-1-text', 'seg-2-text']);
+    const seg2Resolvers: (() => void)[] = [];
+    mockStreamStorySegment.mockImplementation(
+      (storyId: string, segmentIndex: number, text: string) => {
+        if (segmentIndex === 0 || segmentIndex === 1) {
+          return Promise.resolve({
+            storyId,
+            segmentIndex,
+            text,
+            uri: `file://seg-${storyId}-${segmentIndex}.mp3`,
+          });
+        }
+        return new Promise((resolve) => {
+          seg2Resolvers.push(() =>
+            resolve({
+              storyId,
+              segmentIndex,
+              text,
+              uri: `file://seg-${storyId}-${segmentIndex}.mp3`,
+            }),
+          );
+        });
+      },
+    );
+
+    const statusCallbacks: ((status: any) => void)[] = [];
+    mockAddListener.mockImplementation((_event: string, cb: (status: any) => void) => {
+      statusCallbacks.push(cb);
+      return { remove: jest.fn() };
+    });
+
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+
+    await act(async () => {
+      statusCallbacks[statusCallbacks.length - 1]({
+        currentTime: 40, duration: 40, playing: true, isBuffering: false, didJustFinish: false,
+      });
+    });
+
+    mockSeekTo.mockClear();
+
+    // Seek to 40.5s -> jumps to segment 1 (queued, plays immediately)
+    await act(async () => fireEvent.press(getByTestId('seekAcross')));
+    expect(createAudioPlayer).toHaveBeenCalledTimes(2);
+    expect(getByTestId('isPlaying').props.children).toBe('true');
+
+    // Seek to 41.2s -> retargets the jump to segment 2 while segment 1 plays
+    seekSecondsOverride = 41.2;
+    await act(async () => fireEvent.press(getByTestId('seekAny')));
+    expect(getByTestId('isBuffering').props.children).toBe('true');
+    expect(seg2Resolvers).toHaveLength(2); // lookahead (from segment 1) + jump stream
+
+    // The lookahead stream resolves first -> only queues, no player created
+    await act(async () => seg2Resolvers[0]());
+    expect(createAudioPlayer).toHaveBeenCalledTimes(2);
+
+    // The jump stream resolves -> segment 2 player created
+    await act(async () => seg2Resolvers[1]());
+    expect(createAudioPlayer).toHaveBeenCalledTimes(3);
+
+    // Segment 2 loads -> pending offset applied exactly once
+    await act(async () => {
+      statusCallbacks[statusCallbacks.length - 1]({
+        currentTime: 0, duration: 30, playing: true, isBuffering: false, didJustFinish: false,
+      });
+    });
+
+    expect(mockSeekTo).toHaveBeenCalledTimes(1);
+    expect(mockSeekTo.mock.calls[0][0]).toBeCloseTo(0.5, 5);
+    expect(getByTestId('isPlaying').props.children).toBe('true');
+  });
+
+  it('updates the pending offset when seeking again to the same in-flight target', async () => {
+    mockSplitStoryIntoSegments.mockImplementation(() => ['seg-0-text', 'seg-1-text', 'seg-2-text']);
+    let seg2Resolve: (() => void) | undefined;
+    mockStreamStorySegment.mockImplementation(
+      (storyId: string, segmentIndex: number, text: string) => {
+        if (segmentIndex === 0 || segmentIndex === 1) {
+          return Promise.resolve({
+            storyId,
+            segmentIndex,
+            text,
+            uri: `file://seg-${storyId}-${segmentIndex}.mp3`,
+          });
+        }
+        return new Promise((resolve) => {
+          seg2Resolve = () =>
+            resolve({
+              storyId,
+              segmentIndex,
+              text,
+              uri: `file://seg-${storyId}-${segmentIndex}.mp3`,
+            });
+        });
+      },
+    );
+
+    const statusCallbacks: ((status: any) => void)[] = [];
+    mockAddListener.mockImplementation((_event: string, cb: (status: any) => void) => {
+      statusCallbacks.push(cb);
+      return { remove: jest.fn() };
+    });
+
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+
+    await act(async () => {
+      statusCallbacks[statusCallbacks.length - 1]({
+        currentTime: 40, duration: 40, playing: true, isBuffering: false, didJustFinish: false,
+      });
+    });
+
+    mockSeekTo.mockClear();
+
+    // Seek to 41.0s -> jump to segment 2 (not queued, stream in flight)
+    seekSecondsOverride = 41;
+    await act(async () => fireEvent.press(getByTestId('seekAny')));
+    expect(getByTestId('isBuffering').props.children).toBe('true');
+
+    // Drag continues to 41.3s -> same target, offset updated on the pending jump
+    seekSecondsOverride = 41.3;
+    await act(async () => fireEvent.press(getByTestId('seekAny')));
+    expect(getByTestId('isBuffering').props.children).toBe('true');
+
+    await act(async () => seg2Resolve!());
+
+    await act(async () => {
+      statusCallbacks[statusCallbacks.length - 1]({
+        currentTime: 0, duration: 30, playing: true, isBuffering: false, didJustFinish: false,
+      });
+    });
+
+    expect(mockSeekTo).toHaveBeenCalledTimes(1);
+    expect(mockSeekTo.mock.calls[0][0]).toBeCloseTo(0.6, 5);
+    expect(getByTestId('isPlaying').props.children).toBe('true');
   });
 
   it('stopStory clears state and removes player', async () => {
