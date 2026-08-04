@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ChildProfile } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
@@ -60,10 +60,10 @@ export function SelectedChildProvider({ children }: { children: React.ReactNode 
     return () => { cancelled = true; };
   }, [user]);
 
-  const setSelectedProfile = useCallback((profile: ChildProfile) => {
+  const setSelectedProfile = (profile: ChildProfile) => {
     setSelectedProfileId(profile.id);
     AsyncStorage.setItem(STORAGE_KEY, profile.id);
-  }, []);
+  };
 
   const selectedProfile = profiles.find((p) => p.id === selectedProfileId) ?? null;
 

@@ -1,4 +1,3 @@
-import { useCallback } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -22,13 +21,10 @@ export function SeekBar({ progress, position, duration, onSeek }: SeekBarProps) 
     transform: [{ scale: thumbScale.get() }],
   }));
 
-  const handleSeek = useCallback(
-    (locationX: number) => {
-      const fraction = Math.max(0, Math.min(1, locationX / trackWidth.get()));
-      onSeek(fraction * duration);
-    },
-    [duration, onSeek, trackWidth],
-  );
+  const handleSeek = (locationX: number) => {
+    const fraction = Math.max(0, Math.min(1, locationX / trackWidth.get()));
+    onSeek(fraction * duration);
+  };
 
   const panGesture = Gesture.Pan()
     .onBegin(() => {
