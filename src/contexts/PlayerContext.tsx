@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { getAmbientAudioSource } from '@/lib/audio-utils';
-import { streamStorySegment } from '@/lib/inworld-tts';
+import { streamStorySegment, cancelStoryAudio } from '@/lib/inworld-tts';
 import { splitStoryIntoSegments } from '@/lib/story-segments';
 import type { Story } from '@/types';
 
@@ -333,6 +333,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [playNextSegmentFromQueue]);
 
   const playStory = async (story: Story) => {
+    // stop the previous story's in-flight TTS streams before starting a new one
+    if (activeStoryRef.current) {
+      cancelStoryAudio(activeStoryRef.current.id);
+    }
     playbackGenerationRef.current += 1;
     const gen = playbackGenerationRef.current;
 
@@ -474,6 +478,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   };
 
   const stopStory = () => {
+    if (activeStoryRef.current) {
+      cancelStoryAudio(activeStoryRef.current.id);
+    }
     playbackGenerationRef.current += 1;
     segmentQueueRef.current = [];
     nextSegmentIndexRef.current = 0;
@@ -500,6 +507,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   };
 
   const confirmAffirmation = () => {
+    if (activeStoryRef.current) {
+      cancelStoryAudio(activeStoryRef.current.id);
+    }
     playbackGenerationRef.current += 1;
     segmentQueueRef.current = [];
     nextSegmentIndexRef.current = 0;
@@ -523,6 +533,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
     const ambient = ambientPlayerRef.current;
     if (!ambient) {
+      if (activeStoryRef.current) {
+        cancelStoryAudio(activeStoryRef.current.id);
+      }
       playbackGenerationRef.current += 1;
       segmentQueueRef.current = [];
       nextSegmentIndexRef.current = 0;
@@ -552,6 +565,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           fadeIntervalRef.current = null;
         }
         cleanupAmbient();
+        if (activeStoryRef.current) {
+          cancelStoryAudio(activeStoryRef.current.id);
+        }
         playbackGenerationRef.current += 1;
         segmentQueueRef.current = [];
         nextSegmentIndexRef.current = 0;
@@ -571,6 +587,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     return () => {
+      if (activeStoryRef.current) {
+        cancelStoryAudio(activeStoryRef.current.id);
+      }
       playbackGenerationRef.current += 1;
       segmentDurationsRef.current = [];
       pendingSeekRef.current = null;

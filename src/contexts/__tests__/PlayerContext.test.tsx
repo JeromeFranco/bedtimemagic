@@ -34,10 +34,12 @@ jest.mock('expo-audio', () => ({
 }));
 
 const mockStreamStorySegment = jest.fn();
+const mockCancelStoryAudio = jest.fn();
 const mockSplitStoryIntoSegments = jest.fn((text: string) => [text]);
 
 jest.mock('@/lib/inworld-tts', () => ({
   streamStorySegment: (...args: [string, number, string]) => mockStreamStorySegment(...args),
+  cancelStoryAudio: (...args: [string]) => mockCancelStoryAudio(...args),
 }));
 
 jest.mock('@/lib/story-segments', () => ({
@@ -976,6 +978,29 @@ describe('PlayerContext', () => {
     expect(mockAmbientRemove).toHaveBeenCalledTimes(1);
     expect(getByTestId('postStoryPhase').props.children).toBe('done');
     jest.useRealTimers();
+  });
+
+  it('stopStory cancels in-flight TTS for the active story', async () => {
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+    await act(async () => fireEvent.press(getByTestId('stop')));
+    expect(mockCancelStoryAudio).toHaveBeenCalledWith('story-1');
+  });
+
+  it('cancels in-flight TTS on unmount', async () => {
+    const { getByTestId, unmount } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+    await act(async () => unmount());
+    expect(mockCancelStoryAudio).toHaveBeenCalledWith('story-1');
+  });
+
+  it('playStory cancels the previous story before starting a new one', async () => {
+    const { getByTestId } = await renderProvider();
+    await act(async () => fireEvent.press(getByTestId('play')));
+    expect(mockCancelStoryAudio).not.toHaveBeenCalled();
+    await act(async () => fireEvent.press(getByTestId('play2')));
+    expect(mockCancelStoryAudio).toHaveBeenCalledWith('story-1');
+    expect(mockCancelStoryAudio).not.toHaveBeenCalledWith('story-2');
   });
 
   it('stopStory during startFadeToBlack clears interval ref', async () => {
