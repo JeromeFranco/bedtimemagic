@@ -1,4 +1,21 @@
-const mockFiles = new Map<string, { exists: boolean; lastModified: number }>();
+const mockFiles = new Map<string, { exists: boolean; lastModified: number; content?: number[] }>();
+
+const mockBase64Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+function mockBase64ToBytes(base64: string): number[] {
+  const bytes: number[] = [];
+  const clean = base64.replace(/=+$/, '');
+  for (let i = 0; i < clean.length; i += 4) {
+    const c0 = mockBase64Alphabet.indexOf(clean[i]);
+    const c1 = mockBase64Alphabet.indexOf(clean[i + 1]);
+    const c2 = i + 2 < clean.length ? mockBase64Alphabet.indexOf(clean[i + 2]) : -1;
+    const c3 = i + 3 < clean.length ? mockBase64Alphabet.indexOf(clean[i + 3]) : -1;
+    bytes.push((c0 << 2) | (c1 >> 4));
+    if (c2 >= 0) bytes.push(((c1 & 0x0f) << 4) | (c2 >> 2));
+    if (c3 >= 0) bytes.push(((c2 & 0x03) << 6) | c3);
+  }
+  return bytes;
+}
 
 jest.mock('expo-file-system', () => {
   function resolveUri(...parts: any[]): string {
@@ -21,9 +38,26 @@ jest.mock('expo-file-system', () => {
       this.lastModified = mock?.lastModified ?? null;
     }
 
-    write(_content: string, _options?: { encoding?: string }) {
-      mockFiles.set(this.uri, { exists: true, lastModified: Date.now() });
+    write(content: string, options?: { encoding?: string; append?: boolean }) {
+      const existing = mockFiles.get(this.uri);
+      const bytes = options?.encoding === 'base64' ? mockBase64ToBytes(content) : [];
+      const previous = options?.append && existing?.content ? existing.content : [];
+      mockFiles.set(this.uri, {
+        exists: true,
+        lastModified: Date.now(),
+        content: [...previous, ...bytes],
+      });
       this.exists = true;
+    }
+
+    async move(dest: MockFile) {
+      const entry = mockFiles.get(this.uri);
+      if (!entry?.exists) throw new Error(`File does not exist: ${this.uri}`);
+      mockFiles.delete(this.uri);
+      mockFiles.set(dest.uri, entry);
+      this.uri = dest.uri;
+      this.name = dest.name;
+      dest.exists = true;
     }
 
     delete() {
@@ -73,7 +107,7 @@ import {
   evictStory,
   enforceFifoEviction,
   getCachedAudioSegmentPath,
-  writeAudioSegmentToCache,
+  AudioSegmentWriter,
   getCachedAudioSegmentPaths,
 } from '../audio-cache';
 
@@ -215,12 +249,61 @@ describe('getCachedAudioSegmentPath', () => {
   });
 });
 
-describe('writeAudioSegmentToCache', () => {
-  it('encodes Uint8Array as base64 and writes to cache', async () => {
-    const audio = new Uint8Array([104, 101, 108, 108, 111]); // "hello"
-    const result = await writeAudioSegmentToCache('story-1', 0, audio);
-    expect(result).toBe('/mock/cache/audio_v2_story-1_0.mp3');
-    expect(mockFiles.get('/mock/cache/audio_v2_story-1_0.mp3')?.exists).toBe(true);
+describe('AudioSegmentWriter', () => {
+  it('writes awkward-sized chunks and publishes bytes identical to the input', async () => {
+    const total = 60 * 1024 + 1; // not divisible by 3
+    const input = new Uint8Array(total);
+    for (let i = 0; i < total; i++) input[i] = i % 251;
+
+    const writer = new AudioSegmentWriter('story-1', 0);
+    // chunk size not divisible by 3, forcing carry-over between base64 blocks
+    for (let i = 0; i < input.length; i += 1000) {
+      writer.write(input.subarray(i, Math.min(i + 1000, input.length)));
+    }
+    expect(mockFiles.get('/mock/cache/audio_v2_story-1_0.mp3.part')?.exists).toBe(true);
+
+    const uri = await writer.finish();
+
+    expect(uri).toBe('/mock/cache/audio_v2_story-1_0.mp3');
+    expect(mockFiles.get('/mock/cache/audio_v2_story-1_0.mp3')?.content).toEqual(
+      Array.from(input),
+    );
+    expect(mockFiles.has('/mock/cache/audio_v2_story-1_0.mp3.part')).toBe(false);
+  });
+
+  it('flushes incrementally to the part file instead of one giant write', async () => {
+    const writer = new AudioSegmentWriter('story-1', 1);
+    const chunk = new Uint8Array(30 * 1024).fill(7);
+    writer.write(chunk);
+
+    // 30KB exceeds the flush threshold, so bytes hit disk before finish()
+    const part = mockFiles.get('/mock/cache/audio_v2_story-1_1.mp3.part');
+    expect(part?.exists).toBe(true);
+    expect(part?.content?.length).toBeGreaterThan(0);
+
+    await writer.finish();
+    expect(mockFiles.get('/mock/cache/audio_v2_story-1_1.mp3')?.content).toEqual(
+      Array.from(chunk),
+    );
+  });
+
+  it('abort removes the part file', async () => {
+    const writer = new AudioSegmentWriter('story-1', 2);
+    writer.write(new Uint8Array(30 * 1024));
+    expect(mockFiles.get('/mock/cache/audio_v2_story-1_2.mp3.part')?.exists).toBe(true);
+
+    writer.abort();
+
+    expect(mockFiles.get('/mock/cache/audio_v2_story-1_2.mp3.part')?.exists ?? false).toBe(false);
+    expect(mockFiles.get('/mock/cache/audio_v2_story-1_2.mp3')?.exists ?? false).toBe(false);
+  });
+
+  it('finish publishes an empty segment when no chunks were written', async () => {
+    const writer = new AudioSegmentWriter('story-1', 3);
+    const uri = await writer.finish();
+    expect(uri).toBe('/mock/cache/audio_v2_story-1_3.mp3');
+    expect(mockFiles.get('/mock/cache/audio_v2_story-1_3.mp3')?.exists).toBe(true);
+    expect(mockFiles.has('/mock/cache/audio_v2_story-1_3.mp3.part')).toBe(false);
   });
 });
 

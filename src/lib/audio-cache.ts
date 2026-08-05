@@ -5,6 +5,7 @@ export const AUDIO_CACHE_PREFIX = 'audio_v2_';
 const LEGACY_AUDIO_CACHE_PREFIX = 'audio_';
 const COVER_CACHE_PREFIX = 'cover_';
 const MAX_CACHED_STORIES = 5;
+const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 function audioPath(storyId: string): string {
   return new File(Paths.cache, `${AUDIO_CACHE_PREFIX}${storyId}.mp3`).uri;
@@ -19,11 +20,19 @@ function coverPath(storyId: string): string {
 }
 
 function uint8ArrayToBase64(bytes: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  const chars: string[] = [];
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b0 = bytes[i];
+    const b1 = i + 1 < bytes.length ? bytes[i + 1] : 0;
+    const b2 = i + 2 < bytes.length ? bytes[i + 2] : 0;
+    chars.push(
+      BASE64_CHARS[b0 >> 2],
+      BASE64_CHARS[((b0 & 0x03) << 4) | (b1 >> 4)],
+      i + 1 < bytes.length ? BASE64_CHARS[((b1 & 0x0f) << 2) | (b2 >> 6)] : '=',
+      i + 2 < bytes.length ? BASE64_CHARS[b2 & 0x3f] : '=',
+    );
   }
-  return btoa(binary);
+  return chars.join('');
 }
 
 export async function getCachedAudioPath(storyId: string): Promise<string | null> {
@@ -48,15 +57,69 @@ export async function getCachedAudioSegmentPath(
   return file.exists ? file.uri : null;
 }
 
-export async function writeAudioSegmentToCache(
-  storyId: string,
-  segmentIndex: number,
-  audio: Uint8Array
-): Promise<string> {
-  const base64 = uint8ArrayToBase64(audio);
-  const file = new File(audioSegmentPath(storyId, segmentIndex));
-  file.write(base64, { encoding: EncodingType.Base64 });
-  return file.uri;
+const SEGMENT_WRITE_FLUSH_BYTES = 24 * 1024;
+
+/**
+ * Streams TTS audio chunks to a temp `.part` file and atomically publishes
+ * the final `.mp3` on finish, so cache-hit checks never see truncated files.
+ */
+export class AudioSegmentWriter {
+  private readonly partFile: File;
+  private readonly finalFile: File;
+  private pending = new Uint8Array(0);
+  private hasWritten = false;
+
+  constructor(storyId: string, segmentIndex: number) {
+    this.partFile = new File(
+      Paths.cache,
+      `${AUDIO_CACHE_PREFIX}${storyId}_${segmentIndex}.mp3.part`,
+    );
+    this.finalFile = new File(audioSegmentPath(storyId, segmentIndex));
+  }
+
+  private flush(bytes: Uint8Array): void {
+    if (bytes.length === 0) return;
+    this.partFile.write(uint8ArrayToBase64(bytes), {
+      encoding: EncodingType.Base64,
+      append: this.hasWritten,
+    });
+    this.hasWritten = true;
+  }
+
+  write(chunk: Uint8Array): void {
+    const merged = new Uint8Array(this.pending.length + chunk.length);
+    merged.set(this.pending, 0);
+    merged.set(chunk, this.pending.length);
+    this.pending = merged;
+
+    // keep 1-2 trailing bytes so every appended base64 block is 3-byte
+    // aligned, which is required for a valid concatenated base64 stream
+    const flushableLength = this.pending.length - (this.pending.length % 3);
+    if (flushableLength >= SEGMENT_WRITE_FLUSH_BYTES) {
+      const flushable = this.pending.slice(0, flushableLength);
+      this.pending = this.pending.slice(flushableLength);
+      this.flush(flushable);
+    }
+  }
+
+  async finish(): Promise<string> {
+    // the final block may be 1-2 bytes (padding goes at the very end)
+    this.flush(this.pending);
+    this.pending = new Uint8Array(0);
+    if (!this.hasWritten) {
+      this.partFile.write('', { encoding: EncodingType.Base64 });
+    }
+    await this.partFile.move(this.finalFile);
+    return this.finalFile.uri;
+  }
+
+  abort(): void {
+    this.pending = new Uint8Array(0);
+    this.hasWritten = false;
+    if (this.partFile.exists) {
+      this.partFile.delete();
+    }
+  }
 }
 
 export async function getCachedAudioSegmentPaths(

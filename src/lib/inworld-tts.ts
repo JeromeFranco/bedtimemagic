@@ -2,7 +2,7 @@ import { InworldTTS } from '@inworld/tts';
 import type { InworldTTSClient } from '@inworld/tts';
 import {
   getCachedAudioSegmentPath,
-  writeAudioSegmentToCache,
+  AudioSegmentWriter,
   enforceFifoEviction,
 } from './audio-cache';
 import { splitStoryIntoSegments } from './story-segments';
@@ -97,28 +97,26 @@ export async function streamStorySegment(
       await getInworldToken();
       const tts = getOrCreateTTSClient();
 
-      const chunks: Uint8Array[] = [];
-      for await (const chunk of tts.stream({
-        text,
-        voice: 'Ashley',
-        model: 'inworld-tts-1.5-mini',
-        encoding: 'MP3',
-      })) {
-        chunks.push(new Uint8Array(chunk));
+      const writer = new AudioSegmentWriter(storyId, segmentIndex);
+      try {
+        for await (const chunk of tts.stream({
+          text,
+          voice: 'Ashley',
+          model: 'inworld-tts-1.5-mini',
+          encoding: 'MP3',
+        })) {
+          writer.write(chunk);
+        }
+
+        const uri = await writer.finish();
+        await enforceFifoEviction();
+
+        return { storyId, segmentIndex, text, uri };
+      } catch (error) {
+        // never leave a truncated .part file behind on failure
+        writer.abort();
+        throw error;
       }
-
-      const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
-      const merged = new Uint8Array(totalLength);
-      let offset = 0;
-      for (const chunk of chunks) {
-        merged.set(chunk, offset);
-        offset += chunk.length;
-      }
-
-      const uri = await writeAudioSegmentToCache(storyId, segmentIndex, merged);
-      await enforceFifoEviction();
-
-      return { storyId, segmentIndex, text, uri };
     } finally {
       inflightSegments.delete(dedupeKey);
     }

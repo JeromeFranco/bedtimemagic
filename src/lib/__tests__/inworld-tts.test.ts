@@ -1,6 +1,26 @@
+const mockWriterInstances: {
+  storyId: string;
+  segmentIndex: number;
+  write: jest.Mock;
+  finish: jest.Mock;
+  abort: jest.Mock;
+}[] = [];
+
 jest.mock('../audio-cache', () => ({
   getCachedAudioSegmentPath: jest.fn(),
-  writeAudioSegmentToCache: jest.fn(),
+  AudioSegmentWriter: jest.fn().mockImplementation((storyId: string, segmentIndex: number) => {
+    const writer = {
+      storyId,
+      segmentIndex,
+      write: jest.fn(),
+      finish: jest
+        .fn()
+        .mockResolvedValue(`/cache/audio_v2_${storyId}_${segmentIndex}.mp3`),
+      abort: jest.fn(),
+    };
+    mockWriterInstances.push(writer);
+    return writer;
+  }),
   enforceFifoEviction: jest.fn().mockResolvedValue(undefined),
 }));
 
@@ -29,7 +49,7 @@ jest.mock('@inworld/tts', () => ({
   })),
 }));
 
-import { getCachedAudioSegmentPath, writeAudioSegmentToCache, enforceFifoEviction } from '../audio-cache';
+import { getCachedAudioSegmentPath, AudioSegmentWriter, enforceFifoEviction } from '../audio-cache';
 import { splitStoryIntoSegments } from '../story-segments';
 import { supabase } from '../supabase';
 import { InworldTTS } from '@inworld/tts';
@@ -37,7 +57,7 @@ import { streamStorySegment, prefetchStoryAudio, resetTokenCache } from '../inwo
 import type { StoryAudioSegment } from '../inworld-tts';
 
 const mockedGetCachedAudioSegmentPath = getCachedAudioSegmentPath as jest.Mock;
-const mockedWriteAudioSegmentToCache = writeAudioSegmentToCache as jest.Mock;
+const mockedAudioSegmentWriter = AudioSegmentWriter as jest.Mock;
 const mockedEnforceFifoEviction = enforceFifoEviction as jest.Mock;
 const mockedInvoke = supabase.functions.invoke as jest.Mock;
 const mockedInworldTTS = InworldTTS as jest.Mock;
@@ -59,6 +79,7 @@ async function* asyncGenerator(chunks: Uint8Array[]) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockWriterInstances.length = 0;
   resetTokenCache();
   mockedInvoke.mockResolvedValue({
     data: { token: 'test-jwt-token', expirationTime: new Date(Date.now() + 3600_000).toISOString() },
@@ -67,14 +88,12 @@ beforeEach(() => {
 });
 
 describe('streamStorySegment', () => {
-  it('streams TTS audio and writes to cache on miss', async () => {
+  it('streams TTS audio and writes chunks progressively on cache miss', async () => {
     mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
 
     const audioData = new Uint8Array([1, 2, 3, 4, 5]);
     const chunks = makeChunks(audioData, 2);
     mockStream.mockReturnValue(asyncGenerator(chunks));
-
-    mockedWriteAudioSegmentToCache.mockResolvedValue('/cache/audio_story-1_0.mp3');
 
     const result: StoryAudioSegment = await streamStorySegment('story-1', 0, 'Hello world');
 
@@ -91,48 +110,63 @@ describe('streamStorySegment', () => {
       model: 'inworld-tts-1.5-mini',
       encoding: 'MP3',
     });
-    expect(mockedWriteAudioSegmentToCache).toHaveBeenCalledWith(
-      'story-1',
-      0,
-      expect.any(Uint8Array)
-    );
+    expect(mockedAudioSegmentWriter).toHaveBeenCalledWith('story-1', 0);
+    const writer = mockWriterInstances[0];
+    expect(writer.write).toHaveBeenCalledTimes(3);
+    expect(writer.finish).toHaveBeenCalledTimes(1);
+    expect(writer.abort).not.toHaveBeenCalled();
     expect(mockedEnforceFifoEviction).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       storyId: 'story-1',
       segmentIndex: 0,
       text: 'Hello world',
-      uri: '/cache/audio_story-1_0.mp3',
+      uri: '/cache/audio_v2_story-1_0.mp3',
     });
   });
 
   it('returns cached segment without streaming on cache hit', async () => {
-    mockedGetCachedAudioSegmentPath.mockResolvedValue('/cache/audio_story-1_0.mp3');
+    mockedGetCachedAudioSegmentPath.mockResolvedValue('/cache/audio_v2_story-1_0.mp3');
 
     const result = await streamStorySegment('story-1', 0, 'Hello world');
 
     expect(mockStream).not.toHaveBeenCalled();
     expect(mockedInvoke).not.toHaveBeenCalled();
+    expect(mockedAudioSegmentWriter).not.toHaveBeenCalled();
     expect(result).toEqual({
       storyId: 'story-1',
       segmentIndex: 0,
       text: 'Hello world',
-      uri: '/cache/audio_story-1_0.mp3',
+      uri: '/cache/audio_v2_story-1_0.mp3',
     });
   });
 
-  it('concatenates all chunks into a single Uint8Array before writing', async () => {
+  it('passes each chunk to the writer without in-memory merging', async () => {
     mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
 
     const chunk1 = new Uint8Array([10, 20]);
     const chunk2 = new Uint8Array([30, 40, 50]);
     mockStream.mockReturnValue(asyncGenerator([chunk1, chunk2]));
 
-    mockedWriteAudioSegmentToCache.mockResolvedValue('/cache/audio_story-1_0.mp3');
-
     await streamStorySegment('story-1', 0, 'Test');
 
-    const writtenBytes = mockedWriteAudioSegmentToCache.mock.calls[0][2];
-    expect(writtenBytes).toEqual(new Uint8Array([10, 20, 30, 40, 50]));
+    const writer = mockWriterInstances[0];
+    expect(writer.write).toHaveBeenCalledTimes(2);
+    expect(writer.write.mock.calls[0][0]).toEqual(chunk1);
+    expect(writer.write.mock.calls[1][0]).toEqual(chunk2);
+  });
+
+  it('aborts the partial file when the stream fails', async () => {
+    mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
+    mockStream.mockImplementation(async function* () {
+      yield new Uint8Array([1]);
+      throw new Error('stream broke');
+    });
+
+    await expect(streamStorySegment('story-1', 0, 'Test')).rejects.toThrow('stream broke');
+
+    const writer = mockWriterInstances[0];
+    expect(writer.abort).toHaveBeenCalled();
+    expect(writer.finish).not.toHaveBeenCalled();
   });
 
   it('throws when session is null', async () => {
@@ -149,7 +183,6 @@ describe('streamStorySegment', () => {
   it('reuses cached token until near expiry', async () => {
     mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
     mockStream.mockReturnValue(asyncGenerator([new Uint8Array([1])]));
-    mockedWriteAudioSegmentToCache.mockResolvedValue('/cache/audio_story-1_0.mp3');
 
     await streamStorySegment('story-1', 0, 'Hello');
     await streamStorySegment('story-1', 1, 'World');
@@ -170,7 +203,6 @@ describe('streamStorySegment', () => {
       await streamStarted;
       yield new Uint8Array([1]);
     });
-    mockedWriteAudioSegmentToCache.mockResolvedValue('/cache/audio_story-1_0.mp3');
 
     const promise1 = streamStorySegment('story-1', 0, 'Hello');
     await new Promise((r) => process.nextTick(r));
@@ -180,6 +212,7 @@ describe('streamStorySegment', () => {
 
     const [result1, result2] = await Promise.all([promise1, promise2]);
     expect(iterationCount).toBe(1);
+    expect(mockedAudioSegmentWriter).toHaveBeenCalledTimes(1);
     expect(result1.uri).toBe(result2.uri);
   });
 });
@@ -187,7 +220,6 @@ describe('streamStorySegment', () => {
 describe('prefetchStoryAudio', () => {
   it('streams segments sequentially', async () => {
     mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
-    mockedWriteAudioSegmentToCache.mockResolvedValue('/cache/audio_story-1_0.mp3');
     mockedSplitStoryIntoSegments.mockReturnValue(['First.', 'Second.', 'Third.']);
 
     let callCount = 0;
@@ -207,7 +239,6 @@ describe('prefetchStoryAudio', () => {
 
   it('deduplicates concurrent prefetch calls for the same story', async () => {
     mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
-    mockedWriteAudioSegmentToCache.mockResolvedValue('/cache/audio_story-1_0.mp3');
     mockedSplitStoryIntoSegments.mockReturnValue(['Hello.']);
 
     let resolveStream!: () => void;
@@ -234,7 +265,6 @@ describe('prefetchStoryAudio', () => {
 
   it('stops later segments when a segment stream rejects', async () => {
     mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
-    mockedWriteAudioSegmentToCache.mockResolvedValue('/cache/audio_story-1_0.mp3');
     mockedSplitStoryIntoSegments.mockReturnValue(['First.', 'Second.', 'Third.']);
     let callCount = 0;
     mockStream.mockImplementation(async function* () {
@@ -254,7 +284,6 @@ describe('prefetchStoryAudio', () => {
 
   it('clears dedup entry after completion', async () => {
     mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
-    mockedWriteAudioSegmentToCache.mockResolvedValue('/cache/audio_story-1_0.mp3');
     mockedSplitStoryIntoSegments.mockReturnValue(['Hello.']);
     mockStream.mockReturnValue(asyncGenerator([new Uint8Array([1])]));
 
