@@ -53,7 +53,7 @@ import { getCachedAudioSegmentPath, AudioSegmentWriter, enforceFifoEviction } fr
 import { splitStoryIntoSegments } from '../story-segments';
 import { supabase } from '../supabase';
 import { InworldTTS } from '@inworld/tts';
-import { streamStorySegment, prefetchStoryAudio, resetTokenCache } from '../inworld-tts';
+import { streamStorySegment, prefetchStoryAudio, resetTokenCache, cancelStoryAudio, CancelledError } from '../inworld-tts';
 import type { StoryAudioSegment } from '../inworld-tts';
 
 const mockedGetCachedAudioSegmentPath = getCachedAudioSegmentPath as jest.Mock;
@@ -114,7 +114,11 @@ describe('streamStorySegment', () => {
     const writer = mockWriterInstances[0];
     expect(writer.write).toHaveBeenCalledTimes(3);
     expect(writer.finish).toHaveBeenCalledTimes(1);
-    expect(writer.abort).not.toHaveBeenCalled();
+    // only the pre-attempt cleanup runs; nothing is aborted after streaming
+    expect(writer.abort).toHaveBeenCalledTimes(1);
+    expect(writer.abort.mock.invocationCallOrder[0]).toBeLessThan(
+      writer.write.mock.invocationCallOrder[0],
+    );
     expect(mockedEnforceFifoEviction).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       storyId: 'story-1',
@@ -155,7 +159,7 @@ describe('streamStorySegment', () => {
     expect(writer.write.mock.calls[1][0]).toEqual(chunk2);
   });
 
-  it('aborts the partial file when the stream fails', async () => {
+  it('aborts the partial file when the stream fails on every attempt', async () => {
     mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
     mockStream.mockImplementation(async function* () {
       yield new Uint8Array([1]);
@@ -164,9 +168,76 @@ describe('streamStorySegment', () => {
 
     await expect(streamStorySegment('story-1', 0, 'Test')).rejects.toThrow('stream broke');
 
+    expect(mockStream).toHaveBeenCalledTimes(2);
     const writer = mockWriterInstances[0];
     expect(writer.abort).toHaveBeenCalled();
     expect(writer.finish).not.toHaveBeenCalled();
+  });
+
+  it('retries once and succeeds when the first attempt breaks mid-stream', async () => {
+    mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
+    let callCount = 0;
+    mockStream.mockImplementation(async function* () {
+      callCount++;
+      if (callCount === 1) {
+        yield new Uint8Array([1]);
+        throw new Error('stream broke');
+      }
+      yield new Uint8Array([9]);
+    });
+
+    const result = await streamStorySegment('story-1', 0, 'Test');
+
+    expect(callCount).toBe(2);
+    expect(result.uri).toBe('/cache/audio_v2_story-1_0.mp3');
+    const writer = mockWriterInstances[0];
+    expect(writer.abort).toHaveBeenCalled(); // partial file dropped before retry
+    expect(writer.finish).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry when the stream was cancelled', async () => {
+    mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
+    mockStream.mockImplementation(async function* () {
+      for (let i = 0; i < 5000; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        yield new Uint8Array([i % 256]);
+      }
+    });
+
+    const promise = streamStorySegment('story-1', 0, 'Test');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    cancelStoryAudio('story-1');
+
+    await expect(promise).rejects.toBeInstanceOf(CancelledError);
+    expect(mockStream).toHaveBeenCalledTimes(1);
+    const writer = mockWriterInstances[0];
+    expect(writer.abort).toHaveBeenCalled();
+    expect(writer.finish).not.toHaveBeenCalled();
+  });
+
+  it('regenerates cleanly after a cancelled stream', async () => {
+    mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
+    let shouldCancel = true;
+    mockStream.mockImplementation(async function* () {
+      if (shouldCancel) {
+        for (let i = 0; i < 5000; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          yield new Uint8Array([i % 256]);
+        }
+      }
+      yield new Uint8Array([7]);
+    });
+
+    const first = streamStorySegment('story-1', 0, 'Test');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    cancelStoryAudio('story-1');
+    await expect(first).rejects.toBeInstanceOf(CancelledError);
+
+    shouldCancel = false;
+    const result = await streamStorySegment('story-1', 0, 'Test');
+
+    expect(mockStream).toHaveBeenCalledTimes(2);
+    expect(result.uri).toBe('/cache/audio_v2_story-1_0.mp3');
   });
 
   it('throws when session is null', async () => {
@@ -263,13 +334,13 @@ describe('prefetchStoryAudio', () => {
     expect(iterationCount).toBe(1);
   });
 
-  it('stops later segments when a segment stream rejects', async () => {
+  it('stops later segments when a segment stream rejects after retries', async () => {
     mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
     mockedSplitStoryIntoSegments.mockReturnValue(['First.', 'Second.', 'Third.']);
     let callCount = 0;
     mockStream.mockImplementation(async function* () {
       callCount++;
-      if (callCount === 2) {
+      if (callCount >= 2) {
         throw new Error('TTS failed');
       }
       yield new Uint8Array([1]);
@@ -279,7 +350,26 @@ describe('prefetchStoryAudio', () => {
       prefetchStoryAudio('story-1', 'First. Second. Third.')
     ).rejects.toThrow('TTS failed');
 
-    expect(mockStream).toHaveBeenCalledTimes(2);
+    // segment 1 succeeds, segment 2 fails on both attempts
+    expect(mockStream).toHaveBeenCalledTimes(3);
+  });
+
+  it('cancelStoryAudio stops the prefetch loop and rejects the in-flight segment', async () => {
+    mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
+    mockedSplitStoryIntoSegments.mockReturnValue(['First.', 'Second.', 'Third.']);
+    mockStream.mockImplementation(async function* () {
+      for (let i = 0; i < 5000; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        yield new Uint8Array([i % 256]);
+      }
+    });
+
+    const promise = prefetchStoryAudio('story-1', 'First. Second. Third.');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    cancelStoryAudio('story-1');
+
+    await expect(promise).rejects.toBeInstanceOf(CancelledError);
+    expect(mockStream).toHaveBeenCalledTimes(1);
   });
 
   it('clears dedup entry after completion', async () => {

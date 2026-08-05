@@ -15,6 +15,20 @@ export interface StoryAudioSegment {
   uri: string;
 }
 
+export class CancelledError extends Error {
+  constructor(storyId: string) {
+    super(`Audio streaming for story ${storyId} was cancelled`);
+    this.name = 'CancelledError';
+  }
+}
+
+const MAX_SEGMENT_ATTEMPTS = 2;
+const RETRY_DELAY_MS = 600;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 let cachedToken: string | null = null;
 let tokenExpiresAt = 0;
 let ttsClient: InworldTTSClient | null = null;
@@ -77,6 +91,24 @@ function getOrCreateTTSClient(): InworldTTSClient {
 }
 
 const inflightSegments = new Map<string, Promise<StoryAudioSegment>>();
+const activeStreams = new Map<string, AsyncGenerator<Uint8Array>>();
+const cancelCounters = new Map<string, number>();
+
+/**
+ * Cancels all in-flight TTS streams for a story. Best-effort termination:
+ * the SDK exposes no AbortSignal, so the underlying fetch cannot be
+ * aborted — at most one extra chunk arrives before the generator
+ * terminates. Cancelled promises reject with CancelledError and are
+ * removed from the dedupe map, so a later replay regenerates cleanly.
+ */
+export function cancelStoryAudio(storyId: string): void {
+  cancelCounters.set(storyId, (cancelCounters.get(storyId) ?? 0) + 1);
+  for (const [key, stream] of activeStreams) {
+    if (key.startsWith(`${storyId}:`)) {
+      void stream.return(undefined);
+    }
+  }
+}
 
 export async function streamStorySegment(
   storyId: string,
@@ -92,31 +124,59 @@ export async function streamStorySegment(
   const existing = inflightSegments.get(dedupeKey);
   if (existing) return existing;
 
+  const cancelAtStart = cancelCounters.get(storyId) ?? 0;
+
   const promise = (async () => {
     try {
       await getInworldToken();
       const tts = getOrCreateTTSClient();
-
       const writer = new AudioSegmentWriter(storyId, segmentIndex);
-      try {
-        for await (const chunk of tts.stream({
-          text,
-          voice: 'Ashley',
-          model: 'inworld-tts-1.5-mini',
-          encoding: 'MP3',
-        })) {
-          writer.write(chunk);
+
+      let lastError: unknown = null;
+      // The SDK already retries request-start NetworkError/5xx internally
+      // (maxRetries: 2), so this loop only covers mid-stream failures.
+      for (let attempt = 1; attempt <= MAX_SEGMENT_ATTEMPTS; attempt++) {
+        if (attempt > 1) {
+          await delay(RETRY_DELAY_MS);
+        }
+        // drop any partial .part file from a failed attempt
+        writer.abort();
+        if ((cancelCounters.get(storyId) ?? 0) !== cancelAtStart) {
+          throw new CancelledError(storyId);
         }
 
-        const uri = await writer.finish();
-        await enforceFifoEviction();
+        try {
+          const stream = tts.stream({
+            text,
+            voice: 'Ashley',
+            model: 'inworld-tts-1.5-mini',
+            encoding: 'MP3',
+          });
+          activeStreams.set(dedupeKey, stream);
+          for await (const chunk of stream) {
+            writer.write(chunk);
+          }
 
-        return { storyId, segmentIndex, text, uri };
-      } catch (error) {
-        // never leave a truncated .part file behind on failure
-        writer.abort();
-        throw error;
+          if ((cancelCounters.get(storyId) ?? 0) !== cancelAtStart) {
+            writer.abort();
+            throw new CancelledError(storyId);
+          }
+
+          const uri = await writer.finish();
+          await enforceFifoEviction();
+          return { storyId, segmentIndex, text, uri };
+        } catch (error) {
+          if (error instanceof CancelledError) {
+            throw error;
+          }
+          lastError = error;
+        } finally {
+          activeStreams.delete(dedupeKey);
+        }
       }
+
+      writer.abort();
+      throw lastError instanceof Error ? lastError : new Error('TTS streaming failed');
     } finally {
       inflightSegments.delete(dedupeKey);
     }
@@ -138,8 +198,11 @@ export async function prefetchStoryAudio(
   const promise = (async () => {
     try {
       const segments = splitStoryIntoSegments(storyText);
+      const cancelAtStart = cancelCounters.get(storyId) ?? 0;
 
       for (let i = 0; i < segments.length; i++) {
+        // stop queueing further segments once the story was cancelled
+        if ((cancelCounters.get(storyId) ?? 0) !== cancelAtStart) return;
         await streamStorySegment(storyId, i, segments[i]);
       }
     } finally {
