@@ -100,6 +100,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       listenerRef.current = null;
     }
     if (playerRef.current) {
+      // pause first: remove() only deregisters the native player, audio
+      // keeps playing until the object is garbage collected
+      playerRef.current.pause();
       playerRef.current.remove();
       playerRef.current = null;
     }
@@ -307,6 +310,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
         if (nextIndex < segments.length) {
           if (playerRef.current) {
+            playerRef.current.pause();
             playerRef.current.remove();
             playerRef.current = null;
           }
@@ -466,6 +470,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         listenerRef.current.remove();
         listenerRef.current = null;
       }
+      // pause first: remove() only deregisters the native player, audio
+      // keeps playing until the object is garbage collected
+      playerRef.current.pause();
       playerRef.current.remove();
       playerRef.current = null;
     }
