@@ -49,6 +49,7 @@ export function SeekBar({ progress, position, duration, onSeek }: SeekBarProps) 
             trackWidth.set(e.nativeEvent.layout.width);
           }}
         >
+          <View style={styles.trackBg} />
           <View style={[styles.fill, { width: `${progress * 100}%` }]} />
           <Animated.View
             style={[styles.thumb, { left: `${progress * 100}%` }, thumbAnimatedStyle]}
@@ -71,6 +72,15 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: 'center',
     position: 'relative',
+  },
+  trackBg: {
+    height: 4,
+    backgroundColor: 'rgba(226,224,240,0.15)',
+    borderRadius: 2,
+    position: 'absolute',
+    top: 20,
+    left: 0,
+    right: 0,
   },
   fill: {
     height: 4,
