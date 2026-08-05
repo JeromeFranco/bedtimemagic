@@ -83,9 +83,9 @@ beforeEach(() => {
 
 describe('getCachedAudioPath', () => {
   it('returns path when file exists', async () => {
-    mockFiles.set('/mock/cache/audio_story-1.mp3', { exists: true, lastModified: 1000 });
+    mockFiles.set('/mock/cache/audio_v2_story-1.mp3', { exists: true, lastModified: 1000 });
     const result = await getCachedAudioPath('story-1');
-    expect(result).toBe('/mock/cache/audio_story-1.mp3');
+    expect(result).toBe('/mock/cache/audio_v2_story-1.mp3');
   });
 
   it('returns null when file does not exist', async () => {
@@ -97,20 +97,34 @@ describe('getCachedAudioPath', () => {
 describe('writeAudioToCache', () => {
   it('writes base64 audio to mp3 file and returns path', async () => {
     const result = await writeAudioToCache('story-1', 'aGVsbG8=');
-    expect(result).toBe('/mock/cache/audio_story-1.mp3');
-    expect(mockFiles.get('/mock/cache/audio_story-1.mp3')?.exists).toBe(true);
+    expect(result).toBe('/mock/cache/audio_v2_story-1.mp3');
+    expect(mockFiles.get('/mock/cache/audio_v2_story-1.mp3')?.exists).toBe(true);
   });
 });
 
 describe('evictStory', () => {
   it('deletes audio and cover when they exist', async () => {
-    mockFiles.set('/mock/cache/audio_story-1.mp3', { exists: true, lastModified: 1000 });
+    mockFiles.set('/mock/cache/audio_v2_story-1.mp3', { exists: true, lastModified: 1000 });
     mockFiles.set('/mock/cache/cover_story-1.jpg', { exists: true, lastModified: 1000 });
 
     await evictStory('story-1');
 
-    expect(mockFiles.get('/mock/cache/audio_story-1.mp3')?.exists).toBe(false);
+    expect(mockFiles.get('/mock/cache/audio_v2_story-1.mp3')?.exists).toBe(false);
     expect(mockFiles.get('/mock/cache/cover_story-1.jpg')?.exists).toBe(false);
+  });
+
+  it('also deletes legacy audio_ segment and whole-story files', async () => {
+    mockFiles.set('/mock/cache/audio_story-1.mp3', { exists: true, lastModified: 1000 });
+    mockFiles.set('/mock/cache/audio_story-1_0.mp3', { exists: true, lastModified: 1000 });
+    mockFiles.set('/mock/cache/audio_story-1_1.mp3', { exists: true, lastModified: 1000 });
+    mockFiles.set('/mock/cache/audio_v2_story-1_0.mp3', { exists: true, lastModified: 1000 });
+
+    await evictStory('story-1');
+
+    expect(mockFiles.get('/mock/cache/audio_story-1.mp3')?.exists).toBe(false);
+    expect(mockFiles.get('/mock/cache/audio_story-1_0.mp3')?.exists).toBe(false);
+    expect(mockFiles.get('/mock/cache/audio_story-1_1.mp3')?.exists).toBe(false);
+    expect(mockFiles.get('/mock/cache/audio_v2_story-1_0.mp3')?.exists).toBe(false);
   });
 
   it('skips deletion when files do not exist', async () => {
@@ -123,7 +137,7 @@ describe('enforceFifoEviction', () => {
   it('does nothing if <= 5 files', async () => {
     const ids = ['1', '2', '3'];
     for (const id of ids) {
-      mockFiles.set(`/mock/cache/audio_story-${id}.mp3`, {
+      mockFiles.set(`/mock/cache/audio_v2_story-${id}.mp3`, {
         exists: true,
         lastModified: parseInt(id) * 1000,
       });
@@ -140,7 +154,7 @@ describe('enforceFifoEviction', () => {
   it('evicts oldest when > 5 files', async () => {
     const ids = ['1', '2', '3', '4', '5', '6', '7'];
     for (const id of ids) {
-      mockFiles.set(`/mock/cache/audio_story-${id}.mp3`, {
+      mockFiles.set(`/mock/cache/audio_v2_story-${id}.mp3`, {
         exists: true,
         lastModified: parseInt(id) * 1000,
       });
@@ -152,18 +166,47 @@ describe('enforceFifoEviction', () => {
 
     await enforceFifoEviction();
 
-    expect(mockFiles.get('/mock/cache/audio_story-1.mp3')?.exists).toBe(false);
+    expect(mockFiles.get('/mock/cache/audio_v2_story-1.mp3')?.exists).toBe(false);
     expect(mockFiles.get('/mock/cache/cover_story-1.jpg')?.exists).toBe(false);
-    expect(mockFiles.get('/mock/cache/audio_story-2.mp3')?.exists).toBe(false);
+    expect(mockFiles.get('/mock/cache/audio_v2_story-2.mp3')?.exists).toBe(false);
     expect(mockFiles.get('/mock/cache/cover_story-2.jpg')?.exists).toBe(false);
+  });
+
+  it('groups and evicts legacy audio_ files alongside audio_v2_ files', async () => {
+    // oldest story only has legacy-prefix files
+    for (let seg = 0; seg < 3; seg++) {
+      mockFiles.set(`/mock/cache/audio_story-1_${seg}.mp3`, { exists: true, lastModified: 1000 });
+    }
+    mockFiles.set('/mock/cache/audio_story-1.mp3', { exists: true, lastModified: 1000 });
+    for (let story = 2; story <= 7; story++) {
+      const ts = story * 1000;
+      for (let seg = 0; seg < 3; seg++) {
+        mockFiles.set(`/mock/cache/audio_v2_story-${story}_${seg}.mp3`, {
+          exists: true,
+          lastModified: ts,
+        });
+      }
+    }
+
+    await enforceFifoEviction();
+
+    for (let seg = 0; seg < 3; seg++) {
+      expect(mockFiles.get(`/mock/cache/audio_story-1_${seg}.mp3`)?.exists).toBe(false);
+    }
+    expect(mockFiles.get('/mock/cache/audio_story-1.mp3')?.exists).toBe(false);
+    for (let story = 3; story <= 7; story++) {
+      for (let seg = 0; seg < 3; seg++) {
+        expect(mockFiles.get(`/mock/cache/audio_v2_story-${story}_${seg}.mp3`)?.exists).toBe(true);
+      }
+    }
   });
 });
 
 describe('getCachedAudioSegmentPath', () => {
   it('returns path when segment file exists', async () => {
-    mockFiles.set('/mock/cache/audio_story-1_0.mp3', { exists: true, lastModified: 1000 });
+    mockFiles.set('/mock/cache/audio_v2_story-1_0.mp3', { exists: true, lastModified: 1000 });
     const result = await getCachedAudioSegmentPath('story-1', 0);
-    expect(result).toBe('/mock/cache/audio_story-1_0.mp3');
+    expect(result).toBe('/mock/cache/audio_v2_story-1_0.mp3');
   });
 
   it('returns null when segment file does not exist', async () => {
@@ -176,20 +219,20 @@ describe('writeAudioSegmentToCache', () => {
   it('encodes Uint8Array as base64 and writes to cache', async () => {
     const audio = new Uint8Array([104, 101, 108, 108, 111]); // "hello"
     const result = await writeAudioSegmentToCache('story-1', 0, audio);
-    expect(result).toBe('/mock/cache/audio_story-1_0.mp3');
-    expect(mockFiles.get('/mock/cache/audio_story-1_0.mp3')?.exists).toBe(true);
+    expect(result).toBe('/mock/cache/audio_v2_story-1_0.mp3');
+    expect(mockFiles.get('/mock/cache/audio_v2_story-1_0.mp3')?.exists).toBe(true);
   });
 });
 
 describe('getCachedAudioSegmentPaths', () => {
   it('returns paths for existing segments and null for missing', async () => {
-    mockFiles.set('/mock/cache/audio_story-1_0.mp3', { exists: true, lastModified: 1000 });
-    mockFiles.set('/mock/cache/audio_story-1_2.mp3', { exists: true, lastModified: 1000 });
+    mockFiles.set('/mock/cache/audio_v2_story-1_0.mp3', { exists: true, lastModified: 1000 });
+    mockFiles.set('/mock/cache/audio_v2_story-1_2.mp3', { exists: true, lastModified: 1000 });
     const result = await getCachedAudioSegmentPaths('story-1', 3);
     expect(result).toEqual([
-      '/mock/cache/audio_story-1_0.mp3',
+      '/mock/cache/audio_v2_story-1_0.mp3',
       null,
-      '/mock/cache/audio_story-1_2.mp3',
+      '/mock/cache/audio_v2_story-1_2.mp3',
     ]);
   });
 });
@@ -199,7 +242,7 @@ describe('story-level FIFO eviction with segments', () => {
     for (let story = 1; story <= 7; story++) {
       const ts = story * 1000;
       for (let seg = 0; seg < 3; seg++) {
-        mockFiles.set(`/mock/cache/audio_story-${story}_${seg}.mp3`, {
+        mockFiles.set(`/mock/cache/audio_v2_story-${story}_${seg}.mp3`, {
           exists: true,
           lastModified: ts,
         });
@@ -213,15 +256,15 @@ describe('story-level FIFO eviction with segments', () => {
     await enforceFifoEviction();
 
     for (let seg = 0; seg < 3; seg++) {
-      expect(mockFiles.get(`/mock/cache/audio_story-1_${seg}.mp3`)?.exists).toBe(false);
-      expect(mockFiles.get(`/mock/cache/audio_story-2_${seg}.mp3`)?.exists).toBe(false);
+      expect(mockFiles.get(`/mock/cache/audio_v2_story-1_${seg}.mp3`)?.exists).toBe(false);
+      expect(mockFiles.get(`/mock/cache/audio_v2_story-2_${seg}.mp3`)?.exists).toBe(false);
     }
     expect(mockFiles.get('/mock/cache/cover_story-1.jpg')?.exists).toBe(false);
     expect(mockFiles.get('/mock/cache/cover_story-2.jpg')?.exists).toBe(false);
 
     for (let story = 3; story <= 7; story++) {
       for (let seg = 0; seg < 3; seg++) {
-        expect(mockFiles.get(`/mock/cache/audio_story-${story}_${seg}.mp3`)?.exists).toBe(true);
+        expect(mockFiles.get(`/mock/cache/audio_v2_story-${story}_${seg}.mp3`)?.exists).toBe(true);
       }
       expect(mockFiles.get(`/mock/cache/cover_story-${story}.jpg`)?.exists).toBe(true);
     }
