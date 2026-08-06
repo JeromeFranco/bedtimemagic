@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: Colors.dark.scrim,
   },
   sheet: {
     backgroundColor: Colors.dark.bgElement,

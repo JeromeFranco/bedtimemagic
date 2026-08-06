@@ -4,7 +4,7 @@ import Animated, { type AnimatedStyle } from 'react-native-reanimated';
 import { BreathingCircle } from '@/components/breathing-circle';
 import { ThemedText } from '@/components/themed-text';
 import type { PostStoryPhase } from '@/contexts/PlayerContext';
-import { Spacing } from '@/theme';
+import { Colors, Spacing } from '@/theme';
 
 interface GestureHintCueProps {
   phase: PostStoryPhase;
@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xl,
   },
   windDownText: {
-    color: '#E2E0F0',
+    color: Colors.dark.textPrimary,
     fontSize: 23,
     fontWeight: '400',
     lineHeight: 34,
@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
   },
   hintText: {
-    color: '#E2E0F0',
+    color: Colors.dark.textPrimary,
     fontSize: 14,
     fontWeight: '400',
     textAlign: 'center',

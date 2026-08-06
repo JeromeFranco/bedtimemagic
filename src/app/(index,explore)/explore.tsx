@@ -1,15 +1,13 @@
-import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { StoryHistoryCard } from '@/components/story-history-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Button } from '@/components/ui/button';
 import { useStories } from '@/hooks/use-story';
 import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/theme';
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function HistoryVaultScreen() {
   const { data: stories, isLoading, isError } = useStories();
@@ -21,11 +19,6 @@ export default function HistoryVaultScreen() {
   const handleGenerate = () => {
     router.push('/');
   };
-
-  const generateBgColor = useSharedValue<string>(Colors.dark.bgElement);
-  const generateAnimatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: generateBgColor.get(),
-  }));
 
   if (isLoading) {
     return (
@@ -61,20 +54,7 @@ export default function HistoryVaultScreen() {
             <ThemedText themeColor="textSecondary" style={styles.emptyText}>
               Generate your first bedtime story to see it here.
             </ThemedText>
-            <AnimatedPressable
-              onPress={handleGenerate}
-              onPressIn={() => {
-                generateBgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }));
-              }}
-              onPressOut={() => {
-                generateBgColor.set(withTiming(Colors.dark.bgElement, { duration: 150 }));
-              }}
-              style={[styles.generateButton, generateAnimatedStyle]}
-            >
-              <ThemedText style={styles.generateButtonText}>
-                Create a Story
-              </ThemedText>
-            </AnimatedPressable>
+            <Button label="Create a Story" onPress={handleGenerate} />
           </ThemedView>
         ) : (
           <ThemedView style={styles.list}>
@@ -135,16 +115,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: Spacing['2xl'],
   },
-  generateButton: {
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.lg,
-    borderRadius: 12,
-    marginTop: Spacing.sm,
-  },
-  generateButtonText: {
-    color: Colors.dark.textPrimary,
-    fontWeight: '500',
-    fontSize: 17,
-  },
-
 });

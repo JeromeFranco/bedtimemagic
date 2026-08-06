@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, StyleSheet } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 
 import { StoryPlayer } from '@/components/story/story-player';
@@ -7,6 +7,7 @@ import { PillowTalk } from '@/components/story/pillow-talk';
 import { Affirmation } from '@/components/story/affirmation';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Button } from '@/components/ui/button';
 import { Colors, Spacing } from '@/theme';
 import { PROTAGONISTS } from '@/types';
 import { usePlayer } from '@/contexts/PlayerContext';
@@ -70,15 +71,7 @@ export default function StoryScreen() {
     return (
       <ThemedView style={[styles.container, styles.center]}>
         <ThemedText style={styles.errorText}>{"Couldn't load this story"}</ThemedText>
-        <Pressable
-          onPress={() => router.back()}
-          style={({ pressed }) => [
-            styles.secondaryButton,
-            pressed && { backgroundColor: Colors.dark.bgElement },
-          ]}
-        >
-          <ThemedText style={styles.secondaryButtonText}>Go Back</ThemedText>
-        </Pressable>
+        <Button label="Go Back" variant="secondary" onPress={() => router.back()} />
       </ThemedView>
     );
   }
@@ -142,18 +135,5 @@ const styles = StyleSheet.create({
     color: Colors.dark.textSecondary,
     fontSize: 17,
     textAlign: 'center',
-  },
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: Colors.dark.borderDefault,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.xl,
-    borderRadius: 12,
-    marginTop: Spacing.sm,
-  },
-  secondaryButtonText: {
-    color: Colors.dark.textSecondary,
-    fontSize: 15,
-    fontWeight: '500',
   },
 });

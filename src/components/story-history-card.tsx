@@ -1,13 +1,11 @@
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 import { useEffect, useState } from 'react';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import { PressableFeedback } from '@/components/ui/pressable-feedback';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/theme';
 import { getCachedCoverPath } from '@/lib/audio-cache';
 import { CHALLENGE_TRIGGERS, PROTAGONISTS, type Story } from '@/types';
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface StoryHistoryCardProps {
   story: Story;
@@ -28,11 +26,6 @@ function formatRelativeDate(dateString: string): string {
 
 export function StoryHistoryCard({ story, onPress }: StoryHistoryCardProps) {
   const [coverPath, setCoverPath] = useState<string | null>(null);
-  const bgColor = useSharedValue<string>(Colors.dark.bgElement);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: bgColor.get(),
-  }));
 
   const protagonist = PROTAGONISTS.find((p) => p.id === story.protagonist);
   const challenge = CHALLENGE_TRIGGERS.find((c) => c.id === story.challenge);
@@ -42,16 +35,11 @@ export function StoryHistoryCard({ story, onPress }: StoryHistoryCardProps) {
   }, [story.id]);
 
   return (
-    <AnimatedPressable
-      onPress={onPress}
-      onPressIn={() => {
-        bgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }));
-      }}
-      onPressOut={() => {
-        bgColor.set(withTiming(Colors.dark.bgElement, { duration: 150 }));
-      }}
-      style={[styles.card, animatedStyle]}
-    >
+    <View style={styles.cardShell}>
+      <PressableFeedback
+        onPress={onPress}
+        style={styles.cardInner}
+      >
         <View style={styles.coverContainer}>
           {coverPath ? (
             <Image source={{ uri: coverPath }} style={styles.coverImage} resizeMode="cover" />
@@ -84,15 +72,20 @@ export function StoryHistoryCard({ story, onPress }: StoryHistoryCardProps) {
             {formatRelativeDate(story.created_at)}
           </ThemedText>
         </View>
-    </AnimatedPressable>
+      </PressableFeedback>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    flexDirection: 'row',
+  cardShell: {
     borderRadius: 16,
     overflow: 'hidden',
+    backgroundColor: Colors.dark.bgElement,
+  },
+  cardInner: {
+    flex: 1,
+    flexDirection: 'row',
     gap: Spacing.lg,
   },
 

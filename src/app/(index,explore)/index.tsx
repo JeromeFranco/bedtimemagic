@@ -1,18 +1,16 @@
-import { StyleSheet, Pressable, ScrollView } from 'react-native';
+import { StyleSheet, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { ChallengeMatrix } from '@/components/challenge-matrix';
 import { ProfileSelector } from '@/components/profile-selector';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Button } from '@/components/ui/button';
 import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/theme';
 import { useSelectedChild } from '@/contexts/SelectedChildContext';
 import { useStories } from '@/hooks/use-story';
 import { PROTAGONISTS, ChallengeCategory, ChallengeTrigger } from '@/types';
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function HomeScreen() {
   const { selectedProfile } = useSelectedChild();
@@ -32,11 +30,6 @@ export default function HomeScreen() {
       router.push({ pathname: '/story', params: { id: recentStory.id } });
     }
   };
-
-  const replayBgColor = useSharedValue<string>('transparent');
-  const replayAnimatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: replayBgColor.get(),
-  }));
 
   const childName = selectedProfile?.name ?? 'your child';
   const protagonistName = protagonist?.name ?? 'Barnaby';
@@ -66,20 +59,13 @@ export default function HomeScreen() {
           <ChallengeMatrix onGenerate={handleGenerate} />
 
           {recentStory && (
-            <AnimatedPressable
-              onPress={handleReplayPress}
-              onPressIn={() => {
-                replayBgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }));
-              }}
-              onPressOut={() => {
-                replayBgColor.set(withTiming('transparent', { duration: 150 }));
-              }}
-              style={[styles.replayButton, replayAnimatedStyle]}
-            >
-              <ThemedText style={styles.replayText}>
-                Listen to recent story again →
-              </ThemedText>
-            </AnimatedPressable>
+            <View style={styles.replayRow}>
+              <Button
+                label="Listen to recent story again →"
+                variant="ghost"
+                onPress={handleReplayPress}
+              />
+            </View>
           )}
         </ScrollView>
       </SafeAreaView>
@@ -129,19 +115,8 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: Colors.dark.textSecondary,
   },
-  replayButton: {
-    alignSelf: 'center',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: 8,
+  replayRow: {
+    alignItems: 'center',
     marginTop: Spacing.sm,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  replayText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: Colors.dark.textSecondary,
-    textAlign: 'center',
   },
 });

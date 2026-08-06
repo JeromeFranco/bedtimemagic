@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
   },
   trackBg: {
     height: 4,
-    backgroundColor: 'rgba(226,224,240,0.15)',
+    backgroundColor: Colors.dark.track,
     borderRadius: 2,
     position: 'absolute',
     top: 20,

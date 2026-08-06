@@ -1,9 +1,10 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { BreathingCircle } from '@/components/breathing-circle';
 import { ThemedText } from '@/components/themed-text';
+import { Button } from '@/components/ui/button';
 import { Colors, Spacing } from '@/theme';
 
 interface AffirmationProps {
@@ -21,15 +22,7 @@ export function Affirmation({ text, onConfirm }: AffirmationProps) {
         </Animated.View>
 
         <View style={styles.buttonContainer}>
-          <Pressable
-            onPress={onConfirm}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              { backgroundColor: pressed ? Colors.dark.bgElementHover : Colors.dark.bgElement },
-            ]}
-          >
-            <ThemedText style={styles.primaryButtonText}>Goodnight</ThemedText>
-          </Pressable>
+          <Button label="Goodnight" fullWidth onPress={onConfirm} />
         </View>
       </SafeAreaView>
     </View>
@@ -64,16 +57,5 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: Spacing['2xl'],
     paddingBottom: Spacing.lg,
-  },
-  primaryButton: {
-    backgroundColor: Colors.dark.bgElement,
-    paddingVertical: Spacing.lg,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: Colors.dark.textPrimary,
-    fontSize: 17,
-    fontWeight: '500',
   },
 });

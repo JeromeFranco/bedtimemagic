@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
-import { Pressable, StyleSheet } from "react-native";
-import Animated, { FadeInDown, FadeOut, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { useState } from "react";
+import { StyleSheet, View } from "react-native";
+import Animated, { FadeInDown, FadeOut } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { Button } from "@/components/ui/button";
+import { PressableFeedback } from "@/components/ui/pressable-feedback";
 import { CATEGORY_COLORS, Colors, Spacing } from "@/theme";
 import { CHALLENGE_CATEGORIES, CHALLENGE_TRIGGERS, ChallengeCategory, ChallengeTrigger } from "@/types";
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface ChallengeMatrixProps {
   onGenerate: (category: ChallengeCategory, trigger: ChallengeTrigger) => void;
@@ -30,81 +30,51 @@ interface TriggerChipProps {
 
 function CategoryCard({ label, isSelected, categoryId, onPress }: CategoryCardProps) {
   const colors = CATEGORY_COLORS[categoryId];
-  const bgColor = useSharedValue<string>(Colors.dark.bgSurface);
-
-  useEffect(() => {
-    bgColor.set(withTiming(isSelected ? colors.tintSelected : Colors.dark.bgSurface, { duration: 150 }));
-  }, [isSelected, colors.tintSelected, bgColor]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: bgColor.get(),
-  }));
 
   return (
-    <AnimatedPressable
-      onPress={onPress}
-      onPressIn={() => {
-        if (!isSelected) {
-          bgColor.set(withTiming(Colors.dark.bgElement, { duration: 150 }));
-        }
-      }}
-      onPressOut={() => {
-        if (!isSelected) {
-          bgColor.set(withTiming(Colors.dark.bgSurface, { duration: 150 }));
-        }
-      }}
+    <View
       style={[
-        styles.categoryCard,
-        animatedStyle,
+        styles.categoryCardShell,
         {
+          backgroundColor: isSelected ? colors.tintSelected : Colors.dark.bgSurface,
           borderColor: isSelected ? colors.border : Colors.dark.borderSubtle,
         },
       ]}
     >
-      <ThemedText style={[styles.categoryLabel, { color: isSelected ? colors.primary : Colors.dark.textPrimary }]}>
-        {label}
-      </ThemedText>
-    </AnimatedPressable>
+      <PressableFeedback
+        onPress={onPress}
+        style={styles.categoryCardInner}
+      >
+        <ThemedText style={[styles.categoryLabel, { color: isSelected ? colors.primary : Colors.dark.textPrimary }]}>
+          {label}
+        </ThemedText>
+      </PressableFeedback>
+    </View>
   );
 }
 
 function TriggerChip({ label, isSelected, categoryId, onPress }: TriggerChipProps) {
   const colors = CATEGORY_COLORS[categoryId];
-  const bgColor = useSharedValue<string>(isSelected ? colors.tintSelected : Colors.dark.bgElement);
-
-  useEffect(() => {
-    bgColor.set(withTiming(isSelected ? colors.tintSelected : Colors.dark.bgElement, { duration: 150 }));
-  }, [isSelected, colors.tintSelected, bgColor]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: bgColor.get(),
-  }));
 
   return (
-    <AnimatedPressable
-      onPress={onPress}
-      onPressIn={() => {
-        if (!isSelected) {
-          bgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }));
-        }
-      }}
-      onPressOut={() => {
-        if (!isSelected) {
-          bgColor.set(withTiming(Colors.dark.bgElement, { duration: 150 }));
-        }
-      }}
+    <View
       style={[
-        styles.triggerChip,
-        animatedStyle,
+        styles.triggerChipShell,
         {
+          backgroundColor: isSelected ? colors.tintSelected : Colors.dark.bgElement,
           borderColor: isSelected ? colors.border : Colors.dark.borderSubtle,
         },
       ]}
     >
-      <ThemedText style={[styles.triggerLabel, { color: isSelected ? Colors.dark.textPrimary : Colors.dark.textSecondary }]}>
-        {label}
-      </ThemedText>
-    </AnimatedPressable>
+      <PressableFeedback
+        onPress={onPress}
+        style={styles.triggerChipInner}
+      >
+        <ThemedText style={[styles.triggerLabel, { color: isSelected ? Colors.dark.textPrimary : Colors.dark.textSecondary }]}>
+          {label}
+        </ThemedText>
+      </PressableFeedback>
+    </View>
   );
 }
 
@@ -182,15 +152,11 @@ export function ChallengeMatrix({ onGenerate, showHeading = false }: ChallengeMa
 
       {canGenerate && selectedCategory && (
         <Animated.View entering={FadeInDown.duration(200)}>
-          <Pressable
+          <Button
+            label="Create Tonight's Story"
+            fullWidth
             onPress={handleGenerate}
-            style={({ pressed }) => [
-              styles.generateButton,
-              pressed && { backgroundColor: Colors.dark.bgElementHover },
-            ]}
-          >
-            <ThemedText style={styles.generateButtonText}>Create Tonight&apos;s Story</ThemedText>
-          </Pressable>
+          />
         </Animated.View>
       )}
     </ThemedView>
@@ -216,11 +182,15 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     backgroundColor: 'transparent',
   },
-  categoryCard: {
+  categoryCardShell: {
     width: "48%",
     minHeight: 84,
     borderRadius: 16,
     borderWidth: 1,
+    overflow: "hidden",
+  },
+  categoryCardInner: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: Spacing.lg,
@@ -243,10 +213,14 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     backgroundColor: 'transparent',
   },
-  triggerChip: {
+  triggerChipShell: {
     borderRadius: 24,
     borderWidth: 1,
     minHeight: 40,
+    overflow: "hidden",
+  },
+  triggerChipInner: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -255,21 +229,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.lg,
-  },
-  generateButton: {
-    alignSelf: "stretch",
-    backgroundColor: Colors.dark.bgElement,
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.xl,
-    borderRadius: 12,
-    alignItems: "center",
-    marginTop: Spacing.sm,
-    minHeight: 48,
-    justifyContent: "center",
-  },
-  generateButtonText: {
-    color: Colors.dark.textPrimary,
-    fontWeight: "500",
-    fontSize: 17,
   },
 });

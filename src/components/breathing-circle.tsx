@@ -9,8 +9,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useEffect } from 'react';
 
+import { CATEGORY_COLORS, Colors } from '@/theme';
+
 const DEFAULT_SIZE = 120;
-const DEFAULT_COLOR = 'rgba(139, 92, 246, 0.2)';
+const DEFAULT_COLOR = Colors.dark.accentSoft;
 const DURATION = 4000;
 
 interface BreathingCircleProps {
@@ -72,7 +74,7 @@ export function BreathingCircle({
 
 const styles = StyleSheet.create({
   circle: {
-    shadowColor: '#A07BD4',
+    shadowColor: CATEGORY_COLORS.bedtime.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
     shadowRadius: 20,

@@ -20,6 +20,13 @@ export const Colors = {
     success: '#7BC4A8',
     warning: '#D4A06A',
     error: '#D47A6A',
+    // Overlays & scrims
+    scrim: 'rgba(0, 0, 0, 0.5)',
+    overlay: 'rgba(6, 10, 26, 0.8)',
+    // Special-purpose fills
+    track: 'rgba(226, 224, 240, 0.15)',
+    avatarTint: 'rgba(255, 255, 255, 0.1)',
+    accentSoft: 'rgba(139, 92, 246, 0.2)',
   },
 } as const;
 

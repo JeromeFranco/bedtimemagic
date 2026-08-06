@@ -1,32 +1,23 @@
 import { SymbolView } from 'expo-symbols';
 import { PropsWithChildren, useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
-import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { StyleSheet } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
+import { PressableFeedback } from '@/components/ui/pressable-feedback';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing } from '@/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
 export function Collapsible({ children, title }: PropsWithChildren & { title: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const theme = useTheme();
-  const bgColor = useSharedValue<string>(Colors.dark.bgBase);
-  const animatedStyle = useAnimatedStyle(() => ({ backgroundColor: bgColor.get() }));
 
   return (
     <ThemedView>
-      <AnimatedPressable
-        style={[styles.heading, animatedStyle]}
+      <PressableFeedback
+        style={styles.heading}
         onPress={() => setIsOpen((value) => !value)}
-        onPressIn={() => {
-          bgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }));
-        }}
-        onPressOut={() => {
-          bgColor.set(withTiming(Colors.dark.bgBase, { duration: 150 }));
-        }}
       >
         <ThemedView type="bgElement" style={styles.button}>
           <SymbolView
@@ -39,7 +30,7 @@ export function Collapsible({ children, title }: PropsWithChildren & { title: st
         </ThemedView>
 
         <ThemedText type="small">{title}</ThemedText>
-      </AnimatedPressable>
+      </PressableFeedback>
       {isOpen && (
         <Animated.View entering={FadeIn.duration(200)}>
           <ThemedView type="bgElement" style={styles.content}>
@@ -56,6 +47,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+    backgroundColor: Colors.dark.bgBase,
   },
 
   button: {

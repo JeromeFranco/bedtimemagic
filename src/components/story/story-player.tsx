@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import Animated, {
@@ -19,6 +19,8 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { SeekBar } from './seek-bar';
 import { PillowTalkContent, AffirmationContent, GestureHintCue } from './wind-down';
 import { ThemedText } from '@/components/themed-text';
+import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { usePlayer, type PostStoryPhase } from '@/contexts/PlayerContext';
 import { Colors, CATEGORY_COLORS, Spacing } from '@/theme';
 import type { Story, ProtagonistInfo } from '@/types';
@@ -192,31 +194,6 @@ export function StoryPlayer({
 
   const composedGesture = Gesture.Race(panGesture, tapGesture);
 
-  const backBgColor = useSharedValue<string>(Colors.dark.bgElement);
-  const backAnimatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: backBgColor.get(),
-  }));
-
-  const sleepBgColor = useSharedValue<string>(Colors.dark.bgElement);
-  const sleepAnimatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: sleepBgColor.get(),
-  }));
-
-  const playBgColor = useSharedValue<string>(Colors.dark.bgElement);
-  const playAnimatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: playBgColor.get(),
-  }));
-
-  const rewindBgColor = useSharedValue<string>('transparent');
-  const rewindAnimatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: rewindBgColor.get(),
-  }));
-
-  const forwardBgColor = useSharedValue<string>('transparent');
-  const forwardAnimatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: forwardBgColor.get(),
-  }));
-
   const sleepOverlayOpacity = useSharedValue(0);
   const sleepOverlayStyle = useAnimatedStyle(() => ({
     opacity: sleepOverlayOpacity.get(),
@@ -273,39 +250,25 @@ export function StoryPlayer({
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Header Bar */}
       <View style={styles.topBar}>
-        <Pressable
-          testID="player-back-button"
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-          onPress={onBack}
-          onPressIn={() => backBgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }))}
-          onPressOut={() => backBgColor.set(withTiming(Colors.dark.bgElement, { duration: 150 }))}
-        >
-          <Animated.View style={[styles.headerButton, backAnimatedStyle]}>
-            <SymbolView
-              name={{ ios: 'chevron.backward', android: 'arrow_back' }}
-              size={24}
-              tintColor={Colors.dark.textPrimary}
-            />
-          </Animated.View>
-        </Pressable>
+        <IconButton testID="player-back-button" accessibilityLabel="Go back" onPress={onBack}>
+          <SymbolView
+            name={{ ios: 'chevron.backward', android: 'arrow_back' }}
+            size={24}
+            tintColor={Colors.dark.textPrimary}
+          />
+        </IconButton>
 
-        <Pressable
+        <IconButton
           testID="sleep-mode-button"
           accessibilityLabel="Sleep Mode"
-          accessibilityRole="button"
           onPress={toggleSleepMode}
-          onPressIn={() => sleepBgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }))}
-          onPressOut={() => sleepBgColor.set(withTiming(Colors.dark.bgElement, { duration: 150 }))}
         >
-          <Animated.View style={[styles.headerButton, sleepAnimatedStyle]}>
-            <SymbolView
-              name={{ ios: 'moon.fill', android: 'bedtime' }}
-              size={24}
-              tintColor={isSleepMode ? CATEGORY_COLORS.bedtime.primary : Colors.dark.textPrimary}
-            />
-          </Animated.View>
-        </Pressable>
+          <SymbolView
+            name={{ ios: 'moon.fill', android: 'bedtime' }}
+            size={24}
+            tintColor={isSleepMode ? CATEGORY_COLORS.bedtime.primary : Colors.dark.textPrimary}
+          />
+        </IconButton>
       </View>
 
       {/* Main Content Vertical Stack wrapped in GestureDetector */}
@@ -362,64 +325,52 @@ export function StoryPlayer({
 
               {/* Playback Controls */}
               <View style={styles.controlsRow}>
-                <Pressable
+                <IconButton
+                  variant="bare"
                   testID="seek-backward-button"
                   accessibilityLabel="Rewind 15 seconds"
-                  accessibilityRole="button"
                   onPress={() => handleSeekRelative(-15)}
-                  onPressIn={() => rewindBgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }))}
-                  onPressOut={() => rewindBgColor.set(withTiming('transparent', { duration: 150 }))}
                 >
-                  <Animated.View style={[styles.secondaryControlBtn, rewindAnimatedStyle]}>
-                    <SymbolView
-                      name={{ ios: 'gobackward.15', android: 'replay_10' }}
-                      size={28}
-                      tintColor={Colors.dark.textSecondary}
-                    />
-                  </Animated.View>
-                </Pressable>
+                  <SymbolView
+                    name={{ ios: 'gobackward.15', android: 'replay_10' }}
+                    size={28}
+                    tintColor={Colors.dark.textSecondary}
+                  />
+                </IconButton>
 
-                <Pressable
+                <IconButton
                   testID="play-pause-button"
+                  size={72}
                   accessibilityLabel={isPlaying && isCurrentStory ? 'Pause' : 'Play'}
-                  accessibilityRole="button"
                   onPress={handlePlayPause}
-                  onPressIn={() => playBgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }))}
-                  onPressOut={() => playBgColor.set(withTiming(Colors.dark.bgElement, { duration: 150 }))}
                 >
-                  <Animated.View style={[styles.playPauseButton, playAnimatedStyle]}>
-                    {isBuffering && isCurrentStory ? (
-                      <ActivityIndicator size="small" color={Colors.dark.textPrimary} />
-                    ) : (
-                      <SymbolView
-                        name={
-                          isPlaying && isCurrentStory
-                            ? { ios: 'pause.fill', android: 'pause' }
-                            : { ios: 'play.fill', android: 'play_arrow' }
-                        }
-                        size={36}
-                        tintColor={Colors.dark.textPrimary}
-                      />
-                    )}
-                  </Animated.View>
-                </Pressable>
+                  {isBuffering && isCurrentStory ? (
+                    <ActivityIndicator size="small" color={Colors.dark.textPrimary} />
+                  ) : (
+                    <SymbolView
+                      name={
+                        isPlaying && isCurrentStory
+                          ? { ios: 'pause.fill', android: 'pause' }
+                          : { ios: 'play.fill', android: 'play_arrow' }
+                      }
+                      size={36}
+                      tintColor={Colors.dark.textPrimary}
+                    />
+                  )}
+                </IconButton>
 
-                <Pressable
+                <IconButton
+                  variant="bare"
                   testID="seek-forward-button"
                   accessibilityLabel="Forward 15 seconds"
-                  accessibilityRole="button"
                   onPress={() => handleSeekRelative(15)}
-                  onPressIn={() => forwardBgColor.set(withTiming(Colors.dark.bgElementHover, { duration: 150 }))}
-                  onPressOut={() => forwardBgColor.set(withTiming('transparent', { duration: 150 }))}
                 >
-                  <Animated.View style={[styles.secondaryControlBtn, forwardAnimatedStyle]}>
-                    <SymbolView
-                      name={{ ios: 'goforward.15', android: 'forward_10' }}
-                      size={28}
-                      tintColor={Colors.dark.textSecondary}
-                    />
-                  </Animated.View>
-                </Pressable>
+                  <SymbolView
+                    name={{ ios: 'goforward.15', android: 'forward_10' }}
+                    size={28}
+                    tintColor={Colors.dark.textSecondary}
+                  />
+                </IconButton>
               </View>
             </>
           ) : (
@@ -435,24 +386,13 @@ export function StoryPlayer({
                   <GestureHintCue phase="pillow_talk" hintStyle={swipeHintAnimatedStyle} />
                   {controlsVisible && (
                     <View style={styles.windDownButtons}>
-                      <Pressable
-                        onPress={skipPillowTalk}
-                        style={({ pressed }) => [
-                          styles.primaryPillButton,
-                          { backgroundColor: pressed ? Colors.dark.bgElementHover : Colors.dark.bgElement },
-                        ]}
-                      >
-                        <ThemedText style={styles.primaryPillButtonText}>Next</ThemedText>
-                      </Pressable>
-                      <Pressable
+                      <Button label="Next" fullWidth onPress={skipPillowTalk} />
+                      <Button
+                        label="Skip for tonight"
+                        variant="secondary"
+                        fullWidth
                         onPress={startFadeToBlack}
-                        style={({ pressed }) => [
-                          styles.secondaryPillButton,
-                          pressed && { backgroundColor: Colors.dark.bgElement },
-                        ]}
-                      >
-                        <ThemedText style={styles.secondaryPillButtonText}>Skip for tonight</ThemedText>
-                      </Pressable>
+                      />
                     </View>
                   )}
                 </Animated.View>
@@ -469,15 +409,7 @@ export function StoryPlayer({
                   <GestureHintCue phase="affirmation" hintStyle={swipeHintAnimatedStyle} />
                   {controlsVisible && (
                     <View style={styles.windDownButtons}>
-                      <Pressable
-                        onPress={startFadeToBlack}
-                        style={({ pressed }) => [
-                          styles.primaryPillButton,
-                          { backgroundColor: pressed ? Colors.dark.bgElementHover : Colors.dark.bgElement },
-                        ]}
-                      >
-                        <ThemedText style={styles.primaryPillButtonText}>Goodnight</ThemedText>
-                      </Pressable>
+                      <Button label="Goodnight" fullWidth onPress={startFadeToBlack} />
                     </View>
                   )}
                 </Animated.View>
@@ -508,13 +440,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.sm,
-  },
-  headerButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   content: {
     flex: 1,
@@ -574,20 +499,6 @@ const styles = StyleSheet.create({
     gap: Spacing['2xl'],
     marginTop: Spacing.xs,
   },
-  secondaryControlBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  playPauseButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   windDownArea: {
     flex: 1,
     justifyContent: 'space-between',
@@ -606,29 +517,6 @@ const styles = StyleSheet.create({
     width: '100%',
     gap: Spacing.sm,
     paddingTop: Spacing.sm,
-  },
-  primaryPillButton: {
-    backgroundColor: Colors.dark.bgElement,
-    paddingVertical: Spacing.lg,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  primaryPillButtonText: {
-    color: Colors.dark.textPrimary,
-    fontSize: 17,
-    fontWeight: '500',
-  },
-  secondaryPillButton: {
-    borderWidth: 1,
-    borderColor: Colors.dark.borderDefault,
-    paddingVertical: Spacing.lg,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  secondaryPillButtonText: {
-    color: Colors.dark.textSecondary,
-    fontSize: 17,
-    fontWeight: '500',
   },
   dimOverlay: {
     position: 'absolute',

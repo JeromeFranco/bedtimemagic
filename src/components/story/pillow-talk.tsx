@@ -5,6 +5,7 @@ import Animated, { FadeIn, FadeOut, useSharedValue, useAnimatedStyle, withTiming
 
 import { BreathingCircle } from '@/components/breathing-circle';
 import { ThemedText } from '@/components/themed-text';
+import { Button } from '@/components/ui/button';
 import { Colors, Spacing } from '@/theme';
 import type { Story } from '@/types';
 
@@ -78,24 +79,8 @@ export function PillowTalk({ story, protagonistEmoji, imageSource, onSkip, onIma
 
         {controlsVisible && (
           <Animated.View style={styles.buttons} entering={FadeIn.duration(400)} exiting={FadeOut.duration(400)}>
-            <Pressable
-              onPress={onSkip}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                { backgroundColor: pressed ? Colors.dark.bgElementHover : Colors.dark.bgElement },
-              ]}
-            >
-              <ThemedText style={styles.primaryButtonText}>Next</ThemedText>
-            </Pressable>
-            <Pressable
-              onPress={onSkip}
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                pressed && { backgroundColor: Colors.dark.bgElement },
-              ]}
-            >
-              <ThemedText style={styles.secondaryButtonText}>Skip for tonight</ThemedText>
-            </Pressable>
+            <Button label="Next" fullWidth onPress={onSkip} />
+            <Button label="Skip for tonight" variant="secondary" fullWidth onPress={onSkip} />
           </Animated.View>
         )}
       </SafeAreaView>
@@ -134,7 +119,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(6,10,26,0.8)',
+    backgroundColor: Colors.dark.overlay,
   },
   contentContainer: {
     flex: 1,
@@ -170,28 +155,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing['2xl'],
     paddingBottom: Spacing.lg,
     gap: Spacing.sm,
-  },
-  primaryButton: {
-    backgroundColor: Colors.dark.bgElement,
-    paddingVertical: Spacing.lg,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: Colors.dark.textPrimary,
-    fontSize: 17,
-    fontWeight: '500',
-  },
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: Colors.dark.borderDefault,
-    paddingVertical: Spacing.lg,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  secondaryButtonText: {
-    color: Colors.dark.textSecondary,
-    fontSize: 17,
-    fontWeight: '500',
   },
 });

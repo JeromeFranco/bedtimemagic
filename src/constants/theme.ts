@@ -24,6 +24,7 @@ export {
   Layout,
   BottomTabInset,
   MaxContentWidth,
+  Motion,
   Theme,
   type ThemeType,
 } from '@/theme';
