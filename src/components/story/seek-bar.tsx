@@ -1,6 +1,5 @@
-import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useState } from 'react';
+import { Animated, PanResponder, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/theme';
@@ -14,48 +13,61 @@ interface SeekBarProps {
 }
 
 export function SeekBar({ progress, position, duration, onSeek }: SeekBarProps) {
-  const trackWidth = useSharedValue(1);
-  const thumbScale = useSharedValue(1);
+  const [thumbScale] = useState(() => new Animated.Value(1));
+  const [trackWidth, setTrackWidth] = useState(1);
 
-  const thumbAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: thumbScale.get() }],
-  }));
-
-  const handleSeek = (locationX: number) => {
-    const fraction = Math.max(0, Math.min(1, locationX / trackWidth.get()));
+  const seekToLocationX = (locationX: number) => {
+    const fraction = Math.max(0, Math.min(1, locationX / trackWidth));
     onSeek(fraction * duration);
   };
 
-  const panGesture = Gesture.Pan()
-    .onBegin(() => {
-      thumbScale.set(withTiming(18 / 14, { duration: 150 }));
-    })
-    .onUpdate((event) => {
-      const fraction = Math.max(0, Math.min(1, event.x / trackWidth.get()));
-      onSeek(fraction * duration);
-    })
-    .onFinalize(() => {
-      thumbScale.set(withTiming(1, { duration: 150 }));
-    });
+  const startGrow = () =>
+    Animated.timing(thumbScale, {
+      toValue: 18 / 14,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
+
+  const startShrink = () =>
+    Animated.timing(thumbScale, {
+      toValue: 1,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
+
+  const { panHandlers } = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onPanResponderGrant: (e) => {
+      seekToLocationX(e.nativeEvent.locationX);
+      startGrow();
+    },
+    onPanResponderMove: (e) => {
+      seekToLocationX(e.nativeEvent.locationX);
+    },
+    onPanResponderRelease: (e) => {
+      seekToLocationX(e.nativeEvent.locationX);
+      startShrink();
+    },
+    onPanResponderTerminate: () => {
+      startShrink();
+    },
+  });
 
   return (
     <View style={styles.container}>
-      <GestureDetector gesture={panGesture}>
-        <Pressable
-          testID="seek-bar-track"
-          style={styles.track}
-          onPress={(e) => handleSeek(e.nativeEvent.locationX)}
-          onLayout={(e) => {
-            trackWidth.set(e.nativeEvent.layout.width);
-          }}
-        >
-          <View style={styles.trackBg} />
-          <View style={[styles.fill, { width: `${progress * 100}%` }]} />
-          <Animated.View
-            style={[styles.thumb, { left: `${progress * 100}%` }, thumbAnimatedStyle]}
-          />
-        </Pressable>
-      </GestureDetector>
+      <View
+        testID="seek-bar-track"
+        style={styles.track}
+        onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+        {...panHandlers}
+      >
+        <View pointerEvents="none" style={styles.trackBg} />
+        <View pointerEvents="none" style={[styles.fill, { width: `${progress * 100}%` }]} />
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.thumb, { left: `${progress * 100}%` }, { transform: [{ scale: thumbScale }] }]}
+        />
+      </View>
       <View style={styles.timeRow}>
         <ThemedText style={styles.timeText}>{formatDuration(Math.floor(position))}</ThemedText>
         <ThemedText style={styles.timeText}>{formatDuration(Math.floor(duration))}</ThemedText>
