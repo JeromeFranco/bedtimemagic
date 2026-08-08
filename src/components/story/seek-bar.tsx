@@ -15,11 +15,28 @@ interface SeekBarProps {
 export function SeekBar({ progress, position, duration, onSeek }: SeekBarProps) {
   const [thumbScale] = useState(() => new Animated.Value(1));
   const [trackWidth, setTrackWidth] = useState(1);
+  const [isDragging, setIsDragging] = useState(false);
+  const [preview, setPreview] = useState<{ progress: number; seconds: number } | null>(null);
 
-  const seekToLocationX = (locationX: number) => {
+  const previewFromLocationX = (locationX: number) => {
     const fraction = Math.max(0, Math.min(1, locationX / trackWidth));
-    onSeek(fraction * duration);
+    return { fraction, seconds: fraction * duration };
   };
+
+  let displayProgress = progress;
+  let displayPosition = position;
+  if (preview) {
+    if (isDragging) {
+      displayProgress = preview.progress;
+      displayPosition = preview.seconds;
+    } else if (
+      Math.abs(progress - preview.progress) >= 0.01 &&
+      Math.abs(position - preview.seconds) >= 0.75
+    ) {
+      displayProgress = preview.progress;
+      displayPosition = preview.seconds;
+    }
+  }
 
   const startGrow = () =>
     Animated.timing(thumbScale, {
@@ -38,17 +55,26 @@ export function SeekBar({ progress, position, duration, onSeek }: SeekBarProps) 
   const { panHandlers } = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onPanResponderGrant: (e) => {
-      seekToLocationX(e.nativeEvent.locationX);
+      const { fraction, seconds } = previewFromLocationX(e.nativeEvent.locationX);
+      setPreview({ progress: fraction, seconds });
+      setIsDragging(true);
       startGrow();
     },
     onPanResponderMove: (e) => {
-      seekToLocationX(e.nativeEvent.locationX);
+      const { fraction, seconds } = previewFromLocationX(e.nativeEvent.locationX);
+      setPreview({ progress: fraction, seconds });
     },
     onPanResponderRelease: (e) => {
-      seekToLocationX(e.nativeEvent.locationX);
+      const { fraction, seconds } = previewFromLocationX(e.nativeEvent.locationX);
+      const next = { progress: fraction, seconds };
+      setPreview(next);
+      setIsDragging(false);
       startShrink();
+      onSeek(seconds);
     },
     onPanResponderTerminate: () => {
+      setPreview(null);
+      setIsDragging(false);
       startShrink();
     },
   });
@@ -62,14 +88,14 @@ export function SeekBar({ progress, position, duration, onSeek }: SeekBarProps) 
         {...panHandlers}
       >
         <View pointerEvents="none" style={styles.trackBg} />
-        <View pointerEvents="none" style={[styles.fill, { width: `${progress * 100}%` }]} />
+        <View pointerEvents="none" style={[styles.fill, { width: `${displayProgress * 100}%` }]} />
         <Animated.View
           pointerEvents="none"
-          style={[styles.thumb, { left: `${progress * 100}%` }, { transform: [{ scale: thumbScale }] }]}
+          style={[styles.thumb, { left: `${displayProgress * 100}%` }, { transform: [{ scale: thumbScale }] }]}
         />
       </View>
       <View style={styles.timeRow}>
-        <ThemedText style={styles.timeText}>{formatDuration(Math.floor(position))}</ThemedText>
+        <ThemedText style={styles.timeText}>{formatDuration(Math.floor(displayPosition))}</ThemedText>
         <ThemedText style={styles.timeText}>{formatDuration(Math.floor(duration))}</ThemedText>
       </View>
     </View>
