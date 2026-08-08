@@ -84,7 +84,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dark.bgElement,
   },
   cardInner: {
-    flex: 1,
     flexDirection: 'row',
     gap: Spacing.lg,
   },

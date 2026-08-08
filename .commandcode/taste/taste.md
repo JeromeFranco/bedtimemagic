@@ -1,0 +1,1 @@
+- Prefers adding targeted diagnostic logs to trace issues during investigations, especially when runtime behavior is unclear, then removing those temporary logs once the issue is resolved to keep production code clean. Confidence: 0.9
