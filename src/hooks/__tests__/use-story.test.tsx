@@ -5,6 +5,7 @@ import { useStory, useStories } from '../use-story';
 
 const mockGetStory = jest.fn();
 const mockGetStories = jest.fn();
+const queryClients = new Set<QueryClient>();
 
 jest.mock('@/api/stories', () => ({
   getStory: (...args: unknown[]) => mockGetStory(...args),
@@ -15,12 +16,20 @@ function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
+  queryClients.add(queryClient);
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
   };
 }
+
+afterEach(() => {
+  for (const queryClient of queryClients) {
+    queryClient.clear();
+  }
+  queryClients.clear();
+});
 
 describe('useStory', () => {
   beforeEach(() => {
