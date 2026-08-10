@@ -1,4 +1,4 @@
-import { generateImage, gateway } from "ai";
+import OpenAI from "npm:openai@6.42.0";
 import { withSupabase, type SupabaseContext } from "@supabase/server";
 import { CHALLENGE_SCENES } from "../_shared/constants.ts";
 
@@ -69,12 +69,23 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
 
   let imageBytes: Uint8Array;
   try {
-    const result = await generateImage({
-      model: gateway.image("bfl/flux-2-klein-4b"),
+    const client = new OpenAI({
+      apiKey,
+      baseURL: "https://ai-gateway.vercel.sh/v1",
+    });
+    const result = await client.images.generate({
+      model: "bfl/flux-2-klein-4b",
       prompt,
       size: "512x512",
+      response_format: "b64_json",
     });
-    imageBytes = result.image.uint8Array;
+    const base64Image = result.data?.[0]?.b64_json;
+    if (!base64Image) {
+      throw new Error("Image generation returned no image data");
+    }
+
+    const binaryImage = atob(base64Image);
+    imageBytes = Uint8Array.from(binaryImage, (character) => character.charCodeAt(0));
   } catch (err) {
     console.error("Image generation failed:", err);
     return Response.json({ error: "Image generation failed" }, { status: 500 });
