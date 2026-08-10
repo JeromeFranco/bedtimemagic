@@ -29,6 +29,8 @@ These rules override convenience, speed, inferred intent, and pressure to finish
 ## Other Rules
 
 - Use conventional commit for commit message
+- When proposing a fix, state a confidence level (low/medium/high) and briefly explain the evidence supporting it.
+- Prefer idiomatic, framework-supported solutions; explicitly evaluate whether the approach is optimal and avoid monkey patches, test-only behavior changes, or suppressions unless justified and approved.
 - Use expo-ui skill when working with expo ui components and prefer universal components over jetpack-compose and swiftui
 - Use ai-sdk skill when working with ai sdk
 - Run `npm run lint` and `npm run typecheck` after every code change and fix any errors before committing
