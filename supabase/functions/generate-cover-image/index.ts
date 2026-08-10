@@ -1,6 +1,5 @@
-import OpenAI from "@openai/openai";
 import { withSupabase, type SupabaseContext } from "@supabase/server";
-import { AI_MODELS, createAiGatewayClient } from "../_shared/ai.ts";
+import { createAiGatewayClient } from "../_shared/ai.ts";
 import { CHALLENGE_SCENES } from "../_shared/constants.ts";
 
 interface RequestBody {
@@ -31,9 +30,9 @@ export function buildCoverPrompt(
 }
 
 async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
-  let client: OpenAI;
+  let configuredClient: ReturnType<typeof createAiGatewayClient>;
   try {
-    client = createAiGatewayClient();
+    configuredClient = createAiGatewayClient();
   } catch (err) {
     console.error("Failed to create AI Gateway client:", err);
     return Response.json({ error: "AI_GATEWAY_API_KEY not configured" }, { status: 500 });
@@ -73,8 +72,8 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
 
   let imageBytes: Uint8Array;
   try {
-    const result = await client.images.generate({
-      model: AI_MODELS.coverImage,
+    const result = await configuredClient.client.images.generate({
+      model: configuredClient.model,
       prompt,
       size: "512x512",
       response_format: "b64_json",

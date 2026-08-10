@@ -8,6 +8,7 @@ import {
   SafetyFilterError,
 } from "../../generate-story/index.ts";
 import { PROTAGONISTS } from "../../_shared/constants.ts";
+import { AI_MODELS } from "../../_shared/ai.ts";
 
 Deno.test("parseJsonResponse - parses valid JSON", () => {
   const input = JSON.stringify({ title: "Test", storyText: "A story" });
@@ -203,7 +204,11 @@ Deno.test("callLLM - returns parsed story on success", async () => {
     },
   };
 
-  const result = await callLLM(mockClient as any, "system", "user");
+  const result = await callLLM(
+    { client: mockClient as any, model: AI_MODELS.story },
+    "system",
+    "user",
+  );
   assertEquals(result.title, "Barnaby's Big Day");
   assertEquals(result.moral, "Be patient.");
 });
@@ -221,7 +226,11 @@ Deno.test("callLLM - throws SafetyFilterError on refusal", async () => {
   };
 
   try {
-    await callLLM(mockClient as any, "system", "user");
+    await callLLM(
+      { client: mockClient as any, model: AI_MODELS.story },
+      "system",
+      "user",
+    );
     throw new Error("Should have thrown");
   } catch (e) {
     assertEquals(e instanceof SafetyFilterError, true);
@@ -241,7 +250,11 @@ Deno.test("callLLM - throws on empty response", async () => {
   };
 
   try {
-    await callLLM(mockClient as any, "system", "user");
+    await callLLM(
+      { client: mockClient as any, model: AI_MODELS.story },
+      "system",
+      "user",
+    );
     throw new Error("Should have thrown");
   } catch (e) {
     assertEquals((e as Error).message, "Empty response from model");
@@ -261,7 +274,11 @@ Deno.test("callLLM - strips markdown fences from response", async () => {
     },
   };
 
-  const result = await callLLM(mockClient as any, "system", "user");
+  const result = await callLLM(
+    { client: mockClient as any, model: AI_MODELS.story },
+    "system",
+    "user",
+  );
   assertEquals(result.title, "Test");
 });
 

@@ -2,7 +2,7 @@ import OpenAI from "@openai/openai";
 import { withSupabase, type SupabaseContext } from "@supabase/server";
 import { CHALLENGE_LABELS, PROTAGONISTS, TRIGGER_LABELS } from "../_shared/constants.ts";
 import { SafetyFilterError } from "../_shared/errors.ts";
-import { AI_MODELS, createMimoClient } from "../_shared/ai.ts";
+import { createMimoClient, type ConfiguredAiClient } from "../_shared/ai.ts";
 import { buildPrompt, type PromptInput } from "./prompt.ts";
 
 const TIMEOUT_MS = 80_000;
@@ -70,7 +70,7 @@ export function validateStoryFields(story: Record<string, string>): void {
 }
 
 export async function callLLM(
-  client: OpenAI,
+  configuredClient: ConfiguredAiClient,
   system: string,
   user: string,
   { retry = false, signal }: { retry?: boolean; signal?: AbortSignal } = {},
@@ -85,9 +85,9 @@ export async function callLLM(
     },
   ];
 
-  const completion = await client.chat.completions.create(
+  const completion = await configuredClient.client.chat.completions.create(
     {
-      model: AI_MODELS.story,
+      model: configuredClient.model,
       messages,
       reasoning_effort: "medium",
     },
@@ -130,9 +130,9 @@ async function persistStory(
 }
 
 async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
-  let client: OpenAI;
+  let configuredClient: ReturnType<typeof createMimoClient>;
   try {
-    client = createMimoClient();
+    configuredClient = createMimoClient();
   } catch (err) {
     console.error("Failed to create MiMo client:", err);
     return Response.json({ error: "MIMO_API_KEY not configured" }, { status: 500 });
@@ -169,7 +169,7 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
 
   let story: Record<string, string>;
   try {
-    story = await callLLM(client, system, user, { signal: req.signal });
+    story = await callLLM(configuredClient, system, user, { signal: req.signal });
   } catch (err) {
     if (err instanceof SafetyFilterError) {
       return Response.json({ error: "Safety filter triggered" }, { status: 422 });
@@ -177,7 +177,7 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
 
     if (err instanceof SyntaxError) {
       try {
-        story = await callLLM(client, system, user, { retry: true, signal: req.signal });
+        story = await callLLM(configuredClient, system, user, { retry: true, signal: req.signal });
       } catch (retryErr) {
         if (retryErr instanceof SafetyFilterError) {
           return Response.json({ error: "Safety filter triggered" }, { status: 422 });
