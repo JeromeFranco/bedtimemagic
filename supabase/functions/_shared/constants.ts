@@ -67,24 +67,43 @@ export const STAGE_LABELS: Record<string, string> = {
   older_kids: "Older Kids",
 };
 
-export const STAGE_PROFILES: Record<string, { label: string; vocabulary: string; sentences: string; concepts: string }> = {
+type StageProfile = {
+  label: string;
+  vocabulary: string;
+  sentences: string;
+  concepts: string;
+  targetMinutes: number;
+  minimumWords: number;
+  maximumWords: number;
+};
+
+export const STAGE_PROFILES: Record<string, StageProfile> = {
   preschool: {
     label: "Preschool (ages 4-5)",
     vocabulary: "Concrete, familiar objects (blanket, stars, moon, teddy). Avoid abstract nouns. Use simple, warm words.",
     sentences: "Average 6-10 words per sentence. Prefer simple subject-verb-object structures. Use coordinating conjunctions ('and', 'but', 'so') to connect ideas. Avoid subordinate clauses, relative clauses, and passive voice. Repetition of sentence patterns is welcome. Keep paragraphs short.",
     concepts: "Cause-effect only. Name emotions directly ('Barnaby felt sad'). Simple physical similes are fine ('it felt like a hug') — avoid abstract literary metaphors that require reasoning beyond the child's experience.",
+    targetMinutes: 6,
+    minimumWords: 700,
+    maximumWords: 850,
   },
   early_primary: {
     label: "Early Primary (ages 6-7)",
     vocabulary: "Some abstract words (patience, kindness) with context clues. Mix familiar and new vocabulary.",
     sentences: "8-12 words per sentence. Mix simple and compound sentences. Dialogue can appear.",
     concepts: "Simple metaphors allowed ('her heart felt like a balloon deflating'). Basic perspective-taking.",
+    targetMinutes: 8,
+    minimumWords: 900,
+    maximumWords: 1050,
   },
   older_kids: {
     label: "Older Kids (ages 8-10)",
     vocabulary: "Richer vocabulary, figurative language, more descriptive prose.",
     sentences: "10-15 words per sentence. Complex sentences with subordinate clauses. Varied paragraph structure.",
     concepts: "Extended metaphors, perspective-taking, internal monologue. Can explore nuanced emotions.",
+    targetMinutes: 10,
+    minimumWords: 1100,
+    maximumWords: 1250,
   },
 };
 

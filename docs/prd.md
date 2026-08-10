@@ -9,7 +9,7 @@ Project Timeline: 3 Months (Strict)
 
 **Project Name:** Bedtime Magic (Working Title)
 
-**Core Concept:** A mobile application that empowers exhausted parents to instantly generate hyper-personalised, 10-minute audio bedtime stories. These stories are designed to help children navigate daily behavioural challenges and learn life lessons through the empathetic lens of a recurring AI protagonist.
+**Core Concept:** A mobile application that empowers exhausted parents to instantly generate hyper-personalised, stage-adaptive audio bedtime stories. Stories target approximately six minutes for preschool children, eight minutes for early-primary children, and ten minutes for older children. They help children navigate daily behavioural challenges through the empathetic lens of a recurring AI protagonist.
 
 **Primary Value Proposition:** Turning bedtime friction into peaceful, educational bonding moments using frontier-level One-Shot Reasoning AI, built on a strict privacy-first foundation that collects zero children's PII (Personally Identifiable Information).
 
@@ -50,11 +50,11 @@ AI Agents MUST adhere to these principles at all times. Violations of these guar
 ### 3.4. The One-Shot Reasoning Story Engine
 
 - **Function:** Generates the complete story package (text, moral, and post-story interaction prompts) in a single optimised execution.
-- **Architecture:** One-Shot Prompting using a Frontier Reasoning Model (with Test-Time Compute). Replaces the multi-turn agentic workflow to drastically reduce bedtime execution latency. Tokens are buffered on the server and immediately chunked by sentence boundaries for streaming into the Text-to-Speech engine.
-- **Model:** Frontier Model with thinking level set high, configured to run safety, structure, and pacing checks internally within its reasoning trace before producing output.
+- **Architecture:** One-shot story generation through the MiMo V2.5 Pro OpenAI-compatible API. The completed story text is split at natural narrative boundaries under Inworld's 2,000-character input limit. Each segment is synthesized sequentially with Inworld TTS, cached locally as MP3, and appended in order to one native Expo Audio playlist for prepared, gapless track transitions.
+- **Model:** MiMo V2.5 Pro with reasoning enabled, configured to run safety, structure, stage-fit, speakability, and pacing checks internally before producing exact JSON output.
 - **Output Payload:**
   1. Story Title
-  2. Full Story Text (approx. 1,200–1,500 words structured for a 10-minute slow-paced narrative runtime, seamlessly integrating the Bedtime Nickname)
+  2. Full Story Text with stage-adaptive targets: approximately 700–850 words for preschool (six minutes), 900–1,050 words for early primary (eight minutes), or 1,100–1,250 words for older kids (ten minutes), structured as a declining-arousal narrative and seamlessly integrating the Bedtime Nickname
   3. The Moral
   4. Pillow Talk Prompt (Single low-arousal parent discussion question)
   5. Sleepy Affirmation (Short, comforting phrase for the child to repeat)
@@ -64,7 +64,7 @@ AI Agents MUST adhere to these principles at all times. Violations of these guar
 
 - **Function:** A history vault interface showing the last 5 generated stories.
 - **Data Layer:** Text and core structural metadata are stored within central database rows (Supabase).
-- **Local Audio Caching Mechanic:** When a story audio track is generated/streamed for the first time, incoming audio bytes MUST be written concurrently to the client device's volatile cache directory (iOS: NSCachesDirectory, Android: context.cacheDir) using the unique Supabase story_id UUID as the identifier (e.g., audio\_\[story_id\].mp3).
+- **Local Audio Caching Mechanic:** When story segments are synthesized for the first time, incoming MP3 bytes MUST be written to the client device's volatile cache directory (iOS: NSCachesDirectory, Android: context.cacheDir) using the Supabase story ID and segment index as the identifier.
 - **Cache-First Playback Engine:** Replaying an item from the history vault triggers an immediate check for the local file path. If a cache hit occurs, playback begins instantly with 0ms network lag and $0 API cost. If a cache miss occurs, the player falls back to the backend streaming pipeline.
 - **Eviction Policy:** Enforce an automated First-In, First-Out (FIFO) cleanup rule. If a new file is added and the total audio count within the local directory exceeds 5, a background operation must immediately purge the oldest cached audio file based on its last modified timestamp. Local cache eviction operates on a complete story bundle wrapper. When an audio file UUID is purged via the FIFO pipeline, its corresponding cached watercolor cover image asset must be deleted from local disk storage simultaneously. This guarantees a highly disciplined client storage footprint (~15MB to 25MB total).
 
@@ -93,7 +93,7 @@ AI Agents MUST adhere to these principles at all times. Violations of these guar
 
 1. **Home:** Select Profile -> Tap-Only Challenge Matrix -> Generate.
 2. **Review & Optimistic Pre-Fetching:** Parent views the generated Story Card (Title, Cover Art, and Moral). While the parent spends 3 to 5 seconds reviewing this high-level metadata, the app client silently initiates a background worker to fetch, process, and warm up the cache for the first two sentences of the narrative.
-3. **Playback Phase 1 (Wind-Down):** Parent taps _"Play"_. Playback initiates immediately using the pre-fetched local audio buffer. Concurrently, the remaining story blocks stream over the network and pipe directly into the local cacheDir destination file. Screen is ON but dimmed, displaying the watercolor cover art and playback controls.
+3. **Playback Phase 1 (Wind-Down):** Parent taps _"Play"_. Playback initiates using the completed opening segment. Concurrently, later segments are synthesized sequentially, cached, and appended to the same native Expo Audio playlist in story order. Screen is ON but dimmed, displaying the watercolor cover art and playback controls.
 4. **Playback Phase 2 (Sleep Mode):** Toggle button to turn screen completely BLACK. Native background audio playback continues reading seamlessly through the buffered local disk files.
 5. **Post-Story Bridge:**
    - Audio fades to soft ambient noise.

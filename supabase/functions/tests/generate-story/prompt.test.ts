@@ -9,6 +9,7 @@ Deno.test("buildPrompt - system prompt contains story arc structure", () => {
     childNickname: "Alex",
     developmentalStage: "preschool",
     tier1ChallengeLabel: "Bedtime Friction",
+    tier2TriggerId: "leaving_bedroom",
     tier2TriggerLabel: "Leaving the bedroom",
   });
 
@@ -27,6 +28,7 @@ Deno.test("buildPrompt - system prompt contains teaching approach", () => {
     childNickname: "Alex",
     developmentalStage: "preschool",
     tier1ChallengeLabel: "Bedtime Friction",
+    tier2TriggerId: "leaving_bedroom",
     tier2TriggerLabel: "Leaving the bedroom",
   });
 
@@ -43,6 +45,7 @@ Deno.test("buildPrompt - system prompt contains output field guidance", () => {
     childNickname: "Alex",
     developmentalStage: "preschool",
     tier1ChallengeLabel: "Bedtime Friction",
+    tier2TriggerId: "leaving_bedroom",
     tier2TriggerLabel: "Leaving the bedroom",
   });
 
@@ -59,11 +62,14 @@ Deno.test("buildPrompt - user prompt includes stage profile for preschool", () =
     childNickname: "Alex",
     developmentalStage: "preschool",
     tier1ChallengeLabel: "Bedtime Friction",
+    tier2TriggerId: "leaving_bedroom",
     tier2TriggerLabel: "Leaving the bedroom",
   });
 
   assertStringIncludes(user, "Preschool (ages 4-5)");
-  assertStringIncludes(user, "5-8 words per sentence");
+  assertStringIncludes(user, "approximately 6 minutes");
+  assertStringIncludes(user, "700-850 words");
+  assertStringIncludes(user, "6-10 words per sentence");
   assertStringIncludes(user, "Concrete, familiar objects");
 });
 
@@ -75,10 +81,13 @@ Deno.test("buildPrompt - user prompt includes stage profile for early_primary", 
     childNickname: "Sam",
     developmentalStage: "early_primary",
     tier1ChallengeLabel: "Big Emotions / Anger",
+    tier2TriggerId: "yelling",
     tier2TriggerLabel: "Yelling",
   });
 
   assertStringIncludes(user, "Early Primary (ages 6-7)");
+  assertStringIncludes(user, "approximately 8 minutes");
+  assertStringIncludes(user, "900-1050 words");
   assertStringIncludes(user, "8-12 words per sentence");
   assertStringIncludes(user, "Simple metaphors allowed");
 });
@@ -91,10 +100,13 @@ Deno.test("buildPrompt - user prompt includes stage profile for older_kids", () 
     childNickname: "Jordan",
     developmentalStage: "older_kids",
     tier1ChallengeLabel: "Social Skills",
+    tier2TriggerId: "sharing_toys",
     tier2TriggerLabel: "Sharing toys",
   });
 
   assertStringIncludes(user, "Older Kids (ages 8-10)");
+  assertStringIncludes(user, "approximately 10 minutes");
+  assertStringIncludes(user, "1100-1250 words");
   assertStringIncludes(user, "10-15 words per sentence");
   assertStringIncludes(user, "Extended metaphors");
 });
@@ -107,6 +119,7 @@ Deno.test("buildPrompt - user prompt includes protagonist details", () => {
     childNickname: "Mia",
     developmentalStage: "preschool",
     tier1ChallengeLabel: "Screen Time Limits",
+    tier2TriggerId: "stopping_games",
     tier2TriggerLabel: "Stopping video games",
   });
 
@@ -123,8 +136,28 @@ Deno.test("buildPrompt - user prompt falls back for unknown stage", () => {
     childNickname: "Alex",
     developmentalStage: "unknown_stage",
     tier1ChallengeLabel: "Bedtime Friction",
+    tier2TriggerId: "leaving_bedroom",
     tier2TriggerLabel: "Leaving the bedroom",
   });
 
   assertStringIncludes(user, "Adjust vocabulary and sentence complexity accordingly");
+});
+
+Deno.test("buildPrompt - includes trigger-specific and speakable narration guidance", () => {
+  const { system, user } = buildPrompt({
+    protagonistName: "Rex",
+    protagonistSpecies: "Dragon",
+    protagonistPersonality: "Friendly dragon",
+    childNickname: "Rocket",
+    developmentalStage: "preschool",
+    tier1ChallengeLabel: "Big Emotions / Anger",
+    tier2TriggerId: "hitting",
+    tier2TriggerLabel: "Hitting/Pushing",
+  });
+
+  assertStringIncludes(user, "Keep everyone physically safe without punishment or labels");
+  assertStringIncludes(system, "roughly 450-650 characters");
+  assertStringIncludes(system, "arousal must steadily decline");
+  assertStringIncludes(system, "Never use shame, blame, punishment");
+  assertStringIncludes(system, "exact JSON output");
 });

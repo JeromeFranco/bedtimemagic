@@ -17,6 +17,22 @@ interface RequestBody {
   tier2Trigger: string;
 }
 
+export function createPromptInput(
+  body: RequestBody,
+  protagonist: (typeof PROTAGONISTS)[string],
+): PromptInput {
+  return {
+    protagonistName: protagonist.name,
+    protagonistSpecies: protagonist.species,
+    protagonistPersonality: protagonist.personality,
+    childNickname: body.childNickname,
+    developmentalStage: body.developmentalStage,
+    tier1ChallengeLabel: CHALLENGE_LABELS[body.tier1Challenge] || body.tier1Challenge,
+    tier2TriggerId: body.tier2Trigger,
+    tier2TriggerLabel: TRIGGER_LABELS[body.tier2Trigger] || body.tier2Trigger,
+  };
+}
+
 const REQUIRED_STORY_FIELDS = ["title", "storyText", "moral", "pillowTalkPrompt", "sleepyAffirmation"] as const;
 
 export { SafetyFilterError } from "../_shared/errors.ts";
@@ -148,15 +164,7 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
 
   const userId = ctx.userClaims!.id;
 
-  const promptInput: PromptInput = {
-    protagonistName: protagonist.name,
-    protagonistSpecies: protagonist.species,
-    protagonistPersonality: protagonist.personality,
-    childNickname: body.childNickname,
-    developmentalStage: body.developmentalStage, // Pass key directly, not label
-    tier1ChallengeLabel: CHALLENGE_LABELS[body.tier1Challenge] || body.tier1Challenge,
-    tier2TriggerLabel: TRIGGER_LABELS[body.tier2Trigger] || body.tier2Trigger,
-  };
+  const promptInput = createPromptInput(body, protagonist);
 
   const { system, user } = buildPrompt(promptInput);
 

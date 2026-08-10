@@ -109,6 +109,8 @@ describe('streamStorySegment', () => {
       voice: 'Ashley',
       model: 'inworld-tts-1.5-mini',
       encoding: 'MP3',
+      speakingRate: 0.9,
+      temperature: 1.0,
     });
     expect(mockedAudioSegmentWriter).toHaveBeenCalledWith('story-1', 0);
     const writer = mockWriterInstances[0];

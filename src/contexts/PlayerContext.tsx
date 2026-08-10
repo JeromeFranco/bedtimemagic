@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createAudioPlayer, createAudioPlaylist, setAudioModeAsync } from 'expo-audio';
 import { getAmbientAudioSource } from '@/lib/audio-utils';
-import { streamStorySegment, cancelStoryAudio } from '@/lib/inworld-tts';
+import { cancelStoryAudio, streamStorySegment } from '@/lib/inworld-tts';
 import { splitStoryIntoSegments } from '@/lib/story-segments';
 import type { Story } from '@/types';
 
@@ -53,15 +53,14 @@ const ESTIMATED_SECONDS_PER_CHAR = 0.07;
 
 function cumulativeStart(durations: number[], index: number): number {
   let total = 0;
-  for (let i = 0; i < index; i++) {
-    total += durations[i] ?? 0;
-  }
+  for (let i = 0; i < index; i++) total += durations[i] ?? 0;
   return total;
 }
 
-type ActiveSegment = {
-  index: number;
-  uri: string;
+type PendingSeek = {
+  segmentIndex: number;
+  offset: number;
+  resumeOnReady: boolean;
 };
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
@@ -73,19 +72,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [duration, setDuration] = useState(0);
   const [postStoryPhase, setPostStoryPhase] = useState<PostStoryPhase>('idle');
 
-  const playerRef = useRef<ReturnType<typeof createAudioPlayer> | null>(null);
+  const playlistRef = useRef<ReturnType<typeof createAudioPlaylist> | null>(null);
   const ambientPlayerRef = useRef<ReturnType<typeof createAudioPlayer> | null>(null);
   const listenerRef = useRef<{ remove: () => void } | null>(null);
   const fadeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const activeStoryRef = useRef<Story | null>(null);
   const playbackGenerationRef = useRef(0);
   const segmentsRef = useRef<string[]>([]);
-  const segmentQueueRef = useRef<ActiveSegment[]>([]);
-  const nextSegmentIndexRef = useRef(0);
-  const failedSegmentsRef = useRef<Set<number>>(new Set());
   const segmentDurationsRef = useRef<number[]>([]);
-  const pendingSeekRef = useRef<{ segmentIndex: number; offset: number } | null>(null);
-  const attachListenerRef = useRef<(gen: number) => void>(() => {});
+  const pendingSeekRef = useRef<PendingSeek | null>(null);
+  const manuallyPausedRef = useRef(false);
+  const generationUnderrunRef = useRef(false);
+  const finalFlowStartedRef = useRef(false);
+  const generateSegmentRef = useRef<(generation: number, segmentIndex: number) => void>(() => {});
 
   const cleanupAmbient = useCallback(() => {
     if (ambientPlayerRef.current) {
@@ -94,17 +93,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const cleanupPlayer = useCallback(() => {
-    if (listenerRef.current) {
-      listenerRef.current.remove();
-      listenerRef.current = null;
-    }
-    if (playerRef.current) {
-      // pause first: remove() only deregisters the native player, audio
-      // keeps playing until the object is garbage collected
-      playerRef.current.pause();
-      playerRef.current.remove();
-      playerRef.current = null;
+  const cleanupPlaylist = useCallback(() => {
+    listenerRef.current?.remove();
+    listenerRef.current = null;
+    if (playlistRef.current) {
+      playlistRef.current.pause();
+      playlistRef.current.destroy();
+      playlistRef.current = null;
     }
     if (fadeIntervalRef.current) {
       clearInterval(fadeIntervalRef.current);
@@ -115,8 +110,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const startAmbient = useCallback(() => {
     cleanupAmbient();
-    const source = getAmbientAudioSource();
-    const ambientPlayer = createAudioPlayer(source);
+    const ambientPlayer = createAudioPlayer(getAmbientAudioSource());
     ambientPlayer.volume = 0.15;
     ambientPlayer.loop = true;
     ambientPlayer.play();
@@ -124,10 +118,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [cleanupAmbient]);
 
   const startFade = useCallback(() => {
-    const player = playerRef.current;
+    const playlist = playlistRef.current;
     const hasPrompt = !!activeStoryRef.current?.pillow_talk_prompt;
     const hasAffirmation = !!activeStoryRef.current?.sleepy_affirmation;
-    if (!player) {
+
+    const finishFade = () => {
+      if (playlistRef.current) {
+        playlistRef.current.destroy();
+        playlistRef.current = null;
+      }
       if (hasPrompt) {
         startAmbient();
         setPostStoryPhase('pillow_talk');
@@ -136,377 +135,270 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       } else {
         setPostStoryPhase('done');
       }
+    };
+
+    if (!playlist) {
+      finishFade();
       return;
     }
 
     const steps = FADE_DURATION / FADE_INTERVAL;
     let step = 0;
-
     fadeIntervalRef.current = setInterval(() => {
-      step++;
-      const volume = Math.max(0, 1 - step / steps);
-      player.volume = volume;
-
+      step += 1;
+      playlist.volume = Math.max(0, 1 - step / steps);
       if (step >= steps) {
-        if (fadeIntervalRef.current) {
-          clearInterval(fadeIntervalRef.current);
-          fadeIntervalRef.current = null;
-        }
-        if (playerRef.current) {
-          playerRef.current.remove();
-          playerRef.current = null;
-        }
-        if (hasPrompt) {
-          startAmbient();
-          setPostStoryPhase('pillow_talk');
-        } else if (hasAffirmation) {
-          setPostStoryPhase('affirmation');
-        } else {
-          setPostStoryPhase('done');
-        }
+        if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+        fadeIntervalRef.current = null;
+        finishFade();
       }
     }, FADE_INTERVAL);
   }, [startAmbient]);
 
-  const playNextSegmentFromQueueRef = useRef<(gen: number, nextIndex: number) => void>(() => {});
+  const attachPlaylistListener = useCallback(
+    (generation: number) => {
+      const playlist = playlistRef.current;
+      if (!playlist) return;
 
-  const playNextSegmentFromQueue = useCallback((gen: number, nextIndex: number) => {
-    if (failedSegmentsRef.current.has(nextIndex)) {
-      if (pendingSeekRef.current?.segmentIndex === nextIndex) {
-        pendingSeekRef.current = null;
-      }
-      const segments = segmentsRef.current;
-      const skipIndex = nextIndex + 1;
-      if (skipIndex < segments.length) {
-        playNextSegmentFromQueueRef.current(gen, skipIndex);
-      } else {
-        setIsBuffering(false);
-        setIsPlaying(false);
-      }
-      return;
-    }
+      listenerRef.current = playlist.addListener('playlistStatusUpdate', (status) => {
+        if (playbackGenerationRef.current !== generation) return;
 
-    const segments = segmentsRef.current;
-    const alreadyQueued = segmentQueueRef.current.find(
-      (s) => s.index === nextIndex,
-    );
+        if (status.duration > 0) segmentDurationsRef.current[status.currentIndex] = status.duration;
+        setPosition(
+          cumulativeStart(segmentDurationsRef.current, status.currentIndex) + status.currentTime,
+        );
+        setDuration(segmentDurationsRef.current.reduce((total, item) => total + item, 0));
 
-    if (alreadyQueued) {
-      const player = createAudioPlayer({ uri: alreadyQueued.uri });
-      playerRef.current = player;
-      segmentQueueRef.current = segmentQueueRef.current.filter(
-        (s) => s.index !== nextIndex,
-      );
-      nextSegmentIndexRef.current = nextIndex + 1;
-      setIsBuffering(false);
-      setIsPlaying(true);
-      attachListenerRef.current(gen);
-      player.play();
-
-      const lookaheadIndex = nextIndex + 1;
-      if (lookaheadIndex < segments.length && !failedSegmentsRef.current.has(lookaheadIndex)) {
-        const segText = segments[lookaheadIndex];
-        streamStorySegment(activeStoryRef.current!.id, lookaheadIndex, segText)
-          .then((seg) => {
-            if (playbackGenerationRef.current !== gen) return;
-            const currentIdx = nextSegmentIndexRef.current;
-            if (currentIdx <= seg.segmentIndex) {
-              segmentQueueRef.current.push({
-                index: seg.segmentIndex,
-                uri: seg.uri,
-              });
-            }
-          })
-          .catch(() => {
-            if (playbackGenerationRef.current !== gen) return;
-            failedSegmentsRef.current.add(lookaheadIndex);
-            setIsBuffering(false);
-            setIsPlaying(false);
-          });
-      }
-    } else {
-      const segText = segments[nextIndex];
-      streamStorySegment(activeStoryRef.current!.id, nextIndex, segText)
-        .then((seg) => {
-          if (playbackGenerationRef.current !== gen) return;
-          if (pendingSeekRef.current && pendingSeekRef.current.segmentIndex !== seg.segmentIndex) {
-            return;
-          }
-
-          const player = createAudioPlayer({ uri: seg.uri });
-          playerRef.current = player;
-          nextSegmentIndexRef.current = nextIndex + 1;
-          setIsBuffering(false);
-          setIsPlaying(true);
-          attachListenerRef.current(gen);
-          player.play();
-
-          const lookaheadIndex = nextIndex + 1;
-          if (lookaheadIndex < segments.length && !failedSegmentsRef.current.has(lookaheadIndex)) {
-            const lookaheadText = segments[lookaheadIndex];
-            streamStorySegment(
-              activeStoryRef.current!.id,
-              lookaheadIndex,
-              lookaheadText,
-            )
-              .then((lookaheadSeg) => {
-                if (playbackGenerationRef.current !== gen) return;
-                const currentIdx = nextSegmentIndexRef.current;
-                if (currentIdx <= lookaheadSeg.segmentIndex) {
-                  segmentQueueRef.current.push({
-                    index: lookaheadSeg.segmentIndex,
-                    uri: lookaheadSeg.uri,
-                  });
-                }
-              })
-              .catch(() => {
-                if (playbackGenerationRef.current !== gen) return;
-                failedSegmentsRef.current.add(lookaheadIndex);
-              });
-          }
-        })
-        .catch(() => {
-          if (playbackGenerationRef.current !== gen) return;
-          failedSegmentsRef.current.add(nextIndex);
-          if (pendingSeekRef.current?.segmentIndex === nextIndex) {
-            pendingSeekRef.current = null;
-          }
-          setIsBuffering(false);
-          setIsPlaying(false);
-        });
-    }
-  }, []);
-
-  const attachSegmentListener = useCallback((gen: number) => {
-    const listener = playerRef.current!.addListener('playbackStatusUpdate', (status) => {
-      if (playbackGenerationRef.current !== gen) return;
-
-      const segmentIndex = nextSegmentIndexRef.current - 1;
-      if (segmentIndex >= 0 && status.duration > 0) {
-        segmentDurationsRef.current[segmentIndex] = status.duration;
-      }
-
-      setPosition(cumulativeStart(segmentDurationsRef.current, segmentIndex) + status.currentTime);
-      setDuration(segmentDurationsRef.current.reduce((a, b) => a + b, 0));
-      setIsBuffering(status.isBuffering);
-      setIsPlaying(status.playing);
-
-      if (pendingSeekRef.current && status.duration > 0) {
-        const pending = pendingSeekRef.current;
-        if (pending.segmentIndex === segmentIndex) {
-          pendingSeekRef.current = null;
-          playerRef.current?.seekTo(pending.offset);
-        }
-      }
-
-      if (status.didJustFinish) {
-        if (listenerRef.current) {
-          listenerRef.current.remove();
-          listenerRef.current = null;
+        if (!generationUnderrunRef.current) {
+          setIsBuffering(status.isBuffering);
+          setIsPlaying(status.playing);
         }
 
-        const nextIndex = nextSegmentIndexRef.current;
-        const segments = segmentsRef.current;
+        if (!status.didJustFinish) return;
 
-        if (nextIndex < segments.length) {
-          if (playerRef.current) {
-            playerRef.current.pause();
-            playerRef.current.remove();
-            playerRef.current = null;
-          }
+        if (status.currentIndex < status.trackCount - 1) {
+          return;
+        }
+
+        if (status.trackCount < segmentsRef.current.length) {
+          generationUnderrunRef.current = true;
           setIsPlaying(false);
           setIsBuffering(true);
-          playNextSegmentFromQueue(gen, nextIndex);
-        } else {
-          setIsPlaying(false);
-          setIsBuffering(false);
-          setPostStoryPhase('fading');
-          startFade();
+          return;
         }
-      }
-    });
-    listenerRef.current = listener;
-  }, [startFade, playNextSegmentFromQueue]);
+
+        if (finalFlowStartedRef.current) return;
+        finalFlowStartedRef.current = true;
+        setIsPlaying(false);
+        setIsBuffering(false);
+        setPostStoryPhase('fading');
+        startFade();
+      });
+    },
+    [startFade],
+  );
+
+  const generateSegment = useCallback((generation: number, segmentIndex: number) => {
+    const story = activeStoryRef.current;
+    const text = segmentsRef.current[segmentIndex];
+    if (!story || !text) return;
+
+    streamStorySegment(story.id, segmentIndex, text)
+      .then((segment) => {
+        if (playbackGenerationRef.current !== generation) return;
+        const playlist = playlistRef.current;
+        if (!playlist || segment.segmentIndex !== playlist.trackCount) return;
+
+        playlist.add({ uri: segment.uri });
+
+        const pendingSeek = pendingSeekRef.current;
+        if (pendingSeek && pendingSeek.segmentIndex < playlist.trackCount) {
+          pendingSeekRef.current = null;
+          if (playlist.currentIndex !== pendingSeek.segmentIndex) {
+            playlist.skipTo(pendingSeek.segmentIndex);
+          }
+          void playlist.seekTo(pendingSeek.offset);
+          generationUnderrunRef.current = false;
+          setIsBuffering(false);
+          if (pendingSeek.resumeOnReady && !manuallyPausedRef.current) {
+            playlist.play();
+            setIsPlaying(true);
+          }
+        } else if (
+          generationUnderrunRef.current &&
+          !manuallyPausedRef.current &&
+          playlist.currentIndex < playlist.trackCount - 1
+        ) {
+          generationUnderrunRef.current = false;
+          playlist.next();
+          playlist.play();
+          setIsBuffering(false);
+          setIsPlaying(true);
+        }
+
+        const nextIndex = segmentIndex + 1;
+        if (nextIndex < segmentsRef.current.length) {
+          generateSegmentRef.current(generation, nextIndex);
+        }
+      })
+      .catch(() => {
+        if (playbackGenerationRef.current !== generation) return;
+        generationUnderrunRef.current = false;
+        pendingSeekRef.current = null;
+        setIsBuffering(false);
+        setIsPlaying(false);
+      });
+  }, []);
 
   useEffect(() => {
-    attachListenerRef.current = attachSegmentListener;
-  }, [attachSegmentListener]);
-
-  useEffect(() => {
-    playNextSegmentFromQueueRef.current = playNextSegmentFromQueue;
-  }, [playNextSegmentFromQueue]);
+    generateSegmentRef.current = generateSegment;
+  }, [generateSegment]);
 
   const playStory = async (story: Story) => {
-    // stop the previous story's in-flight TTS streams before starting a new one
-    if (activeStoryRef.current) {
-      cancelStoryAudio(activeStoryRef.current.id);
-    }
+    if (activeStoryRef.current) cancelStoryAudio(activeStoryRef.current.id);
     playbackGenerationRef.current += 1;
-    const gen = playbackGenerationRef.current;
+    const generation = playbackGenerationRef.current;
 
-    cleanupPlayer();
-    setPostStoryPhase('idle');
+    cleanupPlaylist();
     activeStoryRef.current = story;
-    segmentQueueRef.current = [];
-    nextSegmentIndexRef.current = 0;
-    failedSegmentsRef.current = new Set();
+    segmentsRef.current = [];
+    segmentDurationsRef.current = [];
+    pendingSeekRef.current = null;
+    manuallyPausedRef.current = false;
+    generationUnderrunRef.current = false;
+    finalFlowStartedRef.current = false;
+    setPostStoryPhase('idle');
 
     await setAudioModeAsync({
       playsInSilentMode: true,
       shouldPlayInBackground: true,
       interruptionMode: 'doNotMix',
     });
-
-    if (playbackGenerationRef.current !== gen) return;
+    if (playbackGenerationRef.current !== generation) return;
 
     const segments = splitStoryIntoSegments(story.story_text);
     segmentsRef.current = segments;
-    segmentDurationsRef.current = segments.map((s) => s.length * ESTIMATED_SECONDS_PER_CHAR);
-    pendingSeekRef.current = null;
-
+    segmentDurationsRef.current = segments.map(
+      (segment) => segment.length * ESTIMATED_SECONDS_PER_CHAR,
+    );
     setIsBuffering(true);
 
     let firstSegment;
     try {
       firstSegment = await streamStorySegment(story.id, 0, segments[0]);
     } catch {
-      if (playbackGenerationRef.current !== gen) return;
+      if (playbackGenerationRef.current !== generation) return;
       setIsBuffering(false);
       setIsPlaying(false);
       return;
     }
+    if (playbackGenerationRef.current !== generation) return;
 
-    if (playbackGenerationRef.current !== gen) return;
-
-    nextSegmentIndexRef.current = 1;
-
-    const player = createAudioPlayer({ uri: firstSegment.uri });
-    playerRef.current = player;
+    const playlist = createAudioPlaylist({
+      sources: [{ uri: firstSegment.uri }],
+      loop: 'none',
+      updateInterval: 250,
+    });
+    playlistRef.current = playlist;
+    attachPlaylistListener(generation);
 
     setCurrentStory(story);
     setIsPlaying(true);
+    setIsBuffering(false);
     setIsSleepMode(false);
     setPosition(0);
-    setDuration(segmentDurationsRef.current.reduce((a, b) => a + b, 0));
-    player.play();
+    setDuration(segmentDurationsRef.current.reduce((total, item) => total + item, 0));
+    playlist.play();
 
-    attachSegmentListener(gen);
-
-    if (segments.length > 1) {
-      streamStorySegment(story.id, 1, segments[1])
-        .then((seg) => {
-          if (playbackGenerationRef.current !== gen) return;
-          segmentQueueRef.current.push({ index: seg.segmentIndex, uri: seg.uri });
-        })
-        .catch(() => {
-          if (playbackGenerationRef.current !== gen) return;
-          failedSegmentsRef.current.add(1);
-        });
-    }
+    if (segments.length > 1) generateSegmentRef.current(generation, 1);
   };
 
   const pause = () => {
-    if (playerRef.current) {
-      playerRef.current.pause();
-    }
+    manuallyPausedRef.current = true;
+    playlistRef.current?.pause();
     setIsPlaying(false);
   };
 
   const resume = () => {
-    if (playerRef.current) {
-      playerRef.current.play();
+    manuallyPausedRef.current = false;
+    const playlist = playlistRef.current;
+    if (!playlist) return;
+    if (pendingSeekRef.current) {
+      pendingSeekRef.current.resumeOnReady = true;
+      setIsBuffering(true);
+      setIsPlaying(false);
+      return;
     }
+    if (generationUnderrunRef.current) {
+      if (playlist.currentIndex >= playlist.trackCount - 1) {
+        setIsBuffering(true);
+        setIsPlaying(false);
+        return;
+      }
+      generationUnderrunRef.current = false;
+      playlist.next();
+      setIsBuffering(false);
+    }
+    playlist.play();
     setIsPlaying(true);
   };
 
   const seekTo = (seconds: number) => {
+    const playlist = playlistRef.current;
     const durations = segmentDurationsRef.current;
-    if (durations.length === 0) return;
-    if (!playerRef.current && !pendingSeekRef.current) return;
+    if (!playlist || durations.length === 0) return;
 
-    const totalDuration = durations.reduce((a, b) => a + b, 0);
-    const clamped = Math.max(0, Math.min(seconds, totalDuration));
-
-    let offset = clamped;
+    const totalDuration = durations.reduce((total, item) => total + item, 0);
+    let offset = Math.max(0, Math.min(seconds, totalDuration));
     let targetIndex = durations.length - 1;
-    for (let i = 0; i < durations.length; i++) {
-      if (offset < durations[i]) {
-        targetIndex = i;
+    for (let index = 0; index < durations.length; index++) {
+      if (offset < durations[index]) {
+        targetIndex = index;
         break;
       }
-      offset -= durations[i];
+      offset -= durations[index];
     }
 
-    // skip segments known to have failed so the jump lands on playable audio
-    while (targetIndex < durations.length && failedSegmentsRef.current.has(targetIndex)) {
-      targetIndex += 1;
-      offset = 0;
-    }
-
-    const currentIndex = nextSegmentIndexRef.current - 1;
-
-    if (targetIndex >= durations.length) {
-      // no playable audio remains ahead - seek to the end of the current
-      // segment and let the natural didJustFinish flow drive the transition
+    if (targetIndex < playlist.trackCount) {
       pendingSeekRef.current = null;
-      playerRef.current?.seekTo(durations[currentIndex] ?? 0);
+      if (targetIndex !== playlist.currentIndex) playlist.skipTo(targetIndex);
+      void playlist.seekTo(offset);
+      setPosition(cumulativeStart(durations, targetIndex) + offset);
       return;
     }
 
-    if (!pendingSeekRef.current && targetIndex === currentIndex) {
-      playerRef.current?.seekTo(offset);
-      return;
-    }
-
-    if (pendingSeekRef.current?.segmentIndex === targetIndex) {
-      // retarget the in-flight jump with a new offset (e.g. seek-bar drag)
-      pendingSeekRef.current.offset = offset;
-      return;
-    }
-
-    // cross-segment jump (new, or superseding an in-flight one)
-    if (playerRef.current) {
-      if (listenerRef.current) {
-        listenerRef.current.remove();
-        listenerRef.current = null;
-      }
-      // pause first: remove() only deregisters the native player, audio
-      // keeps playing until the object is garbage collected
-      playerRef.current.pause();
-      playerRef.current.remove();
-      playerRef.current = null;
-    }
-
-    const gen = playbackGenerationRef.current;
-    pendingSeekRef.current = { segmentIndex: targetIndex, offset };
-    setIsBuffering(true);
+    const resumeOnReady = !manuallyPausedRef.current && isPlaying;
+    pendingSeekRef.current = { segmentIndex: targetIndex, offset, resumeOnReady };
+    playlist.pause();
     setIsPlaying(false);
-    playNextSegmentFromQueueRef.current(gen, targetIndex);
+    setIsBuffering(true);
   };
 
-  const stopStory = () => {
-    if (activeStoryRef.current) {
-      cancelStoryAudio(activeStoryRef.current.id);
-    }
-    playbackGenerationRef.current += 1;
-    segmentQueueRef.current = [];
-    nextSegmentIndexRef.current = 0;
+  const resetStoryState = useCallback(() => {
     segmentsRef.current = [];
-    cleanupPlayer();
+    segmentDurationsRef.current = [];
+    pendingSeekRef.current = null;
+    manuallyPausedRef.current = false;
+    generationUnderrunRef.current = false;
+    finalFlowStartedRef.current = false;
+    activeStoryRef.current = null;
     setCurrentStory(null);
     setIsPlaying(false);
     setIsBuffering(false);
     setIsSleepMode(false);
     setPosition(0);
     setDuration(0);
-    segmentDurationsRef.current = [];
-    pendingSeekRef.current = null;
+  }, []);
+
+  const stopStory = () => {
+    if (activeStoryRef.current) cancelStoryAudio(activeStoryRef.current.id);
+    playbackGenerationRef.current += 1;
+    cleanupPlaylist();
+    resetStoryState();
     setPostStoryPhase('idle');
   };
 
-  const toggleSleepMode = () => {
-    setIsSleepMode((prev) => !prev);
-  };
+  const toggleSleepMode = () => setIsSleepMode((previous) => !previous);
 
   const skipPillowTalk = () => {
     cleanupAmbient();
@@ -514,95 +406,53 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   };
 
   const confirmAffirmation = () => {
-    if (activeStoryRef.current) {
-      cancelStoryAudio(activeStoryRef.current.id);
-    }
+    if (activeStoryRef.current) cancelStoryAudio(activeStoryRef.current.id);
     playbackGenerationRef.current += 1;
-    segmentQueueRef.current = [];
-    nextSegmentIndexRef.current = 0;
-    segmentsRef.current = [];
-    cleanupPlayer();
-    setCurrentStory(null);
-    setIsPlaying(false);
-    setIsBuffering(false);
-    setPosition(0);
-    setDuration(0);
-    segmentDurationsRef.current = [];
-    pendingSeekRef.current = null;
+    cleanupPlaylist();
+    resetStoryState();
     setPostStoryPhase('done');
   };
 
   const startFadeToBlack = () => {
     setPostStoryPhase('fade_to_black');
-    if (fadeIntervalRef.current) {
-      clearInterval(fadeIntervalRef.current);
-      fadeIntervalRef.current = null;
-    }
+    if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+    fadeIntervalRef.current = null;
     const ambient = ambientPlayerRef.current;
-    if (!ambient) {
-      if (activeStoryRef.current) {
-        cancelStoryAudio(activeStoryRef.current.id);
-      }
+
+    const finish = () => {
+      if (activeStoryRef.current) cancelStoryAudio(activeStoryRef.current.id);
       playbackGenerationRef.current += 1;
-      segmentQueueRef.current = [];
-      nextSegmentIndexRef.current = 0;
-      segmentsRef.current = [];
-      cleanupPlayer();
-      setCurrentStory(null);
-      setIsPlaying(false);
-      setIsBuffering(false);
-      setPosition(0);
-      setDuration(0);
-      segmentDurationsRef.current = [];
-      pendingSeekRef.current = null;
+      cleanupPlaylist();
+      resetStoryState();
       setPostStoryPhase('done');
+    };
+
+    if (!ambient) {
+      finish();
       return;
     }
 
     const steps = FADE_TO_BLACK_DURATION / AMBIENT_FADE_INTERVAL;
     const startVolume = ambient.volume;
     let step = 0;
-
     fadeIntervalRef.current = setInterval(() => {
-      step++;
+      step += 1;
       ambient.volume = Math.max(0, startVolume * (1 - step / steps));
       if (step >= steps) {
-        if (fadeIntervalRef.current) {
-          clearInterval(fadeIntervalRef.current);
-          fadeIntervalRef.current = null;
-        }
-        cleanupAmbient();
-        if (activeStoryRef.current) {
-          cancelStoryAudio(activeStoryRef.current.id);
-        }
-        playbackGenerationRef.current += 1;
-        segmentQueueRef.current = [];
-        nextSegmentIndexRef.current = 0;
-        segmentsRef.current = [];
-        segmentDurationsRef.current = [];
-        pendingSeekRef.current = null;
-        cleanupPlayer();
-        setCurrentStory(null);
-        setIsPlaying(false);
-        setIsBuffering(false);
-        setPosition(0);
-        setDuration(0);
-        setPostStoryPhase('done');
+        if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+        fadeIntervalRef.current = null;
+        finish();
       }
     }, AMBIENT_FADE_INTERVAL);
   };
 
   useEffect(() => {
     return () => {
-      if (activeStoryRef.current) {
-        cancelStoryAudio(activeStoryRef.current.id);
-      }
+      if (activeStoryRef.current) cancelStoryAudio(activeStoryRef.current.id);
       playbackGenerationRef.current += 1;
-      segmentDurationsRef.current = [];
-      pendingSeekRef.current = null;
-      cleanupPlayer();
+      cleanupPlaylist();
     };
-  }, [cleanupPlayer]);
+  }, [cleanupPlaylist]);
 
   return (
     <PlayerContext.Provider

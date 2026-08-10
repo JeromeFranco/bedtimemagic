@@ -1,65 +1,108 @@
 import {
-  splitStoryIntoSegments,
   FIRST_SEGMENT_MAX_CHARACTERS,
+  MAX_STREAM_CHARACTERS,
   MAX_STREAM_SEGMENT_CHARACTERS,
+  PREFERRED_SEGMENT_MIN_CHARACTERS,
+  splitStoryIntoSegments,
 } from '../story-segments';
 
-it('groups complete sentences without exceeding 1800 characters', () => {
-  const sentences = Array.from({ length: 150 }, (_, index) => `Sentence ${index + 1}.`);
-  const segments = splitStoryIntoSegments(sentences.join(' '));
-
-  expect(segments.length).toBeGreaterThan(1);
-  expect(segments[0].length).toBeLessThanOrEqual(FIRST_SEGMENT_MAX_CHARACTERS);
-  expect(segments.slice(1).every((segment) => segment.length <= MAX_STREAM_SEGMENT_CHARACTERS)).toBe(true);
-  expect(segments.every((segment) => /[.!?]["')\]]?$/.test(segment))).toBe(true);
-  expect(segments.join(' ')).toBe(sentences.join(' '));
-});
-
-it('caps the first segment at the small-first limit on a sentence boundary', () => {
-  const sentences = Array.from({ length: 100 }, (_, index) => `Sentence ${index + 1} is here.`);
-  const text = sentences.join(' ');
-  const segments = splitStoryIntoSegments(text);
-
-  expect(segments[0].length).toBeLessThanOrEqual(FIRST_SEGMENT_MAX_CHARACTERS);
-  // packs sentences up to the cap instead of emitting a tiny first chunk
-  expect(segments[0].length).toBeGreaterThan(FIRST_SEGMENT_MAX_CHARACTERS - 25);
-  expect(/[.!?]["')\]]?$/.test(segments[0])).toBe(true);
-  expect(segments.slice(1).every((segment) => segment.length <= MAX_STREAM_SEGMENT_CHARACTERS)).toBe(true);
-  expect(segments.join(' ')).toBe(text);
-});
-
-it('keeps short stories as a single segment below the small-first limit', () => {
-  const text = 'Once upon a time, the moonlit fox found her way home.';
-  const segments = splitStoryIntoSegments(text);
-
-  expect(segments).toEqual([text]);
-});
-
-it('preserves punctuation and avoids empty segments', () => {
-  const text = 'Wait... Really?! \u201cYes,\u201d said Pip.  Then they rested.';
-  const segments = splitStoryIntoSegments(text);
-
-  expect(segments.every((segment) => segment.trim().length > 0)).toBe(true);
-  expect(segments.join(' ')).toBe(text);
-});
-
-it('uses clause boundaries for a sentence longer than the small-first limit', () => {
-  const clause = 'The sleepy bear remembered the moonlit path, ';
-  const text = `${clause.repeat(60)}and finally found the warm cabin.`;
-  const segments = splitStoryIntoSegments(text);
-
-  expect(segments.length).toBeGreaterThan(1);
-  expect(segments[0].length).toBeLessThanOrEqual(FIRST_SEGMENT_MAX_CHARACTERS);
-  expect(segments.every((segment) => segment.length < 2000)).toBe(true);
-  expect(segments.join(' ')).toBe(text);
-});
-
-it('hard-splits pathological text only below the streaming limit and always progresses', () => {
-  const text = 'x'.repeat(5000);
-  const segments = splitStoryIntoSegments(text);
-
-  expect(segments[0].length).toBeLessThanOrEqual(FIRST_SEGMENT_MAX_CHARACTERS);
+function expectValidReconstruction(text: string, segments: string[]) {
+  expect(segments.join('')).toBe(text.trim());
+  expect(segments.every((segment) => segment.length > 0)).toBe(true);
   expect(segments.every((segment) => segment.length <= MAX_STREAM_SEGMENT_CHARACTERS)).toBe(true);
-  expect(segments.join('')).toBe(text);
-  expect(segments.every(Boolean)).toBe(true);
+  expect(segments.every((segment) => segment.length < MAX_STREAM_CHARACTERS)).toBe(true);
+}
+
+it('prefers paragraph boundaries and reconstructs every character', () => {
+  const paragraph = (label: string) => `${label} ${'calm words '.repeat(48).trim()}.`;
+  const text = [paragraph('First'), paragraph('Second'), paragraph('Third'), paragraph('Fourth')].join(
+    '\n\n',
+  );
+  const segments = splitStoryIntoSegments(text);
+
+  expect(segments.length).toBeGreaterThan(1);
+  expect(segments[0]).toMatch(/\n\n$/);
+  expectValidReconstruction(text, segments);
+});
+
+it('uses the startup cap when a natural first boundary exists', () => {
+  const text = `${'Opening words '.repeat(38).trim()}. ${'Later sentence. '.repeat(160)}`;
+  const segments = splitStoryIntoSegments(text);
+
+  expect(segments[0].length).toBeLessThanOrEqual(FIRST_SEGMENT_MAX_CHARACTERS);
+  expect(segments[0]).toMatch(/\.$/);
+  expectValidReconstruction(text, segments);
+});
+
+it('lets the first segment grow when no safe early boundary exists', () => {
+  const longOpening = `${'unbroken '.repeat(130).trim()}. `;
+  const text = longOpening + 'A calm ending. '.repeat(100);
+  const segments = splitStoryIntoSegments(text);
+
+  expect(segments[0].length).toBeGreaterThan(FIRST_SEGMENT_MAX_CHARACTERS);
+  expect(segments[0].length).toBeLessThanOrEqual(MAX_STREAM_SEGMENT_CHARACTERS);
+  expect(segments[0]).toMatch(/\.$/);
+  expectValidReconstruction(text, segments);
+});
+
+it('does not split inside dialogue or between dialogue and its attribution', () => {
+  const dialogue = `“${'I can wait calmly '.repeat(42).trim()},” Barnaby said. `;
+  const text = dialogue + 'The room grew quiet. '.repeat(130);
+  const segments = splitStoryIntoSegments(text);
+
+  expect(segments[0]).toContain('Barnaby said.');
+  expect(segments[0].match(/“/g)).toHaveLength(1);
+  expect(segments[0].match(/”/g)).toHaveLength(1);
+  expectValidReconstruction(text, segments);
+});
+
+it('falls back from sentence to clause and then word boundaries', () => {
+  const clauseText = `${'softly '.repeat(90)}, ${'gently '.repeat(240)}, ${'quietly '.repeat(80)}`;
+  const clauseSegments = splitStoryIntoSegments(clauseText);
+  expect(clauseSegments[0]).toMatch(/,$/);
+  expectValidReconstruction(clauseText, clauseSegments);
+
+  const wordText = 'bedtime '.repeat(520).trim();
+  const wordSegments = splitStoryIntoSegments(wordText);
+  expect(wordSegments[0]).toMatch(/\s$/);
+  expectValidReconstruction(wordText, wordSegments);
+});
+
+it('uses line breaks after sentence boundaries are unavailable', () => {
+  const line = 'low gentle humming '.repeat(38).trim();
+  const text = `${line}\n${line}\n${line}\n${line}`;
+  const segments = splitStoryIntoSegments(text);
+
+  expect(segments[0]).toMatch(/\n$/);
+  expectValidReconstruction(text, segments);
+});
+
+it('hard-splits pathological input without empty or oversized segments', () => {
+  const text = 'x'.repeat(MAX_STREAM_SEGMENT_CHARACTERS * 2 + 173);
+  const segments = splitStoryIntoSegments(text);
+
+  expect(segments).toHaveLength(3);
+  expect(segments.slice(0, -1).every((segment) => segment.length >= PREFERRED_SEGMENT_MIN_CHARACTERS)).toBe(
+    true,
+  );
+  expectValidReconstruction(text, segments);
+});
+
+it('does not split inside SSML-like or bracketed tokens', () => {
+  const prefix = 'calm '.repeat(100);
+  const token = `<voice mood="${'gentle'.repeat(80)}">[pause ${'slow'.repeat(50)}]</voice>`;
+  const text = `${prefix}${token} ${'sleepy words. '.repeat(180)}`;
+  const segments = splitStoryIntoSegments(text);
+
+  expect(segments.every((segment) => {
+    const opens = (segment.match(/</g) ?? []).length;
+    const closes = (segment.match(/>/g) ?? []).length;
+    return opens === closes;
+  })).toBe(true);
+  expectValidReconstruction(text, segments);
+});
+
+it('keeps a short story in one segment and rejects blank input', () => {
+  expect(splitStoryIntoSegments('A short and sleepy story.')).toEqual(['A short and sleepy story.']);
+  expect(() => splitStoryIntoSegments('   ')).toThrow('requires non-empty text');
 });

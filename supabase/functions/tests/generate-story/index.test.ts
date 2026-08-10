@@ -3,9 +3,11 @@ import {
   parseJsonResponse,
   validateStoryFields,
   callLLM,
+  createPromptInput,
   handleRequest,
   SafetyFilterError,
 } from "../../generate-story/index.ts";
+import { PROTAGONISTS } from "../../_shared/constants.ts";
 
 Deno.test("parseJsonResponse - parses valid JSON", () => {
   const input = JSON.stringify({ title: "Test", storyText: "A story" });
@@ -104,6 +106,24 @@ Deno.test("validateStoryFields - passes for complete story", () => {
     sleepyAffirmation: "You are safe and loved.",
   };
   validateStoryFields(story);
+});
+
+Deno.test("createPromptInput - preserves trigger ID while resolving display labels", () => {
+  const input = createPromptInput(
+    {
+      childId: "child-1",
+      protagonistId: "barnaby",
+      childNickname: "Rocket",
+      developmentalStage: "preschool",
+      tier1Challenge: "bedtime",
+      tier2Trigger: "refusing_teeth",
+    },
+    PROTAGONISTS.barnaby,
+  );
+
+  assertEquals(input.tier1ChallengeLabel, "Bedtime Friction");
+  assertEquals(input.tier2TriggerId, "refusing_teeth");
+  assertEquals(input.tier2TriggerLabel, "Refusing to brush teeth");
 });
 
 Deno.test("validateStoryFields - throws for missing title", () => {

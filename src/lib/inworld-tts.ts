@@ -151,6 +151,8 @@ export async function streamStorySegment(
             voice: 'Ashley',
             model: 'inworld-tts-1.5-mini',
             encoding: 'MP3',
+            speakingRate: 0.9,
+            temperature: 1.0,
           });
           activeStreams.set(dedupeKey, stream);
           for await (const chunk of stream) {
