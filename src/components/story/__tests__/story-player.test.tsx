@@ -1,4 +1,4 @@
-import { render, fireEvent, act, cleanup } from '@testing-library/react-native';
+import { render, fireEvent, act } from '@testing-library/react-native';
 
 const mockPlayStory = jest.fn();
 const mockPause = jest.fn();
@@ -118,10 +118,6 @@ describe('StoryPlayer', () => {
     mockUsePlayer.mockImplementation(() => basePlayerMock());
   });
 
-  afterEach(() => {
-    cleanup();
-  });
-
   describe('Wind-Down UX in StoryPlayer', () => {
     it('calls startFadeToBlack when Goodnight button is pressed', async () => {
       const mockStartFadeToBlack = jest.fn();
@@ -223,9 +219,7 @@ describe('StoryPlayer', () => {
 
   it('renders placeholder emoji when image onError fires', async () => {
     const { getByText, getByTestId } = await render(<StoryPlayer {...defaultProps} />);
-    await act(async () => {
-      fireEvent(getByTestId('artwork-image'), 'error', { nativeEvent: {} });
-    });
+    await fireEvent(getByTestId('artwork-image'), 'error', { nativeEvent: {} });
     expect(getByText('🐻')).toBeTruthy();
   });
 
@@ -282,13 +276,10 @@ describe('StoryPlayer', () => {
       }),
     );
     const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
-    fireEvent.press(getByTestId('seek-backward-button'));
+    await fireEvent.press(getByTestId('seek-backward-button'));
     expect(mockSeekTo).toHaveBeenCalledWith(15);
 
-    fireEvent.press(getByTestId('seek-forward-button'));
+    await fireEvent.press(getByTestId('seek-forward-button'));
     expect(mockSeekTo).toHaveBeenCalledWith(45);
   });
 });
-
-
-
