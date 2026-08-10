@@ -2,10 +2,9 @@ import OpenAI from "@openai/openai";
 import { withSupabase, type SupabaseContext } from "@supabase/server";
 import { CHALLENGE_LABELS, PROTAGONISTS, TRIGGER_LABELS } from "../_shared/constants.ts";
 import { SafetyFilterError } from "../_shared/errors.ts";
-import { createMimoClient } from "../_shared/openai.ts";
+import { AI_MODELS, createMimoClient } from "../_shared/ai.ts";
 import { buildPrompt, type PromptInput } from "./prompt.ts";
 
-const MODEL = "mimo-v2.5-pro-ultraspeed";
 const TIMEOUT_MS = 80_000;
 
 interface RequestBody {
@@ -88,7 +87,7 @@ export async function callLLM(
 
   const completion = await client.chat.completions.create(
     {
-      model: MODEL,
+      model: AI_MODELS.story,
       messages,
       reasoning_effort: "medium",
     },

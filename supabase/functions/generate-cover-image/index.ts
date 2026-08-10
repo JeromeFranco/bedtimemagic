@@ -1,5 +1,6 @@
-import OpenAI from "npm:openai@6.42.0";
+import OpenAI from "@openai/openai";
 import { withSupabase, type SupabaseContext } from "@supabase/server";
+import { AI_MODELS, createAiGatewayClient } from "../_shared/ai.ts";
 import { CHALLENGE_SCENES } from "../_shared/constants.ts";
 
 interface RequestBody {
@@ -30,6 +31,14 @@ export function buildCoverPrompt(
 }
 
 async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
+  let client: OpenAI;
+  try {
+    client = createAiGatewayClient();
+  } catch (err) {
+    console.error("Failed to create AI Gateway client:", err);
+    return Response.json({ error: "AI_GATEWAY_API_KEY not configured" }, { status: 500 });
+  }
+
   let body: RequestBody;
   try {
     body = await req.json();
@@ -39,11 +48,6 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
 
   if (!body.storyId || !body.title) {
     return Response.json({ error: "storyId and title are required" }, { status: 400 });
-  }
-
-  const apiKey = Deno.env.get("AI_GATEWAY_API_KEY");
-  if (!apiKey) {
-    return Response.json({ error: "AI_GATEWAY_API_KEY not configured" }, { status: 500 });
   }
 
   const userId = ctx.userClaims!.id;
@@ -69,12 +73,8 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
 
   let imageBytes: Uint8Array;
   try {
-    const client = new OpenAI({
-      apiKey,
-      baseURL: "https://ai-gateway.vercel.sh/v1",
-    });
     const result = await client.images.generate({
-      model: "bfl/flux-2-klein-4b",
+      model: AI_MODELS.coverImage,
       prompt,
       size: "512x512",
       response_format: "b64_json",
