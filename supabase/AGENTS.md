@@ -1,5 +1,4 @@
 - Use the `supabase` skill when working with Supabase (Auth, Edge Functions, Database, RLS, etc.)
-- Use the `ai-sdk` skill when implementing AI features with AI SDK (generateText, generateImage)
 - Deno: prefer jsr.io imports (e.g. `jsr:@std/assert`) over legacy `deno.land/std` URLs
 - Deno: declare npm dependencies in `deno.json` imports (e.g. `"ai": "npm:ai@6"`) and import by bare specifier. Do NOT use esm.sh CDN URLs – Deno supports npm natively
 - Check official docs when working with supabase before implementing – don't reverse-engineer package internals from CDN bundles
