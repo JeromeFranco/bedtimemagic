@@ -8,8 +8,6 @@ import {
   SafetyFilterError,
 } from "../../generate-story/index.ts";
 import { PROTAGONISTS } from "../../_shared/constants.ts";
-import { AI_MODELS } from "../../_shared/ai.ts";
-
 Deno.test("parseJsonResponse - parses valid JSON", () => {
   const input = JSON.stringify({ title: "Test", storyText: "A story" });
   const result = parseJsonResponse(input);
@@ -205,7 +203,7 @@ Deno.test("callLLM - returns parsed story on success", async () => {
   };
 
   const result = await callLLM(
-    { client: mockClient as any, model: AI_MODELS.story },
+    { client: mockClient as any, model: "mimo-v2.5-pro" },
     "system",
     "user",
   );
@@ -227,7 +225,7 @@ Deno.test("callLLM - throws SafetyFilterError on refusal", async () => {
 
   try {
     await callLLM(
-      { client: mockClient as any, model: AI_MODELS.story },
+      { client: mockClient as any, model: "mimo-v2.5-pro" },
       "system",
       "user",
     );
@@ -251,7 +249,7 @@ Deno.test("callLLM - throws on empty response", async () => {
 
   try {
     await callLLM(
-      { client: mockClient as any, model: AI_MODELS.story },
+      { client: mockClient as any, model: "mimo-v2.5-pro" },
       "system",
       "user",
     );
@@ -275,7 +273,7 @@ Deno.test("callLLM - strips markdown fences from response", async () => {
   };
 
   const result = await callLLM(
-    { client: mockClient as any, model: AI_MODELS.story },
+    { client: mockClient as any, model: "mimo-v2.5-pro" },
     "system",
     "user",
   );
