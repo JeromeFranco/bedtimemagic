@@ -9,7 +9,7 @@ jest.mock('@/lib/supabase', () => ({
   },
 }));
 
-import { generateCoverImage } from '../stories';
+import { generateCoverImage, generateStory } from '../stories';
 import { supabase } from '@/lib/supabase';
 
 describe('generateCoverImage', () => {
@@ -38,5 +38,41 @@ describe('generateCoverImage', () => {
     });
 
     await expect(generateCoverImage('story-123', 'Test')).rejects.toThrow('Failed');
+  });
+});
+
+describe('generateStory', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('passes the captured request body and optional abort signal to the edge function', async () => {
+    const signal = new AbortController().signal;
+    const story = { id: 'story-123' };
+    jest.mocked(supabase.functions.invoke).mockResolvedValue({ data: story, error: null });
+
+    await expect(
+      generateStory(
+        'child-123',
+        'barnaby',
+        'Mia',
+        'preschool',
+        'bedtime',
+        'refusing_teeth',
+        signal,
+      ),
+    ).resolves.toEqual(story);
+
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('generate-story', {
+      signal,
+      body: {
+        childId: 'child-123',
+        protagonistId: 'barnaby',
+        childNickname: 'Mia',
+        developmentalStage: 'preschool',
+        tier1Challenge: 'bedtime',
+        tier2Trigger: 'refusing_teeth',
+      },
+    });
   });
 });

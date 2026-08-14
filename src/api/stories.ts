@@ -41,12 +41,14 @@ export async function generateStory(
   childNickname: string,
   developmentalStage: DevelopmentalStage,
   tier1Challenge: ChallengeCategory,
-  tier2Trigger: ChallengeTrigger
+  tier2Trigger: ChallengeTrigger,
+  signal?: AbortSignal,
 ): Promise<Story> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   const { data, error } = await supabase.functions.invoke('generate-story', {
+    signal,
     body: {
       childId,
       protagonistId: protagonist,

@@ -1,54 +1,107 @@
-import { useEffect } from 'react';
-import { StyleSheet } from 'react-native';
+import { useCallback, useEffect, useRef } from 'react';
+import { Alert, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, router } from 'expo-router';
-import { useMutation } from '@tanstack/react-query';
+import { router, useNavigation } from 'expo-router';
 
 import { BreathingCircle } from '@/components/breathing-circle';
 import { CalmingCopy } from '@/components/calming-copy';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { generateStory } from '@/api/stories';
-import { useSelectedChild } from '@/contexts/SelectedChildContext';
+import { useStoryGeneration } from '@/contexts/StoryGenerationContext';
 import { Colors, Spacing } from '@/theme';
-import type { ChallengeCategory, ChallengeTrigger } from '@/types';
 
 export default function GenerateScreen() {
-  const { category, trigger } = useLocalSearchParams<{
-    category: ChallengeCategory;
-    trigger: ChallengeTrigger;
-  }>();
-  const { selectedProfile } = useSelectedChild();
-
-  const mutation = useMutation({
-    mutationFn: () => {
-      if (!selectedProfile) throw new Error('No profile selected');
-      return generateStory(
-        selectedProfile.id,
-        selectedProfile.protagonist,
-        selectedProfile.name,
-        selectedProfile.developmental_stage,
-        category!,
-        trigger!
-      );
-    },
-    onSuccess: (story) => {
-      router.replace({
-        pathname: '/story',
-        params: { id: story.id },
-      });
-    },
-  });
+  const navigation = useNavigation();
+  const {
+    state,
+    continueInBackground,
+    cancelGeneration,
+    retryGeneration,
+    takeReadyStory,
+    dismissStatus,
+  } = useStoryGeneration();
+  const hasTakenReadyStoryRef = useRef(false);
+  const hasObservedLifecycleRef = useRef(state.status !== 'idle');
+  const allowNextRemovalRef = useRef(false);
 
   useEffect(() => {
-    if (selectedProfile && category && trigger) {
-      mutation.mutate();
+    if (state.status !== 'idle') {
+      hasObservedLifecycleRef.current = true;
     }
-  }, [selectedProfile, category, trigger, mutation.mutate]);
+  }, [state.status]);
 
-  if (mutation.isError) {
+  const leaveAfterConfirmation = useCallback((leave: () => void) => {
+    allowNextRemovalRef.current = true;
+    leave();
+  }, []);
+
+  const confirmLeave = useCallback((leave: () => void) => {
+    Alert.alert(
+      'Leave story generation?',
+      'You can keep creating while you look around, or cancel this story request.',
+      [
+        { text: 'Stay', style: 'cancel' },
+        {
+          text: 'Keep Creating',
+          onPress: () => {
+            continueInBackground();
+            leaveAfterConfirmation(leave);
+          },
+        },
+        {
+          text: 'Cancel Story',
+          style: 'destructive',
+          onPress: () => {
+            cancelGeneration();
+            leaveAfterConfirmation(leave);
+          },
+        },
+      ],
+    );
+  }, [cancelGeneration, continueInBackground, leaveAfterConfirmation]);
+
+  useEffect(() => {
+    if (state.status !== 'generating') return;
+
+    return navigation.addListener('beforeRemove', (event) => {
+      if (allowNextRemovalRef.current) {
+        allowNextRemovalRef.current = false;
+        return;
+      }
+      event.preventDefault();
+      confirmLeave(() => navigation.dispatch(event.data.action));
+    });
+  }, [confirmLeave, navigation, state.status]);
+
+  useEffect(() => {
+    if (
+      state.status !== 'idle'
+      || hasTakenReadyStoryRef.current
+      || hasObservedLifecycleRef.current
+    ) return;
+    router.replace('/');
+  }, [state.status]);
+
+  useEffect(() => {
+    if (state.status !== 'ready' || state.hasLeftGenerationScreen) return;
+
+    const story = takeReadyStory();
+    if (!story) return;
+    hasTakenReadyStoryRef.current = true;
+    router.replace({ pathname: '/story', params: { id: story.id } });
+  }, [state, takeReadyStory]);
+
+  if (state.status === 'idle') return null;
+
+  if (state.status === 'failed') {
     return (
-      <ErrorState onRetry={() => mutation.mutate()} onBack={() => router.back()} />
+      <ErrorState
+        onRetry={retryGeneration}
+        onBack={() => {
+          dismissStatus();
+          router.back();
+        }}
+      />
     );
   }
 
@@ -56,6 +109,9 @@ export default function GenerateScreen() {
     <SafeAreaView style={[styles.container, styles.background]}>
       <BreathingCircle />
       <CalmingCopy />
+      {state.status === 'generating' && (
+        <Button label="Leave" variant="ghost" onPress={() => confirmLeave(() => router.back())} />
+      )}
     </SafeAreaView>
   );
 }

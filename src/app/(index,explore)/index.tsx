@@ -1,19 +1,21 @@
-import { StyleSheet, ScrollView, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ChallengeMatrix } from '@/components/challenge-matrix';
 import { ProfileSelector } from '@/components/profile-selector';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/theme';
 import { useSelectedChild } from '@/contexts/SelectedChildContext';
+import { useStoryGeneration } from '@/contexts/StoryGenerationContext';
 import { useStories } from '@/hooks/use-story';
-import { PROTAGONISTS, ChallengeCategory, ChallengeTrigger } from '@/types';
+import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/theme';
+import { ChallengeCategory, ChallengeTrigger, PROTAGONISTS } from '@/types';
 
 export default function HomeScreen() {
   const { selectedProfile } = useSelectedChild();
+  const { startGeneration } = useStoryGeneration();
   const { data: stories } = useStories(selectedProfile?.id);
   const recentStory = stories && stories.length > 0 ? stories[0] : null;
 
@@ -22,7 +24,17 @@ export default function HomeScreen() {
     : null;
 
   const handleGenerate = (category: ChallengeCategory, trigger: ChallengeTrigger) => {
-    router.push({ pathname: '/generate', params: { category, trigger } });
+    if (!selectedProfile) return;
+
+    startGeneration({
+      childId: selectedProfile.id,
+      childName: selectedProfile.name,
+      protagonist: selectedProfile.protagonist,
+      developmentalStage: selectedProfile.developmental_stage,
+      category,
+      trigger,
+    });
+    router.push('/generate');
   };
 
   const handleReplayPress = () => {

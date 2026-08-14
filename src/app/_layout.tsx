@@ -7,6 +7,7 @@ import AppTabs from "@/components/app-tabs";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { PlayerProvider } from "@/contexts/PlayerContext";
 import { SelectedChildProvider } from "@/contexts/SelectedChildContext";
+import { StoryGenerationProvider } from "@/contexts/StoryGenerationContext";
 import { queryClient } from "@/lib/query-client";
 
 export default function TabLayout() {
@@ -15,12 +16,14 @@ export default function TabLayout() {
       <AuthProvider>
         <QueryClientProvider client={queryClient}>
           <SelectedChildProvider>
-            <PlayerProvider>
-              <ThemeProvider value={DarkTheme}>
-                <AnimatedSplashOverlay />
-                <AppTabs />
-              </ThemeProvider>
-            </PlayerProvider>
+            <StoryGenerationProvider>
+              <PlayerProvider>
+                <ThemeProvider value={DarkTheme}>
+                  <AnimatedSplashOverlay />
+                  <AppTabs />
+                </ThemeProvider>
+              </PlayerProvider>
+            </StoryGenerationProvider>
           </SelectedChildProvider>
         </QueryClientProvider>
       </AuthProvider>

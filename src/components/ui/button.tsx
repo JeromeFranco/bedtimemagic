@@ -2,14 +2,17 @@ import { StyleSheet, View } from 'react-native';
 
 import { PressableFeedback } from '@/components/ui/pressable-feedback';
 import { ThemedText } from '@/components/themed-text';
-import { BorderRadius, Colors, FontSizes, Spacing } from '@/theme';
+import { BorderRadius, Colors, FontSizes, Layout, Spacing } from '@/theme';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
+export type ButtonSize = 'default' | 'compact';
 
 type ButtonProps = {
   label: string;
   onPress: () => void;
   variant?: ButtonVariant;
+  /** Visual density. Compact keeps a 44 px minimum touch target for inline actions. */
+  size?: ButtonSize;
   /** Stretch to the full width proposed by the surrounding layout (CTAs). */
   fullWidth?: boolean;
   disabled?: boolean;
@@ -35,12 +38,10 @@ const shellStyles: Record<ButtonVariant, object> = {
 
 const innerStyles: Record<ButtonVariant, object> = {
   primary: {
-    flex: 1,
     paddingVertical: Spacing.lg,
     paddingHorizontal: Spacing.xl,
   },
   secondary: {
-    flex: 1,
     paddingVertical: Spacing.lg,
     paddingHorizontal: Spacing.xl,
   },
@@ -58,7 +59,7 @@ const labelColors: Record<ButtonVariant, string> = {
  * feedback (Android ripple, iOS opacity).
  *
  * primary/secondary render an outer clipping shell (borderRadius + overflow:
- * hidden) wrapping a flex:1 Pressable that carries the ripple + content, so the
+ * hidden) wrapping a Pressable that carries the ripple + content, so the
  * bounded Android ripple is clipped to the rounded corners. ghost has no
  * surface and stays a bare PressableFeedback.
  */
@@ -66,6 +67,7 @@ export function Button({
   label,
   onPress,
   variant = 'primary',
+  size = 'default',
   fullWidth = false,
   disabled,
   testID,
@@ -77,7 +79,10 @@ export function Button({
         disabled={disabled}
         testID={testID}
         accessibilityRole="button"
-        style={fullWidth && styles.fullWidth}
+        style={[
+          fullWidth && styles.fullWidth,
+          size === 'compact' && styles.compactGhost,
+        ]}
       >
         <ThemedText
           style={{
@@ -100,7 +105,7 @@ export function Button({
         disabled={disabled}
         testID={testID}
         accessibilityRole="button"
-        style={innerStyles[variant]}
+        style={[innerStyles[variant], size === 'compact' && styles.compactNormal]}
       >
         <ThemedText
           style={{
@@ -118,6 +123,17 @@ export function Button({
 }
 
 const styles = StyleSheet.create({
+  compactNormal: {
+    justifyContent: 'center',
+    minHeight: Layout.minTouchTarget,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  compactGhost: {
+    justifyContent: 'center',
+    minHeight: Layout.minTouchTarget,
+    paddingHorizontal: Spacing.sm,
+  },
   fullWidth: {
     width: '100%',
   },
