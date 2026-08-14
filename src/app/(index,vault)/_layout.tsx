@@ -2,7 +2,7 @@ import Stack from "expo-router/stack";
 
 export const unstable_settings = {
   index: { anchor: "index" },
-  explore: { anchor: "explore" },
+  vault: { anchor: "vault" },
 };
 
 export default function Layout({ segment }: { segment: string }) {

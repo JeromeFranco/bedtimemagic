@@ -18,7 +18,7 @@ export function StoryGenerationStatus() {
   const { state, resumeWaiting, takeReadyStory, retryGeneration, dismissStatus } = useStoryGeneration();
   const lastAnnouncedStateRef = useRef<typeof state | null>(null);
 
-  const isOrdinaryTabRoute = pathname === '/' || pathname === '/explore';
+  const isOrdinaryTabRoute = pathname === '/' || pathname === '/vault';
   const isVisible = state.status !== 'idle'
     && state.hasLeftGenerationScreen
     && isOrdinaryTabRoute;

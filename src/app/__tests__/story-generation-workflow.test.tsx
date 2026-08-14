@@ -3,8 +3,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render } from '@testing-library/react-native';
 import { AccessibilityInfo, Alert, Pressable } from 'react-native';
 
-import HomeScreen from '../(index,explore)/index';
-import GenerateScreen from '../(index,explore)/generate';
+import HomeScreen from '../(index,vault)/index';
+import GenerateScreen from '../(index,vault)/generate';
 import { router, usePathname } from 'expo-router';
 import { StoryGenerationProvider, useStoryGeneration } from '@/contexts/StoryGenerationContext';
 import { useSelectedChild } from '@/contexts/SelectedChildContext';
@@ -301,6 +301,7 @@ describe('story generation workflow', () => {
   it('keeps background completion parent-controlled and hides unchanged status during story playback', async () => {
     const pending = deferred<Story>();
     jest.mocked(generateStory).mockReturnValue(pending.promise);
+    mockPathname.mockReturnValue('/vault');
     const view = await renderWorkflow(<StatusHarness />);
 
     await fireEvent.press(view.getByTestId('start-background'));
@@ -318,7 +319,7 @@ describe('story generation workflow', () => {
     );
     expect(view.queryByText("Mia's story is ready")).toBeNull();
 
-    mockPathname.mockReturnValue('/');
+    mockPathname.mockReturnValue('/vault');
     await view.rerender(
       <QueryClientProvider client={view.client}>
         <StoryGenerationProvider><StatusHarness /></StoryGenerationProvider>

@@ -53,3 +53,6 @@ output/
 .worktrees/
 .superpowers/
 
+
+# Command Code session settings
+.commandcode/settings.json

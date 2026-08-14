@@ -78,7 +78,7 @@ jest.mock('react-native-gesture-handler', () => {
   };
 });
 
-import StoryScreen from '../(index,explore)/story';
+import StoryScreen from '../(index,vault)/story';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useStory } from '@/hooks/use-story';
 import { useCoverImage } from '@/hooks/use-cover-image';
