@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet } from "react-native";
 import Animated, { FadeInDown, FadeOut } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Button } from "@/components/ui/button";
-import { PressableFeedback } from "@/components/ui/pressable-feedback";
 import { CATEGORY_COLORS, Colors, Spacing } from "@/theme";
 import { CHALLENGE_CATEGORIES, CHALLENGE_TRIGGERS, ChallengeCategory, ChallengeTrigger } from "@/types";
+import { Card } from "@/ui/card";
+import { Chip } from "@/ui/chip";
 
 interface ChallengeMatrixProps {
   onGenerate: (category: ChallengeCategory, trigger: ChallengeTrigger) => void;
@@ -32,24 +33,20 @@ function CategoryCard({ label, isSelected, categoryId, onPress }: CategoryCardPr
   const colors = CATEGORY_COLORS[categoryId];
 
   return (
-    <View
+    <Card
+      onPress={onPress}
       style={[
-        styles.categoryCardShell,
+        styles.categoryCard,
         {
           backgroundColor: isSelected ? colors.tintSelected : Colors.dark.bgSurface,
           borderColor: isSelected ? colors.border : Colors.dark.borderSubtle,
         },
       ]}
     >
-      <PressableFeedback
-        onPress={onPress}
-        style={styles.categoryCardInner}
-      >
-        <ThemedText style={[styles.categoryLabel, { color: isSelected ? colors.primary : Colors.dark.textPrimary }]}>
-          {label}
-        </ThemedText>
-      </PressableFeedback>
-    </View>
+      <ThemedText style={[styles.categoryLabel, { color: isSelected ? colors.primary : Colors.dark.textPrimary }]}>
+        {label}
+      </ThemedText>
+    </Card>
   );
 }
 
@@ -57,24 +54,20 @@ function TriggerChip({ label, isSelected, categoryId, onPress }: TriggerChipProp
   const colors = CATEGORY_COLORS[categoryId];
 
   return (
-    <View
+    <Chip
+      onPress={onPress}
       style={[
-        styles.triggerChipShell,
+        styles.triggerChip,
         {
           backgroundColor: isSelected ? colors.tintSelected : Colors.dark.bgElement,
           borderColor: isSelected ? colors.border : Colors.dark.borderSubtle,
         },
       ]}
     >
-      <PressableFeedback
-        onPress={onPress}
-        style={styles.triggerChipInner}
-      >
-        <ThemedText style={[styles.triggerLabel, { color: isSelected ? Colors.dark.textPrimary : Colors.dark.textSecondary }]}>
-          {label}
-        </ThemedText>
-      </PressableFeedback>
-    </View>
+      <ThemedText style={[styles.triggerLabel, { color: isSelected ? Colors.dark.textPrimary : Colors.dark.textSecondary }]}>
+        {label}
+      </ThemedText>
+    </Chip>
   );
 }
 
@@ -182,19 +175,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     backgroundColor: 'transparent',
   },
-  categoryCardShell: {
+  categoryCard: {
     width: "48%",
     minHeight: 84,
-    borderRadius: 16,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  categoryCardInner: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.lg,
   },
   categoryLabel: {
     textAlign: "center",
@@ -213,17 +196,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     backgroundColor: 'transparent',
   },
-  triggerChipShell: {
-    borderRadius: 24,
-    borderWidth: 1,
-    minHeight: 40,
-    overflow: "hidden",
-  },
-  triggerChipInner: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  triggerChip: {},
   triggerLabel: {
     fontWeight: "400",
     fontSize: 15,
