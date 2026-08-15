@@ -1,12 +1,12 @@
 import { router } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ChallengeMatrix } from '@/components/challenge-matrix';
 import { ProfileSelector } from '@/components/profile-selector';
+import { RecentStoryCard } from '@/components/recent-story-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Button } from '@/components/ui/button';
 import { useSelectedChild } from '@/contexts/SelectedChildContext';
 import { useStoryGeneration } from '@/contexts/StoryGenerationContext';
 import { useStories } from '@/hooks/use-story';
@@ -43,9 +43,9 @@ export default function HomeScreen() {
     }
   };
 
-  const childName = selectedProfile?.name ?? 'your child';
+  const childName = selectedProfile?.name;
+  const headline = childName ? `Tonight's story for ${childName}` : "Tonight's story";
   const protagonistName = protagonist?.name ?? 'Barnaby';
-  const protagonistEmoji = protagonist?.emoji ?? '🐻';
 
   return (
     <ThemedView style={styles.container}>
@@ -54,31 +54,35 @@ export default function HomeScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <ThemedView style={styles.topRow}>
-            <ThemedView style={styles.headerTextSection}>
-              <ThemedText style={styles.headline}>
-                What&apos;s happening with {childName} tonight?
+          <ThemedView style={styles.headerRow}>
+            <ThemedView style={styles.headerText}>
+              <ThemedText type="title" style={styles.headline}>
+                {headline}
               </ThemedText>
-
-              <ThemedText style={styles.subtitle}>
-                Featuring {protagonistName} {protagonistEmoji} · 10 min bedtime story
+              <ThemedText type="link" themeColor="textSecondary">
+                {`${protagonistName} will tell it · about 10 minutes`}
               </ThemedText>
             </ThemedView>
 
             <ProfileSelector />
           </ThemedView>
 
-          <ChallengeMatrix onGenerate={handleGenerate} />
-
           {recentStory && (
-            <View style={styles.replayRow}>
-              <Button
-                label="Listen to recent story again →"
-                variant="ghost"
-                onPress={handleReplayPress}
-              />
-            </View>
+            <RecentStoryCard story={recentStory} onPress={handleReplayPress} />
           )}
+
+          <ThemedView style={styles.newStoryGroup}>
+            {recentStory && (
+              <ThemedText
+                type="small"
+                themeColor="textSecondary"
+                style={styles.sectionLabel}
+              >
+                Or make a new one
+              </ThemedText>
+            )}
+            <ChallengeMatrix onGenerate={handleGenerate} />
+          </ThemedView>
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -100,35 +104,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.xl,
     paddingBottom: BottomTabInset + Spacing.xl,
-    gap: Spacing.xl,
+    gap: Spacing['2xl'],
   },
-  topRow: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: Spacing.lg,
     backgroundColor: 'transparent',
-    marginTop: Spacing.xs,
   },
-  headerTextSection: {
+  headerText: {
     flex: 1,
     gap: Spacing.xs,
     backgroundColor: 'transparent',
   },
   headline: {
-    fontSize: 24,
-    fontWeight: '700',
     letterSpacing: -0.24,
-    color: Colors.dark.textPrimary,
-    lineHeight: 30,
   },
-  subtitle: {
-    fontSize: 15,
-    fontWeight: '400',
-    color: Colors.dark.textSecondary,
+  newStoryGroup: {
+    gap: Spacing.sm,
+    backgroundColor: 'transparent',
   },
-  replayRow: {
-    alignItems: 'center',
-    marginTop: Spacing.sm,
+  sectionLabel: {
+    fontWeight: '500',
   },
 });
