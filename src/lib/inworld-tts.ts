@@ -1,5 +1,5 @@
 import type { InworldTTSClient } from '@inworld/tts';
-import { InworldTTS } from '@inworld/tts';
+import { ApiError, InworldTTS } from '@inworld/tts';
 import {
   AudioSegmentWriter,
   enforceFifoEviction,
@@ -146,6 +146,7 @@ export async function streamStorySegment(
   const duration = startDuration();
   emitObservabilityEvent('tts.segment.started', { operationId, parentOperationId: context.parentOperationId, segmentIndex, segmentCount: context.segmentCount, attempt: 1 });
   const promise = (async () => {
+    let lastAttempt = 1;
     try {
       await getInworldToken(context.parentOperationId);
       const tts = getOrCreateTTSClient();
@@ -154,7 +155,10 @@ export async function streamStorySegment(
       let lastError: unknown = null;
       // The SDK already retries request-start NetworkError/5xx internally
       // (maxRetries: 2), so this loop only covers mid-stream failures.
+      // Deterministic 4xx responses (expired token, out of credits, bad
+      // request) are skipped — retrying them only wastes a billed attempt.
       for (let attempt = 1; attempt <= MAX_SEGMENT_ATTEMPTS; attempt++) {
+        lastAttempt = attempt;
         if (attempt > 1) {
           emitObservabilityEvent('tts.segment.retrying', { operationId, parentOperationId: context.parentOperationId, segmentIndex, segmentCount: context.segmentCount, attempt, errorKind: categorizeError(lastError).errorKind });
           await delay(RETRY_DELAY_MS);
@@ -193,6 +197,7 @@ export async function streamStorySegment(
             throw error;
           }
           lastError = error;
+          if (error instanceof ApiError && typeof error.code === 'number' && error.code >= 400 && error.code < 500) break;
         } finally {
           activeStreams.delete(dedupeKey);
         }
@@ -202,7 +207,12 @@ export async function streamStorySegment(
       throw lastError instanceof Error ? lastError : new Error('TTS streaming failed');
     } catch (error) {
       if (error instanceof CancelledError) emitObservabilityEvent('tts.segment.cancelled', { operationId, parentOperationId: context.parentOperationId, segmentIndex, segmentCount: context.segmentCount, attempt: 1, durationMs: duration() });
-      else emitObservabilityEvent('tts.segment.failed', { operationId, parentOperationId: context.parentOperationId, segmentIndex, segmentCount: context.segmentCount, attempt: MAX_SEGMENT_ATTEMPTS, durationMs: duration(), errorKind: categorizeError(error).errorKind });
+      else {
+        // A 401 means the cached token (and the client built from it) is
+        // unusable; drop both so the next attempt refreshes.
+        if (error instanceof ApiError && error.code === 401) resetTokenCache();
+        emitObservabilityEvent('tts.segment.failed', { operationId, parentOperationId: context.parentOperationId, segmentIndex, segmentCount: context.segmentCount, attempt: lastAttempt, durationMs: duration(), errorKind: categorizeError(error).errorKind });
+      }
       throw error;
     } finally {
       inflightSegments.delete(dedupeKey);

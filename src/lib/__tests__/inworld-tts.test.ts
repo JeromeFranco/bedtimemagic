@@ -47,12 +47,20 @@ jest.mock('@inworld/tts', () => ({
   InworldTTS: jest.fn(() => ({
     stream: mockStream,
   })),
+  ApiError: class ApiError extends Error {
+    code: number | null;
+    constructor(message: string, code: number | null = null) {
+      super(message);
+      this.name = 'ApiError';
+      this.code = code;
+    }
+  },
 }));
 
 import { getCachedAudioSegmentPath, AudioSegmentWriter, enforceFifoEviction } from '../audio-cache';
 import { splitStoryIntoSegments } from '../story-segments';
 import { supabase } from '../supabase';
-import { InworldTTS } from '@inworld/tts';
+import { InworldTTS, ApiError } from '@inworld/tts';
 import { streamStorySegment, prefetchStoryAudio, resetTokenCache, cancelStoryAudio, CancelledError } from '../inworld-tts';
 import type { StoryAudioSegment } from '../inworld-tts';
 
@@ -75,6 +83,11 @@ async function* asyncGenerator(chunks: Uint8Array[]) {
   for (const chunk of chunks) {
     yield chunk;
   }
+}
+function apiError(message: string, code: number): ApiError {
+  const error = new ApiError(message);
+  error.code = code;
+  return error;
 }
 
 beforeEach(() => {
@@ -104,6 +117,7 @@ describe('streamStorySegment', () => {
         onTokenExpiring: expect.any(Function),
       })
     );
+
     expect(mockStream).toHaveBeenCalledWith({
       text: 'Hello world',
       voice: 'Ashley',
@@ -195,6 +209,63 @@ describe('streamStorySegment', () => {
     const writer = mockWriterInstances[0];
     expect(writer.abort).toHaveBeenCalled(); // partial file dropped before retry
     expect(writer.finish).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry when the provider rejects with a 4xx ApiError', async () => {
+    mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
+    mockStream.mockImplementation(async function* () {
+      throw apiError('You have no credits remaining.', 403);
+    });
+
+    await expect(streamStorySegment('story-1', 0, 'Test')).rejects.toThrow(
+      'You have no credits remaining.',
+    );
+
+    expect(mockStream).toHaveBeenCalledTimes(1);
+    const writer = mockWriterInstances[0];
+    expect(writer.abort).toHaveBeenCalledTimes(2); // pre-attempt cleanup + post-loop cleanup
+    expect(writer.finish).not.toHaveBeenCalled();
+  });
+
+  it('retries a 5xx ApiError once and succeeds', async () => {
+    mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
+    let callCount = 0;
+    mockStream.mockImplementation(async function* () {
+      callCount++;
+      if (callCount === 1) throw apiError('provider overloaded', 503);
+      yield new Uint8Array([1]);
+    });
+
+    const result = await streamStorySegment('story-1', 0, 'Test');
+
+    expect(callCount).toBe(2);
+    expect(result.uri).toBe('/cache/audio_v2_story-1_0.mp3');
+  });
+
+  it('drops the cached token and client after a 401 so the next attempt refreshes', async () => {
+    mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
+    mockStream.mockImplementation(async function* () {
+      throw apiError('token expired', 401);
+    });
+
+    await expect(streamStorySegment('story-1', 0, 'Test')).rejects.toThrow('token expired');
+    await expect(streamStorySegment('story-1', 0, 'Test')).rejects.toThrow('token expired');
+
+    expect(mockedInvoke).toHaveBeenCalledTimes(2);
+    expect(mockedInworldTTS).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the cached token after non-auth 4xx failures', async () => {
+    mockedGetCachedAudioSegmentPath.mockResolvedValue(null);
+    mockStream.mockImplementation(async function* () {
+      throw apiError('You have no credits remaining.', 403);
+    });
+
+    await expect(streamStorySegment('story-1', 0, 'Test')).rejects.toThrow('credits');
+    await expect(streamStorySegment('story-1', 0, 'Test')).rejects.toThrow('credits');
+
+    expect(mockedInvoke).toHaveBeenCalledTimes(1);
+    expect(mockedInworldTTS).toHaveBeenCalledTimes(1);
   });
 
   it('does not retry when the stream was cancelled', async () => {

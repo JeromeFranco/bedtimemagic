@@ -136,6 +136,7 @@ function TestComponent() {
       <Text testID="story">{player.currentStory?.title ?? 'none'}</Text>
       <Text testID="playing">{String(player.isPlaying)}</Text>
       <Text testID="buffering">{String(player.isBuffering)}</Text>
+      <Text testID="playbackError">{player.playbackError ?? 'none'}</Text>
       <Text testID="position">{String(player.position)}</Text>
       <Text testID="duration">{String(player.duration)}</Text>
       <Text testID="phase">{player.postStoryPhase}</Text>
@@ -406,16 +407,20 @@ describe('PlayerContext playlist playback', () => {
     expect(mockCancelStoryAudio).toHaveBeenCalledWith('story-1');
   });
 
-  it('allows retry after initial generation failure', async () => {
+  it('surfaces a playback error after initial generation failure and clears it on retry', async () => {
     mockStreamStorySegment.mockRejectedValueOnce(new Error('network'));
     const view = await renderPlayer();
     await fireEvent.press(view.getByTestId('play'));
     expect(mockCreateAudioPlaylist).not.toHaveBeenCalled();
     expect(view.getByTestId('playing').props.children).toBe('false');
+    expect(view.getByTestId('playbackError').props.children).toBe(
+      'Something went wrong loading the story audio. Tap play to try again.',
+    );
 
     await fireEvent.press(view.getByTestId('play'));
     expect(mockCreateAudioPlaylist).toHaveBeenCalledTimes(1);
     expect(view.getByTestId('playing').props.children).toBe('true');
+    expect(view.getByTestId('playbackError').props.children).toBe('none');
   });
 
   it('runs the full post-story sequence once after duplicate final events', async () => {

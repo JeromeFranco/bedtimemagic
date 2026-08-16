@@ -59,6 +59,7 @@ const basePlayerMock = (overrides = {}) => ({
   isBuffering: false,
   isSleepMode: false,
   position: 0,
+  playbackError: null,
   duration: 60,
   postStoryPhase: 'idle' as const,
   playStory: mockPlayStory,
@@ -104,6 +105,17 @@ describe('StoryPlayer', () => {
     const playing = await render(<StoryPlayer {...defaultProps} />);
     await fireEvent.press(playing.getByTestId('play-pause-button'));
     expect(mockPause).toHaveBeenCalledTimes(1);
+  });
+
+  it('announces the playback error and keeps the play button actionable', async () => {
+    mockUsePlayer.mockImplementation(() =>
+      basePlayerMock({ playbackError: 'Something went wrong loading the story audio. Tap play to try again.' }),
+    );
+    const queries = await render(<StoryPlayer {...defaultProps} />);
+    expect(queries.getByTestId('playback-error')).toBeTruthy();
+    expect(queries.getByText('Something went wrong loading the story audio. Tap play to try again.')).toBeTruthy();
+    await fireEvent.press(queries.getByTestId('play-pause-button'));
+    expect(mockPlayStory).toHaveBeenCalledWith(MOCK_STORY);
   });
 
   it('keeps Pillow Talk visible and gives its actions distinct outcomes', async () => {

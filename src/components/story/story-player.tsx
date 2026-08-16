@@ -39,6 +39,7 @@ export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPl
     isPlaying,
     isBuffering,
     isSleepMode,
+    playbackError,
     position,
     duration,
     postStoryPhase: phase,
@@ -288,6 +289,16 @@ export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPl
                     />
                   </IconButton>
                 </View>
+                  {playbackError && (
+                    <ThemedText
+                      testID="playback-error"
+                      type="small"
+                      accessibilityRole="alert"
+                      style={styles.playbackErrorText}
+                    >
+                      {playbackError}
+                    </ThemedText>
+                  )}
               </>
             )}
 
@@ -413,6 +424,11 @@ const styles = StyleSheet.create({
   windDownArea: {
     flex: 1,
     width: '100%',
+  },
+  playbackErrorText: {
+    color: Colors.dark.error,
+    textAlign: 'center',
+    marginTop: Spacing.sm,
   },
   windDownButtons: {
     width: '100%',

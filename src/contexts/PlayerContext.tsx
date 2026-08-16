@@ -13,6 +13,7 @@ export interface PlayerContextValue {
   isPlaying: boolean;
   isBuffering: boolean;
   isSleepMode: boolean;
+  playbackError: string | null;
   position: number;
   duration: number;
   postStoryPhase: PostStoryPhase;
@@ -33,6 +34,7 @@ const PlayerContext = createContext<PlayerContextValue>({
   isBuffering: false,
   isSleepMode: false,
   position: 0,
+  playbackError: null,
   duration: 0,
   postStoryPhase: 'idle',
   playStory: async () => {},
@@ -72,6 +74,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [postStoryPhase, setPostStoryPhase] = useState<PostStoryPhase>('idle');
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
 
   const playlistRef = useRef<ReturnType<typeof createAudioPlaylist> | null>(null);
   const ambientPlayerRef = useRef<ReturnType<typeof createAudioPlayer> | null>(null);
@@ -103,6 +106,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setIsBuffering(false);
     setIsSleepMode(false);
     setPosition(0);
+    setPlaybackError(null);
     setDuration(0);
   }, []);
   const generateSegmentRef = useRef<(generation: number, segmentIndex: number) => void>(() => {});
@@ -277,6 +281,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     })
       .then((segment) => {
         if (playbackGenerationRef.current !== generation) return;
+        setPlaybackError(null);
         const playlist = playlistRef.current;
         if (!playlist || segment.segmentIndex !== playlist.trackCount) return;
 
@@ -318,6 +323,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         pendingSeekRef.current = null;
         setIsBuffering(false);
         setIsPlaying(false);
+        setPlaybackError('Something went wrong loading the story audio. Tap play to try again.');
       });
   }, []);
 
@@ -356,6 +362,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       (segment) => segment.length * ESTIMATED_SECONDS_PER_CHAR,
     );
     setIsBuffering(true);
+    setPlaybackError(null);
 
     let firstSegment;
     try {
@@ -367,6 +374,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       if (playbackGenerationRef.current !== generation) return;
       setIsBuffering(false);
       setIsPlaying(false);
+      setPlaybackError('Something went wrong loading the story audio. Tap play to try again.');
       return;
     }
     if (playbackGenerationRef.current !== generation) return;
@@ -487,6 +495,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         isPlaying,
         isBuffering,
         isSleepMode,
+        playbackError,
         position,
         duration,
         postStoryPhase,

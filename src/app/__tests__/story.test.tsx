@@ -55,6 +55,7 @@ const basePlayerMock = (overrides = {}) => ({
   isPlaying: false,
   isBuffering: false,
   isSleepMode: false,
+  playbackError: null,
   position: 0,
   duration: 0,
   postStoryPhase: 'idle' as const,
