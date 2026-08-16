@@ -33,8 +33,7 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
   let configuredClient: ReturnType<typeof createAiGatewayClient>;
   try {
     configuredClient = createAiGatewayClient();
-  } catch (err) {
-    console.error("Failed to create AI Gateway client:", err);
+  } catch {
     return Response.json({ error: "AI_GATEWAY_API_KEY not configured" }, { status: 500 });
   }
 
@@ -85,8 +84,7 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
 
     const binaryImage = atob(base64Image);
     imageBytes = Uint8Array.from(binaryImage, (character) => character.charCodeAt(0));
-  } catch (err) {
-    console.error("Image generation failed:", err);
+  } catch {
     return Response.json({ error: "Image generation failed" }, { status: 500 });
   }
 
@@ -99,7 +97,6 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
     });
 
   if (uploadError) {
-    console.error("Storage upload failed:", uploadError);
     return Response.json({ error: "Failed to upload image" }, { status: 500 });
   }
 
@@ -112,7 +109,6 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
     .eq("id", body.storyId);
 
   if (updateError) {
-    console.error("Story update failed:", updateError);
     return Response.json({ error: "Failed to update story" }, { status: 500 });
   }
 

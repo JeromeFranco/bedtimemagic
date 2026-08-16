@@ -3,6 +3,7 @@ import { createAudioPlayer, createAudioPlaylist, setAudioModeAsync } from 'expo-
 import { getAmbientAudioSource } from '@/lib/audio-utils';
 import { cancelStoryAudio, streamStorySegment } from '@/lib/inworld-tts';
 import { splitStoryIntoSegments } from '@/lib/story-segments';
+import { createOperationId } from '@/lib/observability';
 import type { Story } from '@/types';
 
 export type PostStoryPhase = 'idle' | 'fading' | 'pillow_talk' | 'affirmation' | 'fade_to_black' | 'done';
@@ -78,6 +79,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const fadeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const activeStoryRef = useRef<Story | null>(null);
   const playbackGenerationRef = useRef(0);
+  const playbackOperationIdRef = useRef<string | null>(null);
   const segmentsRef = useRef<string[]>([]);
   const segmentDurationsRef = useRef<number[]>([]);
   const pendingSeekRef = useRef<PendingSeek | null>(null);
@@ -95,6 +97,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     generationUnderrunRef.current = false;
     finalFlowStartedRef.current = false;
     activeStoryRef.current = null;
+    playbackOperationIdRef.current = null;
     setCurrentStory(null);
     setIsPlaying(false);
     setIsBuffering(false);
@@ -268,7 +271,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const text = segmentsRef.current[segmentIndex];
     if (!story || !text) return;
 
-    streamStorySegment(story.id, segmentIndex, text)
+    streamStorySegment(story.id, segmentIndex, text, {
+      parentOperationId: playbackOperationIdRef.current ?? undefined,
+      segmentCount: segmentsRef.current.length,
+    })
       .then((segment) => {
         if (playbackGenerationRef.current !== generation) return;
         const playlist = playlistRef.current;
@@ -323,6 +329,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (activeStoryRef.current) cancelStoryAudio(activeStoryRef.current.id);
     playbackGenerationRef.current += 1;
     const generation = playbackGenerationRef.current;
+    playbackOperationIdRef.current = createOperationId();
 
     cleanupPlaylist();
     activeStoryRef.current = story;
@@ -352,7 +359,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     let firstSegment;
     try {
-      firstSegment = await streamStorySegment(story.id, 0, segments[0]);
+      firstSegment = await streamStorySegment(story.id, 0, segments[0], {
+        parentOperationId: playbackOperationIdRef.current ?? undefined,
+        segmentCount: segments.length,
+      });
     } catch {
       if (playbackGenerationRef.current !== generation) return;
       setIsBuffering(false);

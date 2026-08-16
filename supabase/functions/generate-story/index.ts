@@ -1,8 +1,8 @@
 import OpenAI from "@openai/openai";
 import { withSupabase, type SupabaseContext } from "@supabase/server";
+import { createDeepSeekClient, type ConfiguredAiClient } from "../_shared/ai.ts";
 import { CHALLENGE_LABELS, PROTAGONISTS, TRIGGER_LABELS } from "../_shared/constants.ts";
 import { SafetyFilterError } from "../_shared/errors.ts";
-import { createMimoClient, type ConfiguredAiClient } from "../_shared/ai.ts";
 import { buildPrompt, type PromptInput } from "./prompt.ts";
 
 const TIMEOUT_MS = 80_000;
@@ -130,11 +130,10 @@ async function persistStory(
 }
 
 async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
-  let configuredClient: ReturnType<typeof createMimoClient>;
+  let configuredClient: ReturnType<typeof createDeepSeekClient>;
   try {
-    configuredClient = createMimoClient();
-  } catch (err) {
-    console.error("Failed to create MiMo client:", err);
+    configuredClient = createDeepSeekClient();
+  } catch {
     return Response.json({ error: "MIMO_API_KEY not configured" }, { status: 500 });
   }
 
@@ -182,15 +181,12 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
         if (retryErr instanceof SafetyFilterError) {
           return Response.json({ error: "Safety filter triggered" }, { status: 422 });
         }
-        console.error("LLM retry failed:", retryErr);
         return Response.json({ error: "Failed to generate valid story" }, { status: 500 });
       }
     } else if (err instanceof OpenAI.APIError) {
       const status = err.status || 502;
-      console.error(`LLM API error (${status}):`, err.message);
       return Response.json({ error: err.message }, { status });
     } else {
-      console.error("LLM call failed:", err);
       return Response.json({ error: "Story generation failed" }, { status: 500 });
     }
   }
@@ -198,8 +194,7 @@ async function handler(req: Request, ctx: SupabaseContext): Promise<Response> {
   let savedStory;
   try {
     savedStory = await persistStory(ctx.supabaseAdmin, userId, body, story);
-  } catch (err) {
-    console.error("Failed to persist story:", err);
+  } catch {
     return Response.json({ error: "Failed to save story" }, { status: 500 });
   }
 

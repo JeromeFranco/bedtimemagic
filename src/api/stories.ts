@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { invokeEdgeFunction } from '@/lib/invoke-edge-function';
 import type { Story, ChallengeTrigger, ChallengeCategory, Protagonist, DevelopmentalStage, StoryRating } from '@/types';
 
 export async function getStory(storyId: string): Promise<Story> {
@@ -47,7 +48,7 @@ export async function generateStory(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  const { data, error } = await supabase.functions.invoke('generate-story', {
+  return invokeEdgeFunction('generate-story', {
     signal,
     body: {
       childId,
@@ -59,8 +60,6 @@ export async function generateStory(
     },
   });
 
-  if (error) throw error;
-  return data;
 }
 
 export async function generateCoverImage(
@@ -70,12 +69,10 @@ export async function generateCoverImage(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  const { data, error } = await supabase.functions.invoke('generate-cover-image', {
+  return invokeEdgeFunction('generate-cover-image', {
     body: { storyId, title },
   });
 
-  if (error) throw error;
-  return data;
 }
 
 export async function logStoryRating(

@@ -97,7 +97,7 @@ describe('streamStorySegment', () => {
 
     const result: StoryAudioSegment = await streamStorySegment('story-1', 0, 'Hello world');
 
-    expect(mockedInvoke).toHaveBeenCalledWith('generate-inworld-token');
+    expect(mockedInvoke).toHaveBeenCalledWith('generate-inworld-token', undefined);
     expect(mockedInworldTTS).toHaveBeenCalledWith(
       expect.objectContaining({
         token: 'test-jwt-token',

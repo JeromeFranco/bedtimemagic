@@ -68,6 +68,9 @@ export class AudioSegmentWriter {
   private readonly finalFile: File;
   private pending = new Uint8Array(0);
   private hasWritten = false;
+  private writtenBytes = 0;
+
+  get bytesWritten(): number { return this.writtenBytes; }
 
   constructor(storyId: string, segmentIndex: number) {
     this.partFile = new File(
@@ -87,6 +90,7 @@ export class AudioSegmentWriter {
   }
 
   write(chunk: Uint8Array): void {
+    this.writtenBytes += chunk.byteLength;
     const merged = new Uint8Array(this.pending.length + chunk.length);
     merged.set(this.pending, 0);
     merged.set(chunk, this.pending.length);
@@ -116,6 +120,7 @@ export class AudioSegmentWriter {
   abort(): void {
     this.pending = new Uint8Array(0);
     this.hasWritten = false;
+    this.writtenBytes = 0;
     if (this.partFile.exists) {
       this.partFile.delete();
     }

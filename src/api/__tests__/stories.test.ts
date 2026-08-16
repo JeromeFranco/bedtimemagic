@@ -25,9 +25,9 @@ describe('generateCoverImage', () => {
 
     const result = await generateCoverImage('story-123', 'Test Story');
 
-    expect(supabase.functions.invoke).toHaveBeenCalledWith('generate-cover-image', {
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('generate-cover-image', expect.objectContaining({
       body: { storyId: 'story-123', title: 'Test Story' },
-    });
+    }));
     expect(result).toEqual({ coverImageUrl: 'https://example.com/cover.png' });
   });
 
@@ -63,7 +63,7 @@ describe('generateStory', () => {
       ),
     ).resolves.toEqual(story);
 
-    expect(supabase.functions.invoke).toHaveBeenCalledWith('generate-story', {
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('generate-story', expect.objectContaining({
       signal,
       body: {
         childId: 'child-123',
@@ -73,6 +73,6 @@ describe('generateStory', () => {
         tier1Challenge: 'bedtime',
         tier2Trigger: 'refusing_teeth',
       },
-    });
+    }));
   });
 });

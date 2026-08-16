@@ -79,7 +79,7 @@
     "test:ci": "jest",
     "test:functions": "deno test --no-check --allow-env --allow-sys --config supabase/functions/deno.json supabase/functions/",
     "typecheck": "tsc --noEmit",
-    "typecheck:functions": "deno check --config supabase/functions/generate-inworld-token/deno.json supabase/functions/generate-inworld-token/index.ts"
+    "typecheck:functions": "deno check --config supabase/functions/deno.json supabase/functions/generate-story/index.ts supabase/functions/generate-cover-image/index.ts supabase/functions/generate-inworld-token/index.ts"
   },
   "private": true
 }

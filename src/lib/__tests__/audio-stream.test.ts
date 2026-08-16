@@ -55,7 +55,9 @@ describe('getSegmentAudioSources', () => {
       { uri: '/cache/audio_story-1_1.mp3' },
     ]);
     expect(mockedStreamStorySegment).toHaveBeenCalledTimes(1);
-    expect(mockedStreamStorySegment).toHaveBeenCalledWith('story-1', 1, 'Second');
+    expect(mockedStreamStorySegment).toHaveBeenCalledWith('story-1', 1, 'Second', expect.objectContaining({
+      parentOperationId: expect.any(String), segmentCount: 2,
+    }));
   });
 });
 
