@@ -7,7 +7,7 @@ import type { Story } from '@/types';
 
 export type PostStoryPhase = 'idle' | 'fading' | 'pillow_talk' | 'affirmation' | 'fade_to_black' | 'done';
 
-interface PlayerContextValue {
+export interface PlayerContextValue {
   currentStory: Story | null;
   isPlaying: boolean;
   isBuffering: boolean;
@@ -21,9 +21,9 @@ interface PlayerContextValue {
   seekTo: (seconds: number) => void;
   stopStory: () => void;
   toggleSleepMode: () => void;
-  skipPillowTalk: () => void;
-  confirmAffirmation: () => void;
-  startFadeToBlack: () => void;
+  showAffirmation: () => void;
+  finishWindDown: () => void;
+  completeWindDown: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextValue>({
@@ -40,14 +40,14 @@ const PlayerContext = createContext<PlayerContextValue>({
   seekTo: () => {},
   stopStory: () => {},
   toggleSleepMode: () => {},
-  skipPillowTalk: () => {},
-  confirmAffirmation: () => {},
-  startFadeToBlack: () => {},
+  showAffirmation: () => {},
+  finishWindDown: () => {},
+  completeWindDown: () => {},
 });
 
 const FADE_DURATION = 3000;
 const FADE_INTERVAL = 50;
-const FADE_TO_BLACK_DURATION = 4000;
+const FADE_TO_BLACK_DURATION = 1000;
 const AMBIENT_FADE_INTERVAL = 50;
 const ESTIMATED_SECONDS_PER_CHAR = 0.07;
 
@@ -84,6 +84,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const manuallyPausedRef = useRef(false);
   const generationUnderrunRef = useRef(false);
   const finalFlowStartedRef = useRef(false);
+  const finishingWindDownRef = useRef(false);
+  const completedWindDownRef = useRef(false);
+
+  const resetStoryState = useCallback(() => {
+    segmentsRef.current = [];
+    segmentDurationsRef.current = [];
+    pendingSeekRef.current = null;
+    manuallyPausedRef.current = false;
+    generationUnderrunRef.current = false;
+    finalFlowStartedRef.current = false;
+    activeStoryRef.current = null;
+    setCurrentStory(null);
+    setIsPlaying(false);
+    setIsBuffering(false);
+    setIsSleepMode(false);
+    setPosition(0);
+    setDuration(0);
+  }, []);
   const generateSegmentRef = useRef<(generation: number, segmentIndex: number) => void>(() => {});
 
   const cleanupAmbient = useCallback(() => {
@@ -110,12 +128,56 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const startAmbient = useCallback(() => {
     cleanupAmbient();
-    const ambientPlayer = createAudioPlayer(getAmbientAudioSource());
-    ambientPlayer.volume = 0.15;
-    ambientPlayer.loop = true;
-    ambientPlayer.play();
-    ambientPlayerRef.current = ambientPlayer;
+    let ambientPlayer: typeof ambientPlayerRef.current = null;
+    try {
+      ambientPlayer = createAudioPlayer(getAmbientAudioSource());
+      ambientPlayer.volume = 0.15;
+      ambientPlayer.loop = true;
+      ambientPlayer.play();
+      ambientPlayerRef.current = ambientPlayer;
+    } catch {
+      ambientPlayer?.remove();
+      ambientPlayerRef.current = null;
+    }
   }, [cleanupAmbient]);
+
+  const finishWindDown = useCallback(() => {
+    if (finishingWindDownRef.current) return;
+    finishingWindDownRef.current = true;
+    setPostStoryPhase('fade_to_black');
+
+    if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+    fadeIntervalRef.current = null;
+
+    const playlist = playlistRef.current;
+    const ambient = ambientPlayerRef.current;
+    if (!playlist && !ambient) return;
+
+    const playlistStartVolume = playlist?.volume ?? 0;
+    const ambientStartVolume = ambient?.volume ?? 0;
+    const steps = FADE_TO_BLACK_DURATION / AMBIENT_FADE_INTERVAL;
+    let step = 0;
+    fadeIntervalRef.current = setInterval(() => {
+      step += 1;
+      const remaining = Math.max(0, 1 - step / steps);
+      if (playlist) playlist.volume = playlistStartVolume * remaining;
+      if (ambient) ambient.volume = ambientStartVolume * remaining;
+      if (step >= steps) {
+        if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+        fadeIntervalRef.current = null;
+      }
+    }, AMBIENT_FADE_INTERVAL);
+  }, []);
+
+  const completeWindDown = useCallback(() => {
+    if (!finishingWindDownRef.current || completedWindDownRef.current) return;
+    completedWindDownRef.current = true;
+    if (activeStoryRef.current) cancelStoryAudio(activeStoryRef.current.id);
+    playbackGenerationRef.current += 1;
+    cleanupPlaylist();
+    resetStoryState();
+    setPostStoryPhase('done');
+  }, [cleanupPlaylist, resetStoryState]);
 
   const startFade = useCallback(() => {
     const playlist = playlistRef.current;
@@ -123,17 +185,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const hasAffirmation = !!activeStoryRef.current?.sleepy_affirmation;
 
     const finishFade = () => {
+      listenerRef.current?.remove();
+      listenerRef.current = null;
       if (playlistRef.current) {
         playlistRef.current.destroy();
         playlistRef.current = null;
       }
+      if (hasPrompt || hasAffirmation) startAmbient();
       if (hasPrompt) {
-        startAmbient();
         setPostStoryPhase('pillow_talk');
       } else if (hasAffirmation) {
         setPostStoryPhase('affirmation');
       } else {
-        setPostStoryPhase('done');
+        finishWindDown();
       }
     };
 
@@ -142,18 +206,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    const startVolume = playlist.volume;
     const steps = FADE_DURATION / FADE_INTERVAL;
     let step = 0;
     fadeIntervalRef.current = setInterval(() => {
       step += 1;
-      playlist.volume = Math.max(0, 1 - step / steps);
+      playlist.volume = Math.max(0, startVolume * (1 - step / steps));
       if (step >= steps) {
         if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
         fadeIntervalRef.current = null;
         finishFade();
       }
     }, FADE_INTERVAL);
-  }, [startAmbient]);
+  }, [finishWindDown, startAmbient]);
 
   const attachPlaylistListener = useCallback(
     (generation: number) => {
@@ -267,6 +332,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     manuallyPausedRef.current = false;
     generationUnderrunRef.current = false;
     finalFlowStartedRef.current = false;
+    finishingWindDownRef.current = false;
+    completedWindDownRef.current = false;
     setPostStoryPhase('idle');
 
     await setAudioModeAsync({
@@ -374,21 +441,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setIsBuffering(true);
   };
 
-  const resetStoryState = useCallback(() => {
-    segmentsRef.current = [];
-    segmentDurationsRef.current = [];
-    pendingSeekRef.current = null;
-    manuallyPausedRef.current = false;
-    generationUnderrunRef.current = false;
-    finalFlowStartedRef.current = false;
-    activeStoryRef.current = null;
-    setCurrentStory(null);
-    setIsPlaying(false);
-    setIsBuffering(false);
-    setIsSleepMode(false);
-    setPosition(0);
-    setDuration(0);
-  }, []);
+  const showAffirmation = () => {
+    if (activeStoryRef.current?.sleepy_affirmation) {
+      setPostStoryPhase('affirmation');
+      return;
+    }
+    finishWindDown();
+  };
 
   const stopStory = () => {
     if (activeStoryRef.current) cancelStoryAudio(activeStoryRef.current.id);
@@ -396,55 +455,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     cleanupPlaylist();
     resetStoryState();
     setPostStoryPhase('idle');
+    finishingWindDownRef.current = false;
+    completedWindDownRef.current = false;
   };
 
   const toggleSleepMode = () => setIsSleepMode((previous) => !previous);
 
-  const skipPillowTalk = () => {
-    cleanupAmbient();
-    setPostStoryPhase('affirmation');
-  };
-
-  const confirmAffirmation = () => {
-    if (activeStoryRef.current) cancelStoryAudio(activeStoryRef.current.id);
-    playbackGenerationRef.current += 1;
-    cleanupPlaylist();
-    resetStoryState();
-    setPostStoryPhase('done');
-  };
-
-  const startFadeToBlack = () => {
-    setPostStoryPhase('fade_to_black');
-    if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
-    fadeIntervalRef.current = null;
-    const ambient = ambientPlayerRef.current;
-
-    const finish = () => {
-      if (activeStoryRef.current) cancelStoryAudio(activeStoryRef.current.id);
-      playbackGenerationRef.current += 1;
-      cleanupPlaylist();
-      resetStoryState();
-      setPostStoryPhase('done');
-    };
-
-    if (!ambient) {
-      finish();
-      return;
-    }
-
-    const steps = FADE_TO_BLACK_DURATION / AMBIENT_FADE_INTERVAL;
-    const startVolume = ambient.volume;
-    let step = 0;
-    fadeIntervalRef.current = setInterval(() => {
-      step += 1;
-      ambient.volume = Math.max(0, startVolume * (1 - step / steps));
-      if (step >= steps) {
-        if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
-        fadeIntervalRef.current = null;
-        finish();
-      }
-    }, AMBIENT_FADE_INTERVAL);
-  };
 
   useEffect(() => {
     return () => {
@@ -470,9 +486,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         seekTo,
         stopStory,
         toggleSleepMode,
-        skipPillowTalk,
-        confirmAffirmation,
-        startFadeToBlack,
+        showAffirmation,
+        finishWindDown,
+        completeWindDown,
       }}
     >
       {children}

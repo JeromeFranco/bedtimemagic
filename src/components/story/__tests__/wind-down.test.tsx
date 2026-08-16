@@ -1,26 +1,23 @@
 import { render } from '@testing-library/react-native';
-import { GestureHintCue, WindDownContent } from '../wind-down';
 
-describe('WindDown components', () => {
-  describe('GestureHintCue', () => {
-    it('renders swipe hint cue text for pillow_talk phase', async () => {
-      const { getByText } = await render(<GestureHintCue phase="pillow_talk" />);
-      expect(getByText('Swipe for Affirmation →')).toBeTruthy();
-    });
+import { AffirmationContent, PillowTalkContent } from '../wind-down';
 
-    it('renders swipe hint cue text for affirmation phase', async () => {
-      const { getByText } = await render(<GestureHintCue phase="affirmation" />);
-      expect(getByText('Swipe for Goodnight ↑')).toBeTruthy();
-    });
+describe('WindDown content', () => {
+  it('renders Pillow Talk label, prompt, and compact pacer', async () => {
+    const queries = await render(<PillowTalkContent prompt="How was your day?" />);
+    expect(queries.getByText('Pillow talk')).toBeTruthy();
+    expect(queries.getByText('How was your day?')).toBeTruthy();
+    expect(queries.getByTestId('breathing-circle').props.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ width: 120, height: 120 })]),
+    );
   });
 
-  describe('WindDownContent', () => {
-    it('renders wind-down text and breathing circle', async () => {
-      const { getByText, getByTestId } = await render(
-        <WindDownContent text="How was your day?" postStoryPhase="pillow_talk" />
-      );
-      expect(getByText('How was your day?')).toBeTruthy();
-      expect(getByTestId('breathing-circle')).toBeTruthy();
-    });
+  it('renders affirmation label, text, and larger pacer', async () => {
+    const queries = await render(<AffirmationContent text="I am safe." />);
+    expect(queries.getByText('Say together')).toBeTruthy();
+    expect(queries.getByText('I am safe.')).toBeTruthy();
+    expect(queries.getByTestId('breathing-circle').props.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ width: 160, height: 160 })]),
+    );
   });
 });

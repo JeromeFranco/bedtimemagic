@@ -1,65 +1,26 @@
-import { render, fireEvent, act } from '@testing-library/react-native';
+import { AccessibilityInfo } from 'react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
+import { withRepeat, useReducedMotion } from 'react-native-reanimated';
 
 const mockPlayStory = jest.fn();
 const mockPause = jest.fn();
 const mockResume = jest.fn();
 const mockSeekTo = jest.fn();
 const mockToggleSleepMode = jest.fn();
+const mockShowAffirmation = jest.fn();
+const mockFinishWindDown = jest.fn();
+const mockCompleteWindDown = jest.fn();
 
 jest.mock('@/contexts/PlayerContext', () => ({
-  usePlayer: jest.fn(() => ({
-    currentStory: null,
-    isPlaying: false,
-    isBuffering: false,
-    isSleepMode: false,
-    position: 0,
-    duration: 60,
-    postStoryPhase: 'idle',
-    playStory: mockPlayStory,
-    pause: mockPause,
-    resume: mockResume,
-    seekTo: mockSeekTo,
-    stopStory: jest.fn(),
-    toggleSleepMode: mockToggleSleepMode,
-    skipPillowTalk: jest.fn(),
-    confirmAffirmation: jest.fn(),
-  })),
+  usePlayer: jest.fn(),
 }));
-
-jest.mock('react-native-gesture-handler', () => {
-  const React = require('react');
-  const { View } = require('react-native');
-  const makeChainable = () => {
-    const obj: Record<string, unknown> = {};
-    const chain = () => obj;
-    obj.activeOffsetX = chain;
-    obj.activeOffsetY = chain;
-    obj.onBegin = chain;
-    obj.onUpdate = chain;
-    obj.onFinalize = chain;
-    obj.onEnd = (fn: unknown) => {
-      obj._onEndFn = fn;
-      return obj;
-    };
-    obj.onStart = chain;
-    obj.onChange = chain;
-    return obj;
-  };
-  return {
-    Gesture: {
-      Pan: () => makeChainable(),
-      Tap: () => makeChainable(),
-      Race: (...gestures: unknown[]) => gestures,
-    },
-    GestureDetector: ({ children }: { children: unknown }) =>
-      React.createElement(View, null, children),
-  };
-});
 
 import { StoryPlayer } from '../story-player';
 import { usePlayer } from '@/contexts/PlayerContext';
 
 const mockUsePlayer = usePlayer as jest.Mock;
+const mockUseReducedMotion = useReducedMotion as jest.Mock;
+const mockWithRepeat = withRepeat as jest.Mock;
 
 const MOCK_STORY = {
   id: 'story-1',
@@ -85,201 +46,158 @@ const MOCK_PROTAGONIST = {
   voiceNotes: 'Warm baritone',
 };
 
+const defaultProps = {
+  story: MOCK_STORY,
+  protagonist: MOCK_PROTAGONIST,
+  imageSource: { uri: 'https://example.com/cover.png' },
+  onBack: jest.fn(),
+};
+
+const basePlayerMock = (overrides = {}) => ({
+  currentStory: null,
+  isPlaying: false,
+  isBuffering: false,
+  isSleepMode: false,
+  position: 0,
+  duration: 60,
+  postStoryPhase: 'idle' as const,
+  playStory: mockPlayStory,
+  pause: mockPause,
+  resume: mockResume,
+  seekTo: mockSeekTo,
+  stopStory: jest.fn(),
+  toggleSleepMode: mockToggleSleepMode,
+  showAffirmation: mockShowAffirmation,
+  finishWindDown: mockFinishWindDown,
+  completeWindDown: mockCompleteWindDown,
+  ...overrides,
+});
+
 describe('StoryPlayer', () => {
-  const defaultProps = {
-    story: MOCK_STORY,
-    protagonist: MOCK_PROTAGONIST,
-    imageSource: { uri: 'https://example.com/cover.png' },
-    onBack: jest.fn(),
-  };
-
-  const basePlayerMock = (overrides = {}) => ({
-    currentStory: null,
-    isPlaying: false,
-    isBuffering: false,
-    isSleepMode: false,
-    position: 0,
-    duration: 60,
-    postStoryPhase: 'idle' as const,
-    playStory: mockPlayStory,
-    pause: mockPause,
-    resume: mockResume,
-    seekTo: mockSeekTo,
-    stopStory: jest.fn(),
-    toggleSleepMode: mockToggleSleepMode,
-    skipPillowTalk: jest.fn(),
-    confirmAffirmation: jest.fn(),
-    startFadeToBlack: jest.fn(),
-    ...overrides,
-  });
-
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseReducedMotion.mockReturnValue(false);
     mockUsePlayer.mockImplementation(() => basePlayerMock());
+    jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockClear();
   });
 
-  describe('Wind-Down UX in StoryPlayer', () => {
-    it('calls startFadeToBlack when Goodnight button is pressed', async () => {
-      const mockStartFadeToBlack = jest.fn();
-      mockUsePlayer.mockImplementation(() =>
-        basePlayerMock({
-          postStoryPhase: 'affirmation',
-          startFadeToBlack: mockStartFadeToBlack,
-        }),
-      );
-      const queries = await render(<StoryPlayer {...defaultProps} postStoryPhase="affirmation" />);
-      await fireEvent.press(queries.getByText('Goodnight'));
-      expect(mockStartFadeToBlack).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls startFadeToBlack when Skip for tonight button is pressed in pillow_talk phase', async () => {
-      const mockStartFadeToBlack = jest.fn();
-      mockUsePlayer.mockImplementation(() =>
-        basePlayerMock({
-          postStoryPhase: 'pillow_talk',
-          startFadeToBlack: mockStartFadeToBlack,
-        }),
-      );
-      const queries = await render(<StoryPlayer {...defaultProps} postStoryPhase="pillow_talk" />);
-      await fireEvent.press(queries.getByText('Skip for tonight'));
-      expect(mockStartFadeToBlack).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls skipPillowTalk when Next button is pressed in pillow_talk phase', async () => {
-      const mockSkipPillowTalk = jest.fn();
-      mockUsePlayer.mockImplementation(() =>
-        basePlayerMock({
-          postStoryPhase: 'pillow_talk',
-          skipPillowTalk: mockSkipPillowTalk,
-        }),
-      );
-      const queries = await render(<StoryPlayer {...defaultProps} postStoryPhase="pillow_talk" />);
-      await fireEvent.press(queries.getByText('Next'));
-      expect(mockSkipPillowTalk).toHaveBeenCalledTimes(1);
-    });
-
-    it('hides controls after 5 seconds instead of 15 seconds', async () => {
-      jest.useFakeTimers();
-      try {
-        mockUsePlayer.mockImplementation(() =>
-          basePlayerMock({
-            postStoryPhase: 'pillow_talk',
-          }),
-        );
-        const queries = await render(<StoryPlayer {...defaultProps} postStoryPhase="pillow_talk" />);
-        expect(queries.getByText('Next')).toBeTruthy();
-
-        await act(async () => {
-          jest.advanceTimersByTime(5100);
-        });
-        expect(queries.queryByText('Next')).toBeNull();
-      } finally {
-        jest.useRealTimers();
-      }
-    });
-
-    it('renders GestureHintCue text for pillow_talk phase', async () => {
-      mockUsePlayer.mockImplementation(() =>
-        basePlayerMock({
-          postStoryPhase: 'pillow_talk',
-        }),
-      );
-      const queries = await render(<StoryPlayer {...defaultProps} postStoryPhase="pillow_talk" />);
-      expect(queries.getByText('Swipe for Affirmation →')).toBeTruthy();
-    });
-
-    it('renders GestureHintCue text for affirmation phase', async () => {
-      mockUsePlayer.mockImplementation(() =>
-        basePlayerMock({
-          postStoryPhase: 'affirmation',
-        }),
-      );
-      const queries = await render(<StoryPlayer {...defaultProps} postStoryPhase="affirmation" />);
-      expect(queries.getByText('Swipe for Goodnight ↑')).toBeTruthy();
-    });
-  });
-
-  it('renders story title and moral', async () => {
-    const { getByText } = await render(<StoryPlayer {...defaultProps} />);
-    expect(getByText('The Toothbrush Adventure', { exact: false })).toBeTruthy();
-    expect(getByText('Brushing teeth keeps your smile bright.', { exact: false })).toBeTruthy();
-  });
-
-  it('renders protagonist name', async () => {
-    const { getByText } = await render(<StoryPlayer {...defaultProps} />);
-    expect(getByText('Barnaby', { exact: false })).toBeTruthy();
-  });
-
-  it('renders placeholder emoji when imageSource is null', async () => {
-    const { getByText } = await render(
-      <StoryPlayer {...defaultProps} imageSource={null} />
-    );
-    expect(getByText('🐻')).toBeTruthy();
-  });
-
-  it('renders placeholder emoji when image onError fires', async () => {
-    const { getByText, getByTestId } = await render(<StoryPlayer {...defaultProps} />);
-    await fireEvent(getByTestId('artwork-image'), 'error', { nativeEvent: {} });
-    expect(getByText('🐻')).toBeTruthy();
-  });
-
-  it('calls playStory when Play is pressed while not playing', async () => {
-    const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
-    fireEvent.press(getByTestId('play-pause-button'));
-    expect(mockPlayStory).toHaveBeenCalledWith(MOCK_STORY);
-  });
-
-  it('calls resume when Play is pressed while paused on current story', async () => {
-    mockUsePlayer.mockImplementation(() =>
-      basePlayerMock({
-        currentStory: MOCK_STORY,
-        isPlaying: false,
-        position: 15,
-      }),
-    );
-    const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
-    fireEvent.press(getByTestId('play-pause-button'));
-    expect(mockResume).toHaveBeenCalledTimes(1);
-  });
-
-  it('calls pause when Play is pressed while playing', async () => {
-    mockUsePlayer.mockImplementation(() =>
-      basePlayerMock({
-        currentStory: MOCK_STORY,
-        isPlaying: true,
-        position: 30,
-      }),
-    );
-    const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
-    fireEvent.press(getByTestId('play-pause-button'));
-    expect(mockPause).toHaveBeenCalledTimes(1);
-  });
-
-  it('calls onBack when back button pressed', async () => {
-    const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
-    fireEvent.press(getByTestId('player-back-button'));
+  it('renders ordinary playback and retains immediate Back behavior', async () => {
+    const queries = await render(<StoryPlayer {...defaultProps} />);
+    expect(queries.getByText('The Toothbrush Adventure', { exact: false })).toBeTruthy();
+    expect(queries.getByTestId('play-pause-button')).toBeTruthy();
+    await fireEvent.press(queries.getByTestId('player-back-button'));
     expect(defaultProps.onBack).toHaveBeenCalledTimes(1);
   });
 
-  it('calls toggleSleepMode when sleep button pressed', async () => {
-    const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
-    fireEvent.press(getByTestId('sleep-mode-button'));
-    expect(mockToggleSleepMode).toHaveBeenCalledTimes(1);
+  it('plays, pauses, resumes, and seeks using player context', async () => {
+    const queries = await render(<StoryPlayer {...defaultProps} />);
+    await fireEvent.press(queries.getByTestId('play-pause-button'));
+    expect(mockPlayStory).toHaveBeenCalledWith(MOCK_STORY);
+    await fireEvent.press(queries.getByTestId('seek-backward-button'));
+    await fireEvent.press(queries.getByTestId('seek-forward-button'));
+    expect(mockSeekTo).toHaveBeenNthCalledWith(1, 0);
+    expect(mockSeekTo).toHaveBeenNthCalledWith(2, 15);
+
+    mockUsePlayer.mockImplementation(() =>
+      basePlayerMock({ currentStory: MOCK_STORY, isPlaying: true, position: 30 }),
+    );
+    const playing = await render(<StoryPlayer {...defaultProps} />);
+    await fireEvent.press(playing.getByTestId('play-pause-button'));
+    expect(mockPause).toHaveBeenCalledTimes(1);
   });
 
-  it('calls seekTo when -15s or +15s buttons are pressed', async () => {
-    mockUsePlayer.mockImplementation(() =>
-      basePlayerMock({
-        currentStory: MOCK_STORY,
-        isPlaying: true,
-        position: 30,
-      }),
-    );
-    const { getByTestId } = await render(<StoryPlayer {...defaultProps} />);
-    await fireEvent.press(getByTestId('seek-backward-button'));
-    expect(mockSeekTo).toHaveBeenCalledWith(15);
+  it('keeps Pillow Talk visible and gives its actions distinct outcomes', async () => {
+    mockUsePlayer.mockImplementation(() => basePlayerMock({ postStoryPhase: 'pillow_talk' }));
+    const queries = await render(<StoryPlayer {...defaultProps} />);
+    expect(queries.getByText('Pillow talk')).toBeTruthy();
+    expect(queries.getByText('What was your favorite part?')).toBeTruthy();
+    expect(queries.getByTestId('artwork-image')).toBeTruthy();
+    expect(queries.queryByTestId('sleep-mode-button')).toBeNull();
 
-    await fireEvent.press(getByTestId('seek-forward-button'));
-    expect(mockSeekTo).toHaveBeenCalledWith(45);
+    await fireEvent.press(queries.getByText('Show affirmation'));
+    await fireEvent.press(queries.getByText('Skip wind-down'));
+    expect(mockShowAffirmation).toHaveBeenCalledTimes(1);
+    expect(mockFinishWindDown).toHaveBeenCalledTimes(1);
+    expect(queries.queryByText(['Swipe', 'for'].join(' '))).toBeNull();
+  });
+
+  it('announces each generated content phase once on entry', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    mockUsePlayer.mockImplementation(() => basePlayerMock({ postStoryPhase: 'pillow_talk' }));
+    await render(<StoryPlayer {...defaultProps} />);
+    expect(announce).toHaveBeenCalledWith('Pillow talk. What was your favorite part?');
+
+    mockUsePlayer.mockImplementation(() => basePlayerMock({ postStoryPhase: 'affirmation' }));
+    await render(<StoryPlayer {...defaultProps} />);
+    expect(announce).toHaveBeenCalledWith('Say together. I am brave and kind.');
+  });
+
+  it('reannounces Pillow Talk after an intervening non-content phase', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    mockUsePlayer.mockImplementation(() => basePlayerMock({ postStoryPhase: 'pillow_talk' }));
+    const queries = await render(<StoryPlayer {...defaultProps} />);
+    mockUsePlayer.mockImplementation(() => basePlayerMock({ postStoryPhase: 'fading' }));
+    await queries.rerender(<StoryPlayer {...defaultProps} />);
+    mockUsePlayer.mockImplementation(() => basePlayerMock({ postStoryPhase: 'pillow_talk' }));
+    await queries.rerender(<StoryPlayer {...defaultProps} />);
+    expect(announce).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps content actions rendered beyond the former control timers', async () => {
+    jest.useFakeTimers();
+    mockUsePlayer.mockImplementation(() => basePlayerMock({ postStoryPhase: 'pillow_talk' }));
+    const queries = await render(<StoryPlayer {...defaultProps} />);
+    await act(async () => jest.advanceTimersByTime(20000));
+    expect(queries.getByText('Show affirmation')).toBeTruthy();
+    expect(queries.getByText('Skip wind-down')).toBeTruthy();
+    jest.useRealTimers();
+  });
+
+  it('renders affirmation without artwork and finishes through Goodnight', async () => {
+    mockUsePlayer.mockImplementation(() => basePlayerMock({ postStoryPhase: 'affirmation' }));
+    const queries = await render(<StoryPlayer {...defaultProps} />);
+    expect(queries.getByText('Say together')).toBeTruthy();
+    expect(queries.getByText('I am brave and kind.')).toBeTruthy();
+    expect(queries.queryByTestId('artwork-image')).toBeNull();
+    expect(queries.queryByText('Show affirmation')).toBeNull();
+    await fireEvent.press(queries.getByText('Goodnight'));
+    expect(mockFinishWindDown).toHaveBeenCalledTimes(1);
+  });
+
+  it('finishes instead of navigating back during every nonterminal post-story phase', async () => {
+    for (const postStoryPhase of ['fading', 'pillow_talk', 'affirmation'] as const) {
+      mockUsePlayer.mockImplementation(() => basePlayerMock({ postStoryPhase }));
+      const queries = await render(<StoryPlayer {...defaultProps} />);
+      await fireEvent.press(queries.getByTestId('player-back-button'));
+      await queries.unmount();
+    }
+    expect(mockFinishWindDown).toHaveBeenCalledTimes(3);
+    expect(defaultProps.onBack).toHaveBeenCalledTimes(0);
+  });
+
+  it('intercepts input behind the terminal curtain and completes it once', async () => {
+    mockUsePlayer.mockImplementation(() => basePlayerMock({ postStoryPhase: 'fade_to_black' }));
+    const queries = await render(<StoryPlayer {...defaultProps} />);
+    expect(queries.getByTestId('terminal-curtain').props.pointerEvents).toBe('auto');
+    expect(queries.queryByText('Goodnight')).toBeNull();
+    expect(mockCompleteWindDown).toHaveBeenCalledTimes(1);
+    await fireEvent.press(queries.getByTestId('player-back-button'));
+    expect(mockFinishWindDown).not.toHaveBeenCalled();
+  });
+
+  it('makes artwork drift static under reduced motion while retaining terminal fade', async () => {
+    mockUseReducedMotion.mockReturnValue(true);
+    mockUsePlayer.mockImplementation(() =>
+      basePlayerMock({ currentStory: MOCK_STORY, isPlaying: true, postStoryPhase: 'fade_to_black' }),
+    );
+    const queries = await render(<StoryPlayer {...defaultProps} />);
+    expect(mockWithRepeat).not.toHaveBeenCalled();
+    expect(queries.getByTestId('terminal-curtain')).toBeTruthy();
+  });
+
+  it('renders a protagonist fallback after a cover load failure', async () => {
+    const queries = await render(<StoryPlayer {...defaultProps} />);
+    await fireEvent(queries.getByTestId('artwork-image'), 'error', { nativeEvent: {} });
+    expect(queries.getByText('🐻')).toBeTruthy();
   });
 });

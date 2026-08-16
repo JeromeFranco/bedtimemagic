@@ -1,48 +1,39 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Image, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withDelay,
-  withRepeat,
   cancelAnimation,
   Easing,
+  FadeIn,
+  FadeOut,
   runOnJS,
-  FadeInRight,
-  FadeOutLeft,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
 } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { SeekBar } from './seek-bar';
-import { PillowTalkContent, AffirmationContent, GestureHintCue } from './wind-down';
+import { AffirmationContent, PillowTalkContent } from './wind-down';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
-import { usePlayer, type PostStoryPhase } from '@/contexts/PlayerContext';
-import { Colors, CATEGORY_COLORS, Spacing } from '@/theme';
-import type { Story, ProtagonistInfo } from '@/types';
-
-const HIDE_DELAY = 5000;
+import { usePlayer } from '@/contexts/PlayerContext';
+import { BorderRadius, CATEGORY_COLORS, Colors, MaxContentWidth, Spacing } from '@/theme';
+import type { ProtagonistInfo, Story } from '@/types';
 
 interface StoryPlayerProps {
   story: Story;
   protagonist: ProtagonistInfo | undefined;
   imageSource: { uri: string } | null;
   onBack: () => void;
-  postStoryPhase?: PostStoryPhase;
 }
 
-export function StoryPlayer({
-  story,
-  protagonist,
-  imageSource,
-  onBack,
-  postStoryPhase: propsPostStoryPhase,
-}: StoryPlayerProps) {
+export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPlayerProps) {
   const { width, height } = useWindowDimensions();
+  const reducedMotion = useReducedMotion();
   const {
     currentStory,
     isPlaying,
@@ -50,157 +41,65 @@ export function StoryPlayer({
     isSleepMode,
     position,
     duration,
-    postStoryPhase: playerPostStoryPhase,
+    postStoryPhase: phase,
     playStory,
     pause,
     resume,
     seekTo,
     toggleSleepMode,
-    skipPillowTalk,
-    startFadeToBlack,
+    showAffirmation,
+    finishWindDown,
+    completeWindDown,
   } = usePlayer();
-
-  const phase = propsPostStoryPhase ?? playerPostStoryPhase;
-  const isWindDown = phase === 'pillow_talk' || phase === 'affirmation' || phase === 'fade_to_black';
-
   const [imageError, setImageError] = useState(false);
-  const [controlsVisible, setControlsVisible] = useState(true);
-  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  const announcedPhaseRef = useRef<string | null>(null);
+  const isPostStory = phase !== 'idle';
+  const isTerminal = phase === 'fade_to_black' || phase === 'done';
+  const showsArtwork = phase !== 'affirmation' && !isTerminal;
   const progress = duration > 0 ? position / duration : 0;
   const isCurrentStory = currentStory?.id === story.id;
-
+  const showPlaceholder = !imageSource || imageError;
   const imageScale = useSharedValue(1);
-  const imageAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: imageScale.get() }],
-  }));
-
   const artworkDimension = useSharedValue(320);
+  const dimOpacity = useSharedValue(0);
+  const sleepOverlayOpacity = useSharedValue(0);
+  const terminalOpacity = useSharedValue(0);
 
   useEffect(() => {
-    const targetDimension = isWindDown
+    const targetDimension = isPostStory
       ? 160
       : Math.min(width - Spacing.xl * 2, (height || 600) * 0.35, 320);
-    artworkDimension.set(
-      withTiming(targetDimension, { duration: 1000, easing: Easing.out(Easing.ease) }),
-    );
-    return () => {
-      cancelAnimation(artworkDimension);
-    };
-  }, [isWindDown, width, height, artworkDimension]);
-
-  const artworkAnimatedContainerStyle = useAnimatedStyle(() => ({
-    width: artworkDimension.get(),
-    height: artworkDimension.get(),
-  }));
-
-  const dimOpacity = useSharedValue(0);
-
-  useEffect(() => {
-    const dimTarget =
-      phase === 'pillow_talk'
-        ? 0.6
-        : phase === 'affirmation'
-        ? 0.85
-        : phase === 'fade_to_black'
-        ? 1.0
-        : 0;
-    const dimDuration = phase === 'fade_to_black' ? 4000 : 2000;
-    dimOpacity.set(
-      withTiming(dimTarget, { duration: dimDuration, easing: Easing.out(Easing.ease) }),
-    );
-    return () => {
-      cancelAnimation(dimOpacity);
-    };
-  }, [phase, dimOpacity]);
-
-  const dimOverlayStyle = useAnimatedStyle(() => ({
-    opacity: dimOpacity.get(),
-  }));
-
-  const swipeHintOpacity = useSharedValue(1);
-
-  useEffect(() => {
-    if (isWindDown && (phase === 'pillow_talk' || phase === 'affirmation')) {
-      swipeHintOpacity.set(1);
-      swipeHintOpacity.set(
-        withDelay(
-          3000,
-          withTiming(0, { duration: 1000, easing: Easing.out(Easing.ease) }),
-        ),
+    if (reducedMotion) {
+      artworkDimension.set(targetDimension);
+    } else {
+      artworkDimension.set(
+        withTiming(targetDimension, { duration: 1000, easing: Easing.out(Easing.ease) }),
       );
-    } else {
-      swipeHintOpacity.set(0);
     }
-    return () => {
-      cancelAnimation(swipeHintOpacity);
-    };
-  }, [isWindDown, phase, swipeHintOpacity]);
-
-  const swipeHintAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: swipeHintOpacity.get(),
-  }));
+    return () => cancelAnimation(artworkDimension);
+  }, [artworkDimension, height, isPostStory, reducedMotion, width]);
 
   useEffect(() => {
-    if (isWindDown) {
-      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = setTimeout(() => {
-        setControlsVisible(false);
-      }, HIDE_DELAY);
-    } else {
-      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-    }
-    return () => {
-      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-    };
-  }, [isWindDown, phase]);
-
-  const handleWindDownTap = () => {
-    if (!isWindDown) return;
-    setControlsVisible((prev) => {
-      if (prev) {
-        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-        return false;
-      } else {
-        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-        hideTimerRef.current = setTimeout(() => {
-          setControlsVisible(false);
-        }, HIDE_DELAY);
-        return true;
-      }
-    });
-  };
-
-  const panGesture = Gesture.Pan()
-    .activeOffsetX([-50, 50])
-    .activeOffsetY([-50, 50])
-    .onEnd((event) => {
-      'worklet';
-      if (phase === 'pillow_talk') {
-        if (event.translationX < -50 || event.translationY < -50) {
-          runOnJS(skipPillowTalk)();
-        }
-      } else if (phase === 'affirmation') {
-        if (event.translationY < -50) {
-          runOnJS(startFadeToBlack)();
-        }
-      }
-    });
-
-  const tapGesture = Gesture.Tap().onEnd(() => {
-    'worklet';
-    runOnJS(handleWindDownTap)();
-  });
-
-  const composedGesture = Gesture.Race(panGesture, tapGesture);
-
-  const sleepOverlayOpacity = useSharedValue(0);
-  const sleepOverlayStyle = useAnimatedStyle(() => ({
-    opacity: sleepOverlayOpacity.get(),
-  }));
+    const targetOpacity =
+      phase === 'affirmation' ? 0.85 : phase === 'fading' || phase === 'pillow_talk' ? 0.6 : 0;
+    dimOpacity.set(
+      withTiming(targetOpacity, { duration: 1000, easing: Easing.out(Easing.ease) }),
+    );
+    return () => cancelAnimation(dimOpacity);
+  }, [dimOpacity, phase]);
 
   useEffect(() => {
-    if (isPlaying && isCurrentStory) {
+    const targetOpacity = isSleepMode && phase === 'idle' ? 0.92 : 0;
+    sleepOverlayOpacity.set(
+      withTiming(targetOpacity, { duration: 1000, easing: Easing.out(Easing.ease) }),
+    );
+    return () => cancelAnimation(sleepOverlayOpacity);
+  }, [isSleepMode, phase, sleepOverlayOpacity]);
+
+  useEffect(() => {
+    if (reducedMotion) {
+      imageScale.set(1);
+    } else if (isPlaying && isCurrentStory) {
       imageScale.set(
         withRepeat(
           withTiming(1.02, { duration: 15000, easing: Easing.inOut(Easing.ease) }),
@@ -211,23 +110,41 @@ export function StoryPlayer({
     } else {
       imageScale.set(withTiming(1, { duration: 300, easing: Easing.out(Easing.ease) }));
     }
-    return () => {
-      cancelAnimation(imageScale);
-    };
-  }, [isPlaying, isCurrentStory, imageScale]);
+    return () => cancelAnimation(imageScale);
+  }, [imageScale, isCurrentStory, isPlaying, reducedMotion]);
 
   useEffect(() => {
-    sleepOverlayOpacity.set(
-      withTiming(isSleepMode ? 0.92 : 0, { duration: 1000, easing: Easing.out(Easing.ease) }),
-    );
-    return () => {
-      cancelAnimation(sleepOverlayOpacity);
-    };
-  }, [isSleepMode, sleepOverlayOpacity]);
+    if (phase === 'fade_to_black') {
+      terminalOpacity.set(
+        withTiming(1, { duration: 1000, easing: Easing.out(Easing.ease) }, (finished) => {
+          if (finished) runOnJS(completeWindDown)();
+        }),
+      );
+    } else if (phase === 'done') {
+      terminalOpacity.set(1);
+    } else {
+      terminalOpacity.set(0);
+    }
+    return () => cancelAnimation(terminalOpacity);
+  }, [completeWindDown, phase, terminalOpacity]);
+
+  useEffect(() => {
+    if (phase !== 'pillow_talk' && phase !== 'affirmation') {
+      announcedPhaseRef.current = null;
+      return;
+    }
+    if (phase === 'pillow_talk' && announcedPhaseRef.current !== phase) {
+      announcedPhaseRef.current = phase;
+      AccessibilityInfo.announceForAccessibility(`Pillow talk. ${story.pillow_talk_prompt}`);
+    } else if (announcedPhaseRef.current !== phase) {
+      announcedPhaseRef.current = phase;
+      AccessibilityInfo.announceForAccessibility(`Say together. ${story.sleepy_affirmation}`);
+    }
+  }, [phase, story.pillow_talk_prompt, story.sleepy_affirmation]);
 
   const handlePlayPause = () => {
     if (!isCurrentStory) {
-      playStory(story);
+      void playStory(story);
     } else if (isPlaying) {
       pause();
     } else {
@@ -235,205 +152,200 @@ export function StoryPlayer({
     }
   };
 
-  const handleSeek = (seconds: number) => {
-    seekTo(seconds);
+  const handleBack = () => {
+    if (phase === 'idle') {
+      onBack();
+    } else if (!isTerminal) {
+      finishWindDown();
+    }
   };
 
-  const handleSeekRelative = (delta: number) => {
-    const nextPos = Math.max(0, Math.min(duration, position + delta));
-    seekTo(nextPos);
-  };
-
-  const showPlaceholder = !imageSource || imageError;
+  const artworkAnimatedStyle = useAnimatedStyle(() => ({
+    width: artworkDimension.get(),
+    height: artworkDimension.get(),
+    transform: [{ scale: imageScale.get() }],
+  }));
+  const dimOverlayStyle = useAnimatedStyle(() => ({ opacity: dimOpacity.get() }));
+  const sleepOverlayStyle = useAnimatedStyle(() => ({ opacity: sleepOverlayOpacity.get() }));
+  const terminalCurtainStyle = useAnimatedStyle(() => ({ opacity: terminalOpacity.get() }));
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* Header Bar */}
-      <View style={styles.topBar}>
-        <IconButton testID="player-back-button" accessibilityLabel="Go back" onPress={onBack}>
-          <SymbolView
-            name={{ ios: 'chevron.backward', android: 'arrow_back' }}
-            size={24}
-            tintColor={Colors.dark.textPrimary}
-          />
-        </IconButton>
-
-        <IconButton
-          testID="sleep-mode-button"
-          accessibilityLabel="Sleep Mode"
-          onPress={toggleSleepMode}
-        >
-          <SymbolView
-            name={{ ios: 'moon.fill', android: 'bedtime' }}
-            size={24}
-            tintColor={isSleepMode ? CATEGORY_COLORS.bedtime.primary : Colors.dark.textPrimary}
-          />
-        </IconButton>
-      </View>
-
-      {/* Main Content Vertical Stack wrapped in GestureDetector */}
-      <GestureDetector gesture={composedGesture}>
-        <View style={styles.content}>
-          {/* Centered Artwork Card */}
-          <View style={styles.artworkWrapper}>
-            <Animated.View
-              style={[
-                styles.artworkContainer,
-                artworkAnimatedContainerStyle,
-                imageAnimatedStyle,
-              ]}
+    <View style={styles.root}>
+      <Animated.View style={[styles.backgroundDim, dimOverlayStyle]} pointerEvents="none" />
+      <Animated.View style={[styles.sleepOverlay, sleepOverlayStyle]} pointerEvents="none" />
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.topBar}>
+          <IconButton testID="player-back-button" accessibilityLabel="Go back" onPress={handleBack}>
+            <SymbolView
+              name={{ ios: 'chevron.backward', android: 'arrow_back' }}
+              size={24}
+              tintColor={Colors.dark.textPrimary}
+            />
+          </IconButton>
+          {!isPostStory && (
+            <IconButton
+              testID="sleep-mode-button"
+              accessibilityLabel="Sleep Mode"
+              onPress={toggleSleepMode}
             >
-              {showPlaceholder ? (
-                <View style={styles.placeholder}>
-                  <ThemedText style={styles.placeholderEmoji}>
-                    {protagonist?.emoji ?? '📖'}
-                  </ThemedText>
-                </View>
-              ) : (
-                <Image
-                  testID="artwork-image"
-                  source={imageSource!}
-                  style={styles.artworkImage}
-                  resizeMode="cover"
-                  onError={() => setImageError(true)}
-                />
-              )}
-            </Animated.View>
-          </View>
-
-          {!isWindDown ? (
-            <>
-              {/* Track Metadata */}
-              <View style={styles.metadataArea}>
-                <ThemedText style={styles.storyTitle} numberOfLines={2}>
-                  {story.title}
-                </ThemedText>
-                <ThemedText style={styles.subtitleText} numberOfLines={1}>
-                  {protagonist?.name ? `${protagonist.name} • ` : ''}{story.moral}
-                </ThemedText>
-              </View>
-
-              {/* Seek Bar */}
-              <View style={styles.seekArea}>
-                <SeekBar
-                  progress={progress}
-                  position={position}
-                  duration={duration}
-                  onSeek={handleSeek}
-                />
-              </View>
-
-              {/* Playback Controls */}
-              <View style={styles.controlsRow}>
-                <IconButton
-                  variant="bare"
-                  testID="seek-backward-button"
-                  accessibilityLabel="Rewind 15 seconds"
-                  onPress={() => handleSeekRelative(-15)}
-                >
-                  <SymbolView
-                    name={{ ios: 'gobackward.15', android: 'replay_10' }}
-                    size={28}
-                    tintColor={Colors.dark.textSecondary}
-                  />
-                </IconButton>
-
-                <IconButton
-                  testID="play-pause-button"
-                  size={72}
-                  accessibilityLabel={isPlaying && isCurrentStory ? 'Pause' : 'Play'}
-                  onPress={handlePlayPause}
-                >
-                  {isBuffering && isCurrentStory ? (
-                    <ActivityIndicator size="small" color={Colors.dark.textPrimary} />
-                  ) : (
-                    <SymbolView
-                      name={
-                        isPlaying && isCurrentStory
-                          ? { ios: 'pause.fill', android: 'pause' }
-                          : { ios: 'play.fill', android: 'play_arrow' }
-                      }
-                      size={36}
-                      tintColor={Colors.dark.textPrimary}
-                    />
-                  )}
-                </IconButton>
-
-                <IconButton
-                  variant="bare"
-                  testID="seek-forward-button"
-                  accessibilityLabel="Forward 15 seconds"
-                  onPress={() => handleSeekRelative(15)}
-                >
-                  <SymbolView
-                    name={{ ios: 'goforward.15', android: 'forward_10' }}
-                    size={28}
-                    tintColor={Colors.dark.textSecondary}
-                  />
-                </IconButton>
-              </View>
-            </>
-          ) : (
-            <View style={styles.windDownArea}>
-              {phase === 'pillow_talk' && (
-                <Animated.View
-                  key="pillow_talk"
-                  entering={FadeInRight?.duration ? FadeInRight.duration(400) : undefined}
-                  exiting={FadeOutLeft?.duration ? FadeOutLeft.duration(400) : undefined}
-                  style={styles.phaseContentWrapper}
-                >
-                  <PillowTalkContent prompt={story.pillow_talk_prompt ?? ''} />
-                  <GestureHintCue phase="pillow_talk" hintStyle={swipeHintAnimatedStyle} />
-                  {controlsVisible && (
-                    <View style={styles.windDownButtons}>
-                      <Button label="Next" fullWidth onPress={skipPillowTalk} />
-                      <Button
-                        label="Skip for tonight"
-                        variant="secondary"
-                        fullWidth
-                        onPress={startFadeToBlack}
-                      />
-                    </View>
-                  )}
-                </Animated.View>
-              )}
-
-              {phase === 'affirmation' && (
-                <Animated.View
-                  key="affirmation"
-                  entering={FadeInRight?.duration ? FadeInRight.duration(400) : undefined}
-                  exiting={FadeOutLeft?.duration ? FadeOutLeft.duration(400) : undefined}
-                  style={styles.phaseContentWrapper}
-                >
-                  <AffirmationContent text={story.sleepy_affirmation ?? ''} />
-                  <GestureHintCue phase="affirmation" hintStyle={swipeHintAnimatedStyle} />
-                  {controlsVisible && (
-                    <View style={styles.windDownButtons}>
-                      <Button label="Goodnight" fullWidth onPress={startFadeToBlack} />
-                    </View>
-                  )}
-                </Animated.View>
-              )}
-
-              {phase === 'fade_to_black' && <View style={styles.blankWindDown} />}
-            </View>
+              <SymbolView
+                name={{ ios: 'moon.fill', android: 'bedtime' }}
+                size={24}
+                tintColor={isSleepMode ? CATEGORY_COLORS.bedtime.primary : Colors.dark.textPrimary}
+              />
+            </IconButton>
           )}
         </View>
-      </GestureDetector>
 
-      {/* Dimming Curtain Overlay */}
-      <Animated.View style={[styles.dimOverlay, dimOverlayStyle]} pointerEvents="none" />
+        <View style={styles.content}>
+          <View style={styles.contentColumn}>
+            {showsArtwork && (
+              <View style={styles.artworkWrapper}>
+                <Animated.View
+                  style={[styles.artworkContainer, artworkAnimatedStyle]}
+                  exiting={reducedMotion ? undefined : FadeOut.duration(400)}
+                >
+                  {showPlaceholder ? (
+                    <View style={styles.placeholder}>
+                      <ThemedText style={styles.placeholderEmoji}>
+                        {protagonist?.emoji ?? '📖'}
+                      </ThemedText>
+                    </View>
+                  ) : (
+                    <Image
+                      testID="artwork-image"
+                      source={imageSource}
+                      style={styles.artworkImage}
+                      resizeMode="cover"
+                      onError={() => setImageError(true)}
+                    />
+                  )}
+                </Animated.View>
+              </View>
+            )}
 
-      {/* Sleep Mode Overlay */}
-      <Animated.View style={[styles.sleepOverlay, sleepOverlayStyle]} pointerEvents="none" />
-    </SafeAreaView>
+            {phase === 'idle' && (
+              <>
+                <View style={styles.metadataArea}>
+                  <ThemedText type="title" style={styles.storyTitle} numberOfLines={2}>
+                    {story.title}
+                  </ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary" style={styles.subtitleText} numberOfLines={1}>
+                    {protagonist?.name ? `${protagonist.name} • ` : ''}{story.moral}
+                  </ThemedText>
+                </View>
+                <View style={styles.seekArea}>
+                  <SeekBar
+                    progress={progress}
+                    position={position}
+                    duration={duration}
+                    onSeek={seekTo}
+                  />
+                </View>
+                <View style={styles.controlsRow}>
+                  <IconButton
+                    variant="bare"
+                    testID="seek-backward-button"
+                    accessibilityLabel="Rewind 15 seconds"
+                    onPress={() => seekTo(Math.max(0, Math.min(duration, position - 15)))}
+                  >
+                    <SymbolView
+                      name={{ ios: 'gobackward.15', android: 'replay_10' }}
+                      size={28}
+                      tintColor={Colors.dark.textSecondary}
+                    />
+                  </IconButton>
+                  <IconButton
+                    testID="play-pause-button"
+                    size={72}
+                    accessibilityLabel={isPlaying && isCurrentStory ? 'Pause' : 'Play'}
+                    onPress={handlePlayPause}
+                  >
+                    {isBuffering && isCurrentStory ? (
+                      <ActivityIndicator size="small" color={Colors.dark.textPrimary} />
+                    ) : (
+                      <SymbolView
+                        name={
+                          isPlaying && isCurrentStory
+                            ? { ios: 'pause.fill', android: 'pause' }
+                            : { ios: 'play.fill', android: 'play_arrow' }
+                        }
+                        size={36}
+                        tintColor={Colors.dark.textPrimary}
+                      />
+                    )}
+                  </IconButton>
+                  <IconButton
+                    variant="bare"
+                    testID="seek-forward-button"
+                    accessibilityLabel="Forward 15 seconds"
+                    onPress={() => seekTo(Math.max(0, Math.min(duration, position + 15)))}
+                  >
+                    <SymbolView
+                      name={{ ios: 'goforward.15', android: 'forward_10' }}
+                      size={28}
+                      tintColor={Colors.dark.textSecondary}
+                    />
+                  </IconButton>
+                </View>
+              </>
+            )}
+
+            {phase === 'pillow_talk' && (
+              <Animated.View
+                entering={reducedMotion ? undefined : FadeIn.duration(400)}
+                exiting={reducedMotion ? undefined : FadeOut.duration(400)}
+                style={styles.windDownArea}
+              >
+                <PillowTalkContent prompt={story.pillow_talk_prompt} />
+                <View style={styles.windDownButtons}>
+                  <Button label="Show affirmation" fullWidth onPress={showAffirmation} />
+                  <Button label="Skip wind-down" variant="ghost" fullWidth onPress={finishWindDown} />
+                </View>
+              </Animated.View>
+            )}
+
+            {phase === 'affirmation' && (
+              <Animated.View
+                entering={reducedMotion ? undefined : FadeIn.duration(400)}
+                exiting={reducedMotion ? undefined : FadeOut.duration(400)}
+                style={styles.windDownArea}
+              >
+                <AffirmationContent text={story.sleepy_affirmation} />
+                <View style={styles.windDownButtons}>
+                  <Button label="Goodnight" fullWidth onPress={finishWindDown} />
+                </View>
+              </Animated.View>
+            )}
+          </View>
+        </View>
+      </SafeAreaView>
+      {isTerminal && (
+        <Animated.View
+          testID="terminal-curtain"
+          style={[styles.terminalCurtain, terminalCurtainStyle]}
+          pointerEvents="auto"
+        />
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
     backgroundColor: Colors.dark.bgBase,
+  },
+  container: {
+    flex: 1,
+  },
+  backgroundDim: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: Colors.dark.bgDeepest,
+  },
+  sleepOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: Colors.dark.bgDeepest,
   },
   topBar: {
     flexDirection: 'row',
@@ -443,10 +355,15 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.xl,
     paddingTop: Spacing.xs,
+  },
+  contentColumn: {
+    flex: 1,
+    width: '100%',
+    maxWidth: MaxContentWidth,
   },
   artworkWrapper: {
     alignItems: 'center',
@@ -454,7 +371,7 @@ const styles = StyleSheet.create({
     marginVertical: Spacing.sm,
   },
   artworkContainer: {
-    borderRadius: 16,
+    borderRadius: BorderRadius.lg,
     overflow: 'hidden',
     backgroundColor: Colors.dark.bgSurface,
   },
@@ -477,15 +394,9 @@ const styles = StyleSheet.create({
     marginVertical: Spacing.xs,
   },
   storyTitle: {
-    color: Colors.dark.textPrimary,
-    fontSize: 24,
-    fontWeight: '700',
     textAlign: 'center',
-    letterSpacing: -0.24,
   },
   subtitleText: {
-    color: Colors.dark.textSecondary,
-    fontSize: 14,
     textAlign: 'center',
   },
   seekArea: {
@@ -501,37 +412,15 @@ const styles = StyleSheet.create({
   },
   windDownArea: {
     flex: 1,
-    justifyContent: 'space-between',
-    alignItems: 'stretch',
-  },
-  phaseContentWrapper: {
-    flex: 1,
     width: '100%',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  blankWindDown: {
-    flex: 1,
   },
   windDownButtons: {
     width: '100%',
     gap: Spacing.sm,
     paddingTop: Spacing.sm,
   },
-  dimOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: Colors.dark.bgDeepest,
-  },
-  sleepOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  terminalCurtain: {
+    ...StyleSheet.absoluteFill,
     backgroundColor: Colors.dark.bgDeepest,
   },
 });

@@ -93,7 +93,8 @@ jest.mock('@/lib/audio-utils', () => ({
 }));
 
 import type { Story } from '@/types';
-import { PlayerProvider, usePlayer } from '../PlayerContext';
+import { PlayerProvider, usePlayer, type PlayerContextValue } from '../PlayerContext';
+let contextActions: PlayerContextValue | null = null;
 
 const STORY: Story = {
   id: 'story-1',
@@ -112,8 +113,24 @@ const STORY: Story = {
 
 const STORY_TWO: Story = { ...STORY, id: 'story-2', title: 'Second Story' };
 
+const STORY_WITHOUT_PROMPT: Story = { ...STORY, id: 'story-no-prompt', pillow_talk_prompt: '' };
+const STORY_WITHOUT_AFFIRMATION: Story = {
+  ...STORY,
+  id: 'story-no-affirmation',
+  sleepy_affirmation: '',
+};
+const STORY_WITHOUT_WIND_DOWN: Story = {
+  ...STORY,
+  id: 'story-no-wind-down',
+  pillow_talk_prompt: '',
+  sleepy_affirmation: '',
+};
+
 function TestComponent() {
   const player = usePlayer();
+  React.useEffect(() => {
+    contextActions = player;
+  }, [player]);
   return (
     <View>
       <Text testID="story">{player.currentStory?.title ?? 'none'}</Text>
@@ -123,13 +140,23 @@ function TestComponent() {
       <Text testID="duration">{String(player.duration)}</Text>
       <Text testID="phase">{player.postStoryPhase}</Text>
       <Pressable testID="play" onPress={() => player.playStory(STORY)} />
+      <Pressable testID="playNoPrompt" onPress={() => player.playStory(STORY_WITHOUT_PROMPT)} />
+      <Pressable
+        testID="playNoAffirmation"
+        onPress={() => player.playStory(STORY_WITHOUT_AFFIRMATION)}
+      />
+      <Pressable
+        testID="playNoWindDown"
+        onPress={() => player.playStory(STORY_WITHOUT_WIND_DOWN)}
+      />
       <Pressable testID="playTwo" onPress={() => player.playStory(STORY_TWO)} />
       <Pressable testID="pause" onPress={player.pause} />
       <Pressable testID="resume" onPress={player.resume} />
       <Pressable testID="seek" onPress={() => player.seekTo(40.5)} />
       <Pressable testID="stop" onPress={player.stopStory} />
-      <Pressable testID="skip" onPress={player.skipPillowTalk} />
-      <Pressable testID="confirm" onPress={player.confirmAffirmation} />
+      <Pressable testID="showAffirmation" onPress={player.showAffirmation} />
+      <Pressable testID="finishWindDown" onPress={player.finishWindDown} />
+      <Pressable testID="completeWindDown" onPress={player.completeWindDown} />
     </View>
   );
 }
@@ -177,7 +204,7 @@ describe('PlayerContext playlist playback', () => {
 
   it('starts one playlist per story with the completed first segment', async () => {
     const view = await renderPlayer();
-    await act(async () => fireEvent.press(view.getByTestId('play')));
+    await fireEvent.press(view.getByTestId('play'));
 
     expect(mockCreateAudioPlaylist).toHaveBeenCalledWith({
       sources: [{ uri: 'file://story-1-0.mp3' }],
@@ -196,7 +223,7 @@ describe('PlayerContext playlist playback', () => {
 
   it('configures background playback before creating the playlist', async () => {
     const view = await renderPlayer();
-    await act(async () => fireEvent.press(view.getByTestId('play')));
+    await fireEvent.press(view.getByTestId('play'));
 
     expect(mockSetAudioModeAsync).toHaveBeenCalledWith({
       playsInSilentMode: true,
@@ -216,7 +243,7 @@ describe('PlayerContext playlist playback', () => {
         index === 1 ? second.promise : Promise.resolve(segment(storyId, index, text)),
     );
     const view = await renderPlayer();
-    await act(async () => fireEvent.press(view.getByTestId('play')));
+    await fireEvent.press(view.getByTestId('play'));
 
     expect(mockStreamStorySegment).toHaveBeenCalledTimes(2);
     expect(mockStreamStorySegment).not.toHaveBeenCalledWith('story-1', 2, 'two');
@@ -233,7 +260,7 @@ describe('PlayerContext playlist playback', () => {
   it('uses native track progression and reports cumulative position', async () => {
     mockSplitStoryIntoSegments.mockReturnValue(['zero', 'one'.repeat(10)]);
     const view = await renderPlayer();
-    await act(async () => fireEvent.press(view.getByTestId('play')));
+    await fireEvent.press(view.getByTestId('play'));
     const playlist = playlistInstances[0];
 
     await act(async () => playlist.emit({ currentIndex: 0, currentTime: 40, duration: 40 }));
@@ -255,7 +282,7 @@ describe('PlayerContext playlist playback', () => {
         index === 1 ? second.promise : Promise.resolve(segment(storyId, index, text)),
     );
     const view = await renderPlayer();
-    await act(async () => fireEvent.press(view.getByTestId('play')));
+    await fireEvent.press(view.getByTestId('play'));
     const playlist = playlistInstances[0];
 
     await act(async () => playlist.emit({ didJustFinish: true, duration: 40, currentTime: 40 }));
@@ -277,10 +304,10 @@ describe('PlayerContext playlist playback', () => {
         index === 1 ? second.promise : Promise.resolve(segment(storyId, index, text)),
     );
     const view = await renderPlayer();
-    await act(async () => fireEvent.press(view.getByTestId('play')));
+    await fireEvent.press(view.getByTestId('play'));
     const playlist = playlistInstances[0];
     await act(async () => playlist.emit({ didJustFinish: true }));
-    await act(async () => fireEvent.press(view.getByTestId('pause')));
+    await fireEvent.press(view.getByTestId('pause'));
 
     await act(async () => second.resolve(segment('story-1', 1, 'one')));
     expect(playlist.next).not.toHaveBeenCalled();
@@ -296,10 +323,10 @@ describe('PlayerContext playlist playback', () => {
         index === 1 ? second.promise : Promise.resolve(segment(storyId, index, text)),
     );
     const view = await renderPlayer();
-    await act(async () => fireEvent.press(view.getByTestId('play')));
+    await fireEvent.press(view.getByTestId('play'));
     const playlist = playlistInstances[0];
     await act(async () => playlist.emit({ didJustFinish: true }));
-    await act(async () => fireEvent.press(view.getByTestId('resume')));
+    await fireEvent.press(view.getByTestId('resume'));
 
     expect(playlist.play).toHaveBeenCalledTimes(1);
     expect(view.getByTestId('buffering').props.children).toBe('true');
@@ -313,11 +340,11 @@ describe('PlayerContext playlist playback', () => {
   it('seeks across known segment durations using playlist track indexes', async () => {
     mockSplitStoryIntoSegments.mockReturnValue(['zero', 'one'.repeat(10)]);
     const view = await renderPlayer();
-    await act(async () => fireEvent.press(view.getByTestId('play')));
+    await fireEvent.press(view.getByTestId('play'));
     const playlist = playlistInstances[0];
     await act(async () => playlist.emit({ currentIndex: 0, duration: 40, currentTime: 10 }));
 
-    await act(async () => fireEvent.press(view.getByTestId('seek')));
+    await fireEvent.press(view.getByTestId('seek'));
     expect(playlist.skipTo).toHaveBeenCalledWith(1);
     expect(playlist.seekTo.mock.calls[0][0]).toBeCloseTo(0.5, 5);
     expect(Number(view.getByTestId('position').props.children)).toBe(40.5);
@@ -331,9 +358,9 @@ describe('PlayerContext playlist playback', () => {
         index === 1 ? second.promise : Promise.resolve(segment(storyId, index, text)),
     );
     const view = await renderPlayer();
-    await act(async () => fireEvent.press(view.getByTestId('play')));
+    await fireEvent.press(view.getByTestId('play'));
     const playlist = playlistInstances[0];
-    await act(async () => fireEvent.press(view.getByTestId('seek')));
+    await fireEvent.press(view.getByTestId('seek'));
     expect(playlist.pause).toHaveBeenCalled();
     expect(view.getByTestId('buffering').props.children).toBe('true');
 
@@ -345,16 +372,16 @@ describe('PlayerContext playlist playback', () => {
 
   it('cancels and destroys playback on stop and unmount', async () => {
     const view = await renderPlayer();
-    await act(async () => fireEvent.press(view.getByTestId('play')));
+    await fireEvent.press(view.getByTestId('play'));
     const firstPlaylist = playlistInstances[0];
-    await act(async () => fireEvent.press(view.getByTestId('stop')));
+    await fireEvent.press(view.getByTestId('stop'));
 
     expect(mockCancelStoryAudio).toHaveBeenCalledWith('story-1');
     expect(firstPlaylist.pause).toHaveBeenCalled();
     expect(firstPlaylist.destroy).toHaveBeenCalledTimes(1);
     expect(view.getByTestId('story').props.children).toBe('none');
 
-    await act(async () => fireEvent.press(view.getByTestId('play')));
+    await fireEvent.press(view.getByTestId('play'));
     const secondPlaylist = playlistInstances[1];
     await view.unmount();
     expect(secondPlaylist.destroy).toHaveBeenCalledTimes(1);
@@ -368,8 +395,8 @@ describe('PlayerContext playlist playback', () => {
       return Promise.resolve(segment(storyId, index, text));
     });
     const view = await renderPlayer();
-    await act(async () => fireEvent.press(view.getByTestId('play')));
-    await act(async () => fireEvent.press(view.getByTestId('playTwo')));
+    await fireEvent.press(view.getByTestId('play'));
+    await fireEvent.press(view.getByTestId('playTwo'));
     expect(view.getByTestId('story').props.children).toBe('Second Story');
 
     await act(async () => staleSecond.resolve(segment('story-1', 1, 'one')));
@@ -382,19 +409,19 @@ describe('PlayerContext playlist playback', () => {
   it('allows retry after initial generation failure', async () => {
     mockStreamStorySegment.mockRejectedValueOnce(new Error('network'));
     const view = await renderPlayer();
-    await act(async () => fireEvent.press(view.getByTestId('play')));
+    await fireEvent.press(view.getByTestId('play'));
     expect(mockCreateAudioPlaylist).not.toHaveBeenCalled();
     expect(view.getByTestId('playing').props.children).toBe('false');
 
-    await act(async () => fireEvent.press(view.getByTestId('play')));
+    await fireEvent.press(view.getByTestId('play'));
     expect(mockCreateAudioPlaylist).toHaveBeenCalledTimes(1);
     expect(view.getByTestId('playing').props.children).toBe('true');
   });
 
-  it('enters the post-story flow exactly once after the final track', async () => {
+  it('runs the full post-story sequence once after duplicate final events', async () => {
     jest.useFakeTimers();
     const view = await renderPlayer();
-    await act(async () => fireEvent.press(view.getByTestId('play')));
+    await fireEvent.press(view.getByTestId('play'));
     const playlist = playlistInstances[0];
 
     await act(async () => {
@@ -402,17 +429,97 @@ describe('PlayerContext playlist playback', () => {
       playlist.emit({ didJustFinish: true, duration: 40, currentTime: 40 });
     });
     expect(view.getByTestId('phase').props.children).toBe('fading');
-    await act(async () => jest.advanceTimersByTime(3100));
 
+    await act(async () => jest.advanceTimersByTime(3000));
     expect(playlist.destroy).toHaveBeenCalledTimes(1);
     expect(mockCreateAudioPlayer).toHaveBeenCalledTimes(1);
-    expect(mockCreateAudioPlayer).toHaveBeenCalledWith('ambient-rain');
     expect(view.getByTestId('phase').props.children).toBe('pillow_talk');
 
-    await act(async () => fireEvent.press(view.getByTestId('skip')));
-    expect(mockAmbientPlayer.remove).toHaveBeenCalled();
+    await fireEvent.press(view.getByTestId('showAffirmation'));
     expect(view.getByTestId('phase').props.children).toBe('affirmation');
-    await act(async () => fireEvent.press(view.getByTestId('confirm')));
+    expect(mockCreateAudioPlayer).toHaveBeenCalledTimes(1);
+
+    await fireEvent.press(view.getByTestId('finishWindDown'));
+    expect(view.getByTestId('phase').props.children).toBe('fade_to_black');
+    await act(async () => jest.advanceTimersByTime(1000));
+    expect(view.getByTestId('phase').props.children).toBe('fade_to_black');
+
+    await fireEvent.press(view.getByTestId('completeWindDown'));
+    expect(mockAmbientPlayer.remove).toHaveBeenCalledTimes(1);
     expect(view.getByTestId('phase').props.children).toBe('done');
+    jest.useRealTimers();
+  });
+
+  it('skips unavailable content while preserving the terminal visual phase', async () => {
+    jest.useFakeTimers();
+    const view = await renderPlayer();
+    await fireEvent.press(view.getByTestId('playNoPrompt'));
+    await act(async () => playlistInstances[0].emit({ didJustFinish: true }));
+    await act(async () => jest.advanceTimersByTime(3000));
+    expect(view.getByTestId('phase').props.children).toBe('affirmation');
+    expect(mockCreateAudioPlayer).toHaveBeenCalledTimes(1);
+
+    await fireEvent.press(view.getByTestId('stop'));
+    await fireEvent.press(view.getByTestId('playNoWindDown'));
+    await act(async () => playlistInstances[1].emit({ didJustFinish: true }));
+    await act(async () => jest.advanceTimersByTime(3000));
+    expect(view.getByTestId('phase').props.children).toBe('fade_to_black');
+    expect(mockCreateAudioPlayer).toHaveBeenCalledTimes(1);
+
+    await fireEvent.press(view.getByTestId('completeWindDown'));
+    expect(view.getByTestId('phase').props.children).toBe('done');
+    jest.useRealTimers();
+  });
+
+  it('finishes from Pillow Talk when affirmation is unavailable', async () => {
+    jest.useFakeTimers();
+    const view = await renderPlayer();
+    await fireEvent.press(view.getByTestId('playNoAffirmation'));
+    await act(async () => playlistInstances[0].emit({ didJustFinish: true }));
+    await act(async () => jest.advanceTimersByTime(3000));
+    expect(view.getByTestId('phase').props.children).toBe('pillow_talk');
+
+    await fireEvent.press(view.getByTestId('showAffirmation'));
+    expect(view.getByTestId('phase').props.children).toBe('fade_to_black');
+    jest.useRealTimers();
+  });
+  it('releases an ambient player when playback startup throws', async () => {
+    jest.useFakeTimers();
+    mockAmbientPlayer.play.mockImplementationOnce(() => {
+      throw new Error('ambient playback unavailable');
+    });
+    const view = await renderPlayer();
+    await fireEvent.press(view.getByTestId('play'));
+    await act(async () => playlistInstances[0].emit({ didJustFinish: true }));
+    await act(async () => jest.advanceTimersByTime(3000));
+    expect(view.getByTestId('phase').props.children).toBe('pillow_talk');
+    expect(mockAmbientPlayer.remove).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
+  });
+
+
+
+  it('continues the lifecycle when ambient setup fails and ignores repeated completion', async () => {
+    jest.useFakeTimers();
+    mockCreateAudioPlayer.mockImplementationOnce(() => {
+      throw new Error('ambient unavailable');
+    });
+    const view = await renderPlayer();
+    await fireEvent.press(view.getByTestId('play'));
+    const playlist = playlistInstances[0];
+    await act(async () => playlist.emit({ didJustFinish: true }));
+    await act(async () => jest.advanceTimersByTime(3000));
+    expect(view.getByTestId('phase').props.children).toBe('pillow_talk');
+
+    await act(async () => {
+      contextActions!.finishWindDown();
+      contextActions!.finishWindDown();
+      contextActions!.completeWindDown();
+      contextActions!.completeWindDown();
+    });
+    expect(mockCancelStoryAudio).toHaveBeenCalledTimes(1);
+    expect(playlist.destroy).toHaveBeenCalledTimes(1);
+    expect(view.getByTestId('phase').props.children).toBe('done');
+    jest.useRealTimers();
   });
 });

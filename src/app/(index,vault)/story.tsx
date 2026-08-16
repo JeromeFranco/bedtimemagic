@@ -1,10 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 
 import { StoryPlayer } from '@/components/story/story-player';
-import { PillowTalk } from '@/components/story/pillow-talk';
-import { Affirmation } from '@/components/story/affirmation';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
@@ -18,45 +16,62 @@ import { getCachedCoverPath, cacheCoverImage } from '@/lib/audio-cache';
 
 export default function StoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const navigation = useNavigation();
   const { data: story, isLoading, error } = useStory(id!);
-  const { postStoryPhase, stopStory, skipPillowTalk, confirmAffirmation } = usePlayer();
-
+  const { postStoryPhase, stopStory, finishWindDown } = usePlayer();
   const [localCoverPath, setLocalCoverPath] = useState<string | null>(null);
-
   const { coverUrl } = useCoverImage(story?.id ?? '', story?.title ?? '');
+  const storyId = story?.id;
+  const storyText = story?.story_text;
+  const isPostStoryPhase =
+    postStoryPhase === 'fading' ||
+    postStoryPhase === 'pillow_talk' ||
+    postStoryPhase === 'affirmation' ||
+    postStoryPhase === 'fade_to_black';
+
+  const handleBack = useCallback(() => {
+    stopStory();
+    router.back();
+  }, [stopStory]);
 
   useEffect(() => {
-    if (!story) return;
-    getCachedCoverPath(story.id).then((path) => {
+    if (!storyId) return;
+    getCachedCoverPath(storyId).then((path) => {
       if (path) setLocalCoverPath(path);
     });
-  }, [story?.id]);
+  }, [storyId]);
 
   useEffect(() => {
-    if (coverUrl && story && !localCoverPath) {
-      cacheCoverImage(story.id, coverUrl)
+    if (coverUrl && storyId && !localCoverPath) {
+      cacheCoverImage(storyId, coverUrl)
         .then((path) => setLocalCoverPath(path))
         .catch(() => {});
     }
-  }, [coverUrl, story?.id, localCoverPath]);
+  }, [coverUrl, localCoverPath, storyId]);
 
   useEffect(() => {
-    if (story?.id && story?.story_text) {
-      prefetchStoryAudio(story.id, story.story_text).catch(() => {});
+    if (storyId && storyText) {
+      prefetchStoryAudio(storyId, storyText).catch(() => {});
     }
-  }, [story?.id, story?.story_text]);
+  }, [storyId, storyText]);
 
   useEffect(() => {
-    if (postStoryPhase === 'done') {
-      router.back();
-    }
+    if (postStoryPhase === 'done') router.back();
   }, [postStoryPhase]);
+
+  useEffect(() => {
+    if (!isPostStoryPhase) return;
+    return navigation.addListener('beforeRemove', (event) => {
+      event.preventDefault();
+      finishWindDown();
+    });
+  }, [finishWindDown, isPostStoryPhase, navigation]);
 
   useEffect(() => {
     return () => {
       stopStory();
     };
-  }, []);
+  }, [stopStory]);
 
   if (isLoading) {
     return (
@@ -80,39 +95,15 @@ export default function StoryScreen() {
   const imageSource = localCoverPath
     ? { uri: localCoverPath }
     : coverUrl
-    ? { uri: coverUrl }
-    : null;
-
-  if (postStoryPhase === 'pillow_talk') {
-    return (
-      <PillowTalk
-        story={story}
-        protagonistEmoji={protagonist?.emoji ?? '📖'}
-        imageSource={imageSource}
-        onSkip={skipPillowTalk}
-        onImageError={() => {}}
-      />
-    );
-  }
-
-  if (postStoryPhase === 'affirmation') {
-    return (
-      <Affirmation
-        text={story.sleepy_affirmation}
-        onConfirm={confirmAffirmation}
-      />
-    );
-  }
+      ? { uri: coverUrl }
+      : null;
 
   return (
     <StoryPlayer
       story={story}
       protagonist={protagonist}
       imageSource={imageSource}
-      onBack={() => {
-        stopStory();
-        router.back();
-      }}
+      onBack={handleBack}
     />
   );
 }

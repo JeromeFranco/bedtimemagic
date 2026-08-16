@@ -1,80 +1,70 @@
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, { type AnimatedStyle } from 'react-native-reanimated';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { BreathingCircle } from '@/components/breathing-circle';
 import { ThemedText } from '@/components/themed-text';
-import type { PostStoryPhase } from '@/contexts/PlayerContext';
-import { Colors, Spacing } from '@/theme';
-
-interface GestureHintCueProps {
-  phase: PostStoryPhase;
-  hintStyle?: StyleProp<AnimatedStyle<ViewStyle>>;
-}
-
-export function GestureHintCue({ phase, hintStyle }: GestureHintCueProps) {
-  const hintText = phase === 'pillow_talk' ? 'Swipe for Affirmation →' : 'Swipe for Goodnight ↑';
-  return (
-    <Animated.View style={[styles.hintContainer, hintStyle]}>
-      <ThemedText style={styles.hintText}>{hintText}</ThemedText>
-    </Animated.View>
-  );
-}
+import { Spacing } from '@/theme';
 
 interface WindDownContentProps {
   text: string;
-  postStoryPhase: PostStoryPhase;
+  label: string;
+  circleSize: number;
 }
 
-export function WindDownContent({ text, postStoryPhase }: WindDownContentProps) {
-  const circleSize = postStoryPhase === 'pillow_talk' ? 120 : 160;
+export function WindDownContent({ text, label, circleSize }: WindDownContentProps) {
   return (
-    <View style={styles.contentContainer}>
-      <ThemedText style={styles.windDownText}>{text}</ThemedText>
+    <ScrollView
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.textGroup}>
+        <ThemedText
+          accessibilityRole="header"
+          themeColor="textSecondary"
+          type="small"
+          style={styles.label}
+        >
+          {label}
+        </ThemedText>
+        <ThemedText type="heading" style={styles.windDownText}>
+          {text}
+        </ThemedText>
+      </View>
       <View style={styles.breathingContainer}>
         <BreathingCircle size={circleSize} testID="breathing-circle" />
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 export function PillowTalkContent({ prompt }: { prompt: string }) {
-  return <WindDownContent text={prompt} postStoryPhase="pillow_talk" />;
+  return <WindDownContent text={prompt} label="Pillow talk" circleSize={120} />;
 }
 
 export function AffirmationContent({ text }: { text: string }) {
-  return <WindDownContent text={text} postStoryPhase="affirmation" />;
+  return <WindDownContent text={text} label="Say together" circleSize={160} />;
 }
 
 const styles = StyleSheet.create({
   contentContainer: {
-    flex: 1,
-    justifyContent: 'space-between',
+    flexGrow: 1,
     alignItems: 'center',
-    paddingHorizontal: Spacing['2xl'],
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.xl,
   },
+  textGroup: {
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  label: {
+    textAlign: 'center',
+  },
   windDownText: {
-    color: Colors.dark.textPrimary,
-    fontSize: 23,
-    fontWeight: '400',
-    lineHeight: 34,
     textAlign: 'center',
   },
   breathingContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: Spacing.lg,
-  },
-  hintContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.xs,
-  },
-  hintText: {
-    color: Colors.dark.textPrimary,
-    fontSize: 14,
-    fontWeight: '400',
-    textAlign: 'center',
-    opacity: 0.7,
+    marginTop: Spacing['2xl'],
   },
 });

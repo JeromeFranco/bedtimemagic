@@ -4,7 +4,11 @@ jest.mock('react-native-reanimated', () => {
   const NOOP = () => {};
   const ID = (t) => t;
   const IMMEDIATE_CALLBACK_INVOCATION = (callback) => callback();
-
+  const withTiming = jest.fn((toValue, _config, callback) => {
+    callback?.(true);
+    return toValue;
+  });
+  const withRepeat = jest.fn(ID);
   const Animated = {
     View,
     Text,
@@ -46,12 +50,13 @@ jest.mock('react-native-reanimated', () => {
     useScrollViewOffset: () => ({ value: 0 }),
     useScrollOffset: () => ({ value: 0 }),
     cancelAnimation: NOOP,
-    withTiming: (toValue) => toValue,
+    withTiming,
     withSpring: (toValue) => toValue,
-    withRepeat: ID,
+    withRepeat,
     withDelay: (_delay, next) => next,
     withSequence: () => 0,
     withDecay: () => 0,
+    useReducedMotion: jest.fn(() => false),
     runOnJS: ID,
     runOnUI: ID,
     makeMutable: ID,
