@@ -49,7 +49,7 @@ Provide only the context needed to review:
 - review scope;
 - relevant constraints.
 
-Use `code-reviewer.md` as the reviewer instructions.
+Use `code-review.md` as the reviewer instructions.
 
 If no separate reviewer context is available, perform the review directly using the same criteria.
 
