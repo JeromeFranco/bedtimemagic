@@ -26,6 +26,9 @@ export class CancelledError extends Error {
 
 const MAX_SEGMENT_ATTEMPTS = 2;
 const RETRY_DELAY_MS = 600;
+const TTS_MODEL = 'inworld-tts-2-flash';
+const TTS_VOICE = 'Ashley';
+const TTS_SPEAKING_RATE = 0.9;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -172,11 +175,10 @@ export async function streamStorySegment(
         try {
           const stream = tts.stream({
             text,
-            voice: 'Ashley',
-            model: 'inworld-tts-1.5-mini',
+            voice: TTS_VOICE,
+            model: TTS_MODEL,
             encoding: 'MP3',
-            speakingRate: 0.9,
-            temperature: 1.0,
+            speakingRate: TTS_SPEAKING_RATE,
           });
           activeStreams.set(dedupeKey, stream);
           for await (const chunk of stream) {
