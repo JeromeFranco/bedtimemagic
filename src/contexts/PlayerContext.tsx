@@ -1,10 +1,10 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { createAudioPlayer, createAudioPlaylist, setAudioModeAsync } from 'expo-audio';
 import { getAmbientAudioSource } from '@/lib/audio-utils';
 import { cancelStoryAudio, streamStorySegment } from '@/lib/inworld-tts';
-import { splitStoryIntoSegments } from '@/lib/story-segments';
 import { createOperationId } from '@/lib/observability';
+import { splitStoryIntoSegments } from '@/lib/story-segments';
 import type { Story } from '@/types';
+import { createAudioPlayer, createAudioPlaylist, setAudioModeAsync } from 'expo-audio';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 export type PostStoryPhase = 'idle' | 'fading' | 'pillow_talk' | 'affirmation' | 'fade_to_black' | 'done';
 
@@ -467,7 +467,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     finishWindDown();
   };
 
-  const stopStory = () => {
+  const stopStory = useCallback(() => {
     if (activeStoryRef.current) cancelStoryAudio(activeStoryRef.current.id);
     playbackGenerationRef.current += 1;
     cleanupPlaylist();
@@ -475,7 +475,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setPostStoryPhase('idle');
     finishingWindDownRef.current = false;
     completedWindDownRef.current = false;
-  };
+  }, [cleanupPlaylist, resetStoryState]);
 
   const toggleSleepMode = () => setIsSleepMode((previous) => !previous);
 
