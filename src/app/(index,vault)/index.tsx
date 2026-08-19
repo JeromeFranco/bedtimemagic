@@ -1,21 +1,22 @@
 import { router } from 'expo-router';
-import { ScrollView, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Platform, ScrollView, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ChallengeMatrix } from '@/components/challenge-matrix';
 import { ProfileSelector } from '@/components/profile-selector';
 import { RecentStoryCard } from '@/components/recent-story-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Button } from '@/components/ui/button';
 import { useSelectedChild } from '@/contexts/SelectedChildContext';
 import { useStoryGeneration } from '@/contexts/StoryGenerationContext';
 import { useStories } from '@/hooks/use-story';
-import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/theme';
-import { ChallengeCategory, ChallengeTrigger, PROTAGONISTS } from '@/types';
+import { Colors, MaxContentWidth, Spacing } from '@/theme';
+import { PROTAGONISTS } from '@/types';
 
 export default function HomeScreen() {
   const { selectedProfile } = useSelectedChild();
-  const { startGeneration } = useStoryGeneration();
+  const { state, resumeWaiting } = useStoryGeneration();
+  const insets = useSafeAreaInsets();
   const { data: stories } = useStories(selectedProfile?.id);
   const recentStory = stories && stories.length > 0 ? stories[0] : null;
 
@@ -23,18 +24,16 @@ export default function HomeScreen() {
     ? PROTAGONISTS.find((p) => p.id === selectedProfile.protagonist)
     : null;
 
-  const handleGenerate = (category: ChallengeCategory, trigger: ChallengeTrigger) => {
+  const handleCreatePress = () => {
+    if (state.status === 'generating') {
+      resumeWaiting();
+      router.push('/generate');
+      return;
+    }
+
     if (!selectedProfile) return;
 
-    startGeneration({
-      childId: selectedProfile.id,
-      childName: selectedProfile.name,
-      protagonist: selectedProfile.protagonist,
-      developmentalStage: selectedProfile.developmental_stage,
-      category,
-      trigger,
-    });
-    router.push('/generate');
+    router.push('/create');
   };
 
   const handleReplayPress = () => {
@@ -49,11 +48,15 @@ export default function HomeScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={[
+          styles.scrollContent,
+          Platform.OS === 'android' && { paddingTop: insets.top + Spacing.xl },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <ThemedView style={styles.content} collapsable={false}>
           <ThemedView style={styles.headerRow}>
             <ThemedView style={styles.headerText}>
               <ThemedText type="title" style={styles.headline}>
@@ -71,20 +74,14 @@ export default function HomeScreen() {
             <RecentStoryCard story={recentStory} onPress={handleReplayPress} />
           )}
 
-          <ThemedView style={styles.newStoryGroup}>
-            {recentStory && (
-              <ThemedText
-                type="small"
-                themeColor="textSecondary"
-                style={styles.sectionLabel}
-              >
-                Or make a new one
-              </ThemedText>
-            )}
-            <ChallengeMatrix onGenerate={handleGenerate} />
-          </ThemedView>
-        </ScrollView>
-      </SafeAreaView>
+          <Button
+            label="Create Tonight's Story"
+            fullWidth
+            disabled={!selectedProfile && state.status !== 'generating'}
+            onPress={handleCreatePress}
+          />
+        </ThemedView>
+      </ScrollView>
     </ThemedView>
   );
 }
@@ -94,17 +91,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.dark.bgBase,
   },
-  safeArea: {
-    flex: 1,
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
-    width: '100%',
-  },
   scrollContent: {
-    paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.xl,
-    paddingBottom: BottomTabInset + Spacing.xl,
+    paddingBottom: Spacing['3xl'],
+  },
+  content: {
+    alignSelf: 'center',
     gap: Spacing['2xl'],
+    maxWidth: MaxContentWidth,
+    paddingHorizontal: Spacing.xl,
+    width: '100%',
   },
   headerRow: {
     flexDirection: 'row',
@@ -120,12 +116,5 @@ const styles = StyleSheet.create({
   },
   headline: {
     letterSpacing: -0.24,
-  },
-  newStoryGroup: {
-    gap: Spacing.sm,
-    backgroundColor: 'transparent',
-  },
-  sectionLabel: {
-    fontWeight: '500',
   },
 });

@@ -1,19 +1,14 @@
-import React from 'react';
+import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render } from '@testing-library/react-native';
 import { AccessibilityInfo, Alert, Pressable } from 'react-native';
 
-import HomeScreen from '../(index,vault)/index';
 import GenerateScreen from '../(index,vault)/generate';
 import { router, usePathname } from 'expo-router';
 import { StoryGenerationProvider, useStoryGeneration } from '@/contexts/StoryGenerationContext';
-import { useSelectedChild } from '@/contexts/SelectedChildContext';
 import { generateStory } from '@/api/stories';
 import { StoryGenerationStatus } from '@/components/story-generation-status';
 import type { Story } from '@/types';
-
-const mockReact = React;
-const mockPressable = Pressable;
 
 jest.mock('expo-router', () => {
   let beforeRemoveListener: ((event: {
@@ -56,26 +51,6 @@ jest.mock('@/api/stories', () => ({
   generateStory: jest.fn(),
 }));
 
-jest.mock('@/contexts/SelectedChildContext', () => ({
-  useSelectedChild: jest.fn(),
-}));
-
-jest.mock('@/hooks/use-story', () => ({
-  useStories: jest.fn(() => ({ data: [] })),
-}));
-
-jest.mock('@/components/challenge-matrix', () => {
-  return {
-    ChallengeMatrix: ({ onGenerate }: { onGenerate: (category: 'bedtime', trigger: 'refusing_teeth') => void }) => (
-      mockReact.createElement(mockPressable, {
-        testID: 'start-generation',
-        onPress: () => onGenerate('bedtime', 'refusing_teeth'),
-      })
-    ),
-  };
-});
-
-jest.mock('@/components/profile-selector', () => ({ ProfileSelector: () => null }));
 jest.mock('@/components/breathing-circle', () => ({ BreathingCircle: () => null }));
 jest.mock('@/components/calming-copy', () => ({ CalmingCopy: () => null }));
 
@@ -90,6 +65,25 @@ const mockAddListener = navigation.addListener;
 const mockDispatch = navigation.dispatch;
 const clients: QueryClient[] = [];
 
+const SNAPSHOT = {
+  childId: 'child-1',
+  childName: 'Mia',
+  protagonist: 'barnaby' as const,
+  developmentalStage: 'preschool' as const,
+  category: 'bedtime' as const,
+  trigger: 'refusing_teeth' as const,
+};
+
+function StartGenerationHarness() {
+  const generation = useStoryGeneration();
+  return (
+    <Pressable
+      testID="start-generation"
+      onPress={() => generation.startGeneration(SNAPSHOT)}
+    />
+  );
+}
+
 function StatusHarness() {
   const generation = useStoryGeneration();
   return (
@@ -97,14 +91,7 @@ function StatusHarness() {
       <Pressable
         testID="start-background"
         onPress={() => {
-          generation.startGeneration({
-            childId: 'child-1',
-            childName: 'Mia',
-            protagonist: 'barnaby',
-            developmentalStage: 'preschool',
-            category: 'bedtime',
-            trigger: 'refusing_teeth',
-          });
+          generation.startGeneration(SNAPSHOT);
           generation.continueInBackground();
         }}
       />
@@ -138,7 +125,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-async function renderWorkflow(screen: React.ReactNode) {
+async function renderWorkflow(screen: ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   clients.push(client);
   const view = await render(
@@ -153,29 +140,16 @@ describe('story generation workflow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPathname.mockReturnValue('/');
-    jest.mocked(useSelectedChild).mockReturnValue({
-      profiles: [],
-      selectedProfile: {
-        id: 'child-1',
-        user_id: 'user-1',
-        name: 'Mia',
-        developmental_stage: 'preschool',
-        protagonist: 'barnaby',
-        emoji: '🌙',
-        created_at: '2026-08-13T00:00:00Z',
-      },
-      setSelectedProfile: jest.fn(),
-    });
   });
 
   afterEach(() => {
     clients.splice(0).forEach((client) => client.clear());
   });
 
-  it('captures Home inputs once and opens existing work on duplicate entry', async () => {
+  it('starts one request when the generation entry point is pressed twice', async () => {
     const pending = deferred<Story>();
     jest.mocked(generateStory).mockReturnValue(pending.promise);
-    const view = await renderWorkflow(<HomeScreen />);
+    const view = await renderWorkflow(<StartGenerationHarness />);
 
     await fireEvent.press(view.getByTestId('start-generation'));
     await fireEvent.press(view.getByTestId('start-generation'));
@@ -184,8 +158,6 @@ describe('story generation workflow', () => {
     expect(generateStory).toHaveBeenCalledWith(
       'child-1', 'barnaby', 'Mia', 'preschool', 'bedtime', 'refusing_teeth', expect.any(AbortSignal),
     );
-    expect(mockPush).toHaveBeenCalledTimes(2);
-    expect(mockPush).toHaveBeenLastCalledWith('/generate');
     view.client.clear();
     await view.unmount();
   });
@@ -193,7 +165,7 @@ describe('story generation workflow', () => {
   it('only observes existing work on route mount and replaces with a waiting success once', async () => {
     const pending = deferred<Story>();
     jest.mocked(generateStory).mockReturnValue(pending.promise);
-    const view = await renderWorkflow(<HomeScreen />);
+    const view = await renderWorkflow(<StartGenerationHarness />);
 
     await fireEvent.press(view.getByTestId('start-generation'));
     await view.rerender(
@@ -217,7 +189,7 @@ describe('story generation workflow', () => {
     const pending = deferred<Story>();
     jest.mocked(generateStory).mockReturnValue(pending.promise);
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const view = await renderWorkflow(<HomeScreen />);
+    const view = await renderWorkflow(<StartGenerationHarness />);
 
     await fireEvent.press(view.getByTestId('start-generation'));
     await view.rerender(
@@ -263,7 +235,7 @@ describe('story generation workflow', () => {
   it('shows the calm retry and back choices after a waiting failure', async () => {
     jest.mocked(generateStory).mockRejectedValueOnce(new Error('network'));
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const view = await renderWorkflow(<HomeScreen />);
+    const view = await renderWorkflow(<StartGenerationHarness />);
 
     await fireEvent.press(view.getByTestId('start-generation'));
     await view.rerender(

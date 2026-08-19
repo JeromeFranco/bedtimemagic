@@ -6,7 +6,7 @@ export const Layout = {
   screenMargin: 16,
   sectionPadding: 24,
   cardPadding: 16,
-  chipHeight: 40,
+  chipHeight: 44,
   minTouchTarget: 44,
 } as const;
 

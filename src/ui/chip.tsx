@@ -1,10 +1,21 @@
 import type { PropsWithChildren } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  type PressableProps,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 
 import { PressableFeedback } from '@/components/ui/pressable-feedback';
-import { Colors, Spacing } from '@/theme';
+import { Colors, Layout } from '@/theme';
 
-export type ChipProps = PropsWithChildren<{
+type InteractiveChipProps = Pick<
+  PressableProps,
+  'accessibilityHint' | 'accessibilityLabel' | 'accessibilityRole' | 'testID'
+>;
+
+export type ChipProps = PropsWithChildren<InteractiveChipProps & {
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
   contentStyle?: StyleProp<ViewStyle>;
@@ -16,9 +27,25 @@ export type ChipProps = PropsWithChildren<{
  * Static chips render their content in a regular View and do not create a
  * Pressable.
  */
-export function Chip({ children, onPress, style, contentStyle }: ChipProps) {
+export function Chip({
+  children,
+  onPress,
+  style,
+  contentStyle,
+  accessibilityHint,
+  accessibilityLabel,
+  accessibilityRole,
+  testID,
+}: ChipProps) {
   const content = onPress ? (
-    <PressableFeedback onPress={onPress} style={[styles.content, contentStyle]}>
+    <PressableFeedback
+      onPress={onPress}
+      accessibilityHint={accessibilityHint}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole={accessibilityRole}
+      testID={testID}
+      style={[styles.content, contentStyle]}
+    >
       {children}
     </PressableFeedback>
   ) : (
@@ -34,7 +61,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.dark.borderSubtle,
     borderRadius: 24,
     borderWidth: 1,
-    minHeight: 40,
+    minHeight: Layout.chipHeight,
     overflow: 'hidden',
   },
   content: {

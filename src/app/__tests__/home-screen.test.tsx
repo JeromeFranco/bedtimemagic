@@ -1,4 +1,5 @@
 import { fireEvent, render } from '@testing-library/react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import HomeScreen from '../(index,vault)/index';
 import { router } from 'expo-router';
@@ -12,12 +13,12 @@ jest.mock('@/contexts/SelectedChildContext', () => ({ useSelectedChild: jest.fn(
 jest.mock('@/contexts/StoryGenerationContext', () => ({ useStoryGeneration: jest.fn() }));
 jest.mock('@/hooks/use-story', () => ({ useStories: jest.fn() }));
 jest.mock('@/components/profile-selector', () => ({ ProfileSelector: () => null }));
-jest.mock('@/components/challenge-matrix', () => ({ ChallengeMatrix: () => null }));
 
 const mockPush = jest.mocked(router.push);
 const mockUseStories = jest.mocked(useStories);
 const mockUseSelectedChild = jest.mocked(useSelectedChild);
 const mockUseStoryGeneration = jest.mocked(useStoryGeneration);
+const mockResumeWaiting = jest.fn();
 
 const STORY: Story = {
   id: 'story-1',
@@ -33,6 +34,19 @@ const STORY: Story = {
   protagonist: 'barnaby',
   created_at: '2026-08-14T00:00:00Z',
 };
+
+function renderHome() {
+  return render(
+    <SafeAreaProvider
+      initialMetrics={{
+        frame: { x: 0, y: 0, width: 390, height: 844 },
+        insets: { top: 47, right: 0, bottom: 34, left: 0 },
+      }}
+    >
+      <HomeScreen />
+    </SafeAreaProvider>,
+  );
+}
 
 describe('HomeScreen', () => {
   beforeEach(() => {
@@ -50,33 +64,60 @@ describe('HomeScreen', () => {
       },
       setSelectedProfile: jest.fn(),
     } as never);
-    mockUseStoryGeneration.mockReturnValue({ startGeneration: jest.fn() } as never);
+    mockUseStoryGeneration.mockReturnValue({
+      state: { status: 'idle' },
+      resumeWaiting: mockResumeWaiting,
+    } as never);
   });
 
-  it('renders the warm headline and subtitle and no recent card when there is no recent story', async () => {
+  it('shows one creation action and routes idle parents to Create', async () => {
     mockUseStories.mockReturnValue({ data: [] } as never);
+    const view = await renderHome();
 
-    const { getByText, queryByText } = await render(<HomeScreen />);
+    expect(view.getByText("Tonight's story for Mia")).toBeTruthy();
+    expect(view.getByText('Barnaby will tell it · about 10 minutes')).toBeTruthy();
+    expect(view.queryByText('Or make a new one')).toBeNull();
+    expect(view.queryByText('What needs a story tonight?')).toBeNull();
 
-    expect(getByText("Tonight's story for Mia")).toBeTruthy();
-    expect(getByText('Barnaby will tell it · about 10 minutes')).toBeTruthy();
-    expect(queryByText('Or make a new one')).toBeNull();
-    expect(queryByText(STORY.title)).toBeNull();
+    fireEvent.press(view.getByText("Create Tonight's Story"));
+    expect(mockPush).toHaveBeenCalledWith('/create');
   });
 
-  it('renders the recent card and section label, and routes to /story on press', async () => {
+  it('keeps recent-story replay secondary to the creation action', async () => {
     mockUseStories.mockReturnValue({ data: [STORY] } as never);
+    const view = await renderHome();
 
-    const view = await render(<HomeScreen />);
-
-    expect(view.getByText('Or make a new one')).toBeTruthy();
     expect(view.getByText(STORY.title)).toBeTruthy();
-    expect(view.getByLabelText(`Listen to ${STORY.title} again`)).toBeTruthy();
-
-    await fireEvent.press(view.getByText(STORY.title));
+    fireEvent.press(view.getByText(STORY.title));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/story',
       params: { id: 'story-1' },
     });
+  });
+
+  it('returns an active generation to its existing waiting screen', async () => {
+    mockUseStories.mockReturnValue({ data: [] } as never);
+    mockUseStoryGeneration.mockReturnValue({
+      state: { status: 'generating' },
+      resumeWaiting: mockResumeWaiting,
+    } as never);
+    const view = await renderHome();
+
+    fireEvent.press(view.getByText("Create Tonight's Story"));
+    expect(mockResumeWaiting).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith('/generate');
+  });
+
+  it('does not offer the setup route before a child is selected', async () => {
+    mockUseStories.mockReturnValue({ data: [] } as never);
+    mockUseSelectedChild.mockReturnValue({
+      profiles: [],
+      selectedProfile: null,
+      setSelectedProfile: jest.fn(),
+    } as never);
+    const view = await renderHome();
+
+    fireEvent.press(view.getByText("Create Tonight's Story"));
+    expect(mockPush).not.toHaveBeenCalled();
   });
 });

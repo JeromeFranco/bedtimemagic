@@ -127,7 +127,7 @@ components:
   chip:
     backgroundColor: "{colors.bg-element}"
     rounded: "{rounded.full}"
-    height: 40px
+    height: 44px
   card:
     backgroundColor: "{colors.bg-surface}"
     rounded: "{rounded.lg}"
@@ -138,7 +138,7 @@ components:
 
 ## Overview
 
-A parent holding a phone at 8pm, running on fumes, needs to get from "my kid had a rough day" to a story playing in under 60 seconds — they're not browsing, they're solving a problem, and they want to tap three times and hear a story start. The visual system reads as _quiet confidence_: dark, warm, low-stimulus. Not a toy store, not a wellness-app cliché. Feels like Calm, Moshi, or Libby — never Duolingo. App shape: NativeTabs (Home + Vault), flow Home → Generate (challenge matrix + child profile) → Story player with sleep mode.
+A parent holding a phone at 8pm, running on fumes, needs to get from "my kid had a rough day" to a story playing in under 60 seconds — they're not browsing, they're solving a problem, and they want to tap three times and hear a story start. The visual system reads as _quiet confidence_: dark, warm, low-stimulus. Not a toy store, not a wellness-app cliché. Feels like Calm, Moshi, or Libby — never Duolingo. App shape: NativeTabs (Home + Vault), flow Home → Create Story → Generate → Story player with sleep mode.
 
 ## Colors
 
@@ -178,8 +178,9 @@ Radius carries role: 12 for buttons, 16 for cards, pill (full) for chips. Cover 
 ## Components
 
 - **Button:** Three variants — primary (`bg-element` fill), secondary (1px `border-default` border on transparent, noted here since the token schema has no borderColor property), ghost (bare text). Plus a compact size. One primary CTA per screen. No icon-only buttons, no FABs.
-- **Chip:** The app's primary interactive element. Pill shape, `bg-element` unselected, category tint when selected, 1px `border-subtle`, at least 40px tall. Must feel tappable, not decorative.
+- **Chip:** The app's primary interactive element. Pill shape, `bg-element` unselected, category tint when selected, 1px `border-subtle`, at least 44px tall. Must feel tappable, not decorative.
 - **Card:** Used sparingly (story card, lesson-log entries). 16 radius, `bg-surface`, no shadow. Everything else uses inline layout.
+- **Selection row:** A full-width, single-choice control built from a card surface. Use it for expandable choice lists, with a left-aligned body label and platform-native press feedback. Do not add chevrons, emoji, checks, or category-colour fills.
 - **Iconography:** SF Symbols (iOS) / Material Symbols (Android), regular weight. Playback controls and navigation only — no decorative icons. Emoji appear only in post-story feedback, where they're functional input.
 - **Tabs:** expo-router NativeTabs — `bg-base` bar, `bg-element` indicator, `text-primary` selected label.
 - **Press feedback:** `PressableFeedback` delegates to the platform — Android ripple, iOS opacity dim. No Reanimated, no scale transforms.
@@ -195,6 +196,10 @@ Don'ts:
 - No gamification — no streaks, badges, points, levels, or progress bars. The Lesson Log tracks behavior gently, not competitively.
 - No card grids for feature display; no empty states without a primary action ("Create your first story").
 - No inverted (dark-on-light) text anywhere.
+
+## Story setup flow
+
+Home is a calm landing surface with one full-width primary action: `Create Tonight's Story`. Story setup progressively discloses one category and then its matching trigger; choosing a trigger starts generation immediately. Category accents are reserved for the active challenge context, never page, card, or button decoration.
 
 When principles conflict, resolve in this order: sleep hygiene non-negotiable (cut anything that increases arousal) → accessibility floor (change the color, not the requirement) → cognitive load over density → tap-first, always → restraint over completeness → platform-native over brand-consistent.
 
