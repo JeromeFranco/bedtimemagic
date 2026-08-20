@@ -7,12 +7,13 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StoryHistoryCard } from '@/components/story-history-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
+import { StatusBarScrim } from '@/components/ui/status-bar-scrim';
+import { useTopChromeInset } from '@/components/ui/use-top-chrome-inset';
 import { useStories } from '@/hooks/use-story';
 import { Colors, MaxContentWidth, Spacing } from '@/theme';
 
@@ -71,7 +72,7 @@ function StorySeparator() {
 }
 
 export default function VaultScreen() {
-  const insets = useSafeAreaInsets();
+  const topChromeInset = useTopChromeInset({ hasNativeHeader: false });
   const { data, isError, isPending, isRefetching, refetch } = useStories();
   const stories = data ?? [];
 
@@ -105,9 +106,10 @@ export default function VaultScreen() {
         )}
         contentContainerStyle={[
           styles.content,
-          Platform.OS === 'android' && { paddingTop: insets.top + Spacing.xl },
+          Platform.OS === 'android' && { paddingTop: topChromeInset + Spacing.xl },
         ]}
       />
+      <StatusBarScrim height={topChromeInset} />
     </ThemedView>
   );
 }

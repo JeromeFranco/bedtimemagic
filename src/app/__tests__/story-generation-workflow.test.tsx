@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render } from '@testing-library/react-native';
 import { AccessibilityInfo, Alert, Pressable } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import GenerateScreen from '../(index,vault)/generate';
 import { router, usePathname } from 'expo-router';
@@ -41,6 +42,7 @@ jest.mock('expo-router', () => {
       replace: jest.fn(),
       back: jest.fn(() => notifyBeforeRemove({ type: 'GO_BACK' })),
     },
+    Stack: { Screen: jest.fn(() => null) },
     useNavigation: () => navigation,
     usePathname: jest.fn(() => '/'),
     __testNavigation: navigation,
@@ -61,6 +63,9 @@ const mockPathname = jest.mocked(usePathname);
 const navigation = (jest.requireMock('expo-router') as {
   __testNavigation: { addListener: jest.Mock; dispatch: jest.Mock };
 }).__testNavigation;
+const mockStackScreen = (jest.requireMock('expo-router') as {
+  Stack: { Screen: jest.Mock };
+}).Stack.Screen;
 const mockAddListener = navigation.addListener;
 const mockDispatch = navigation.dispatch;
 const clients: QueryClient[] = [];
@@ -125,14 +130,27 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+function withSafeArea(children: ReactNode) {
+  return (
+    <SafeAreaProvider
+      initialMetrics={{
+        frame: { x: 0, y: 0, width: 390, height: 844 },
+        insets: { top: 47, right: 0, bottom: 34, left: 0 },
+      }}
+    >
+      {children}
+    </SafeAreaProvider>
+  );
+}
+
 async function renderWorkflow(screen: ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   clients.push(client);
-  const view = await render(
+  const view = await render(withSafeArea(
     <QueryClientProvider client={client}>
       <StoryGenerationProvider>{screen}</StoryGenerationProvider>
     </QueryClientProvider>,
-  );
+  ));
   return { ...view, client };
 }
 
@@ -168,11 +186,11 @@ describe('story generation workflow', () => {
     const view = await renderWorkflow(<StartGenerationHarness />);
 
     await fireEvent.press(view.getByTestId('start-generation'));
-    await view.rerender(
+    await view.rerender(withSafeArea(
       <QueryClientProvider client={view.client}>
         <StoryGenerationProvider><GenerateScreen /></StoryGenerationProvider>
       </QueryClientProvider>,
-    );
+    ));
     expect(generateStory).toHaveBeenCalledTimes(1);
     mockReplace.mockClear();
 
@@ -185,35 +203,37 @@ describe('story generation workflow', () => {
     await view.unmount();
   });
 
-  it('keeps or cancels active work through the shared Leave confirmation', async () => {
+  it('keeps or cancels active work through the native header Back confirmation', async () => {
     const pending = deferred<Story>();
     jest.mocked(generateStory).mockReturnValue(pending.promise);
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const view = await renderWorkflow(<StartGenerationHarness />);
 
     await fireEvent.press(view.getByTestId('start-generation'));
-    await view.rerender(
+    await view.rerender(withSafeArea(
       <QueryClientProvider client={view.client}>
         <StoryGenerationProvider>
           <GenerateScreen />
           <StoryGenerationStatus />
         </StoryGenerationProvider>
       </QueryClientProvider>,
-    );
+    ));
 
-    await fireEvent.press(view.getByText('Leave'));
+    const generatingHeader = mockStackScreen.mock.calls.at(-1)![0].options.headerLeft();
+    const header = await render(generatingHeader);
+    await fireEvent.press(header.getByTestId('generate-header-back'));
     const stayAlert = alert.mock.calls[0][2]!;
     expect(stayAlert.map((button) => button.text)).toEqual(['Stay', 'Keep Creating', 'Cancel Story']);
     await act(async () => {
       stayAlert[0].onPress?.();
     });
-    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockBack).toHaveBeenCalledTimes(1);
 
-    await fireEvent.press(view.getByText('Leave'));
+    await fireEvent.press(header.getByTestId('generate-header-back'));
     await act(async () => {
       alert.mock.calls[1][2]![1].onPress?.();
     });
-    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockBack).toHaveBeenCalledTimes(2);
     expect(view.getByText("Writing Mia's story…")).toBeTruthy();
     expect(alert).toHaveBeenCalledTimes(2);
 
@@ -232,20 +252,22 @@ describe('story generation workflow', () => {
     await view.unmount();
   });
 
-  it('shows the calm retry and back choices after a waiting failure', async () => {
+  it('uses native header Back to dismiss and return after a waiting failure', async () => {
     jest.mocked(generateStory).mockRejectedValueOnce(new Error('network'));
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const view = await renderWorkflow(<StartGenerationHarness />);
 
     await fireEvent.press(view.getByTestId('start-generation'));
-    await view.rerender(
+    await view.rerender(withSafeArea(
       <QueryClientProvider client={view.client}>
         <StoryGenerationProvider><GenerateScreen /></StoryGenerationProvider>
       </QueryClientProvider>,
-    );
+    ));
 
     expect(view.getByText('Try Again')).toBeTruthy();
-    await fireEvent.press(view.getByText('Go Back'));
+    const failedHeader = mockStackScreen.mock.calls.at(-1)![0].options.headerLeft();
+    const header = await render(failedHeader);
+    await fireEvent.press(header.getByTestId('generate-header-back'));
     expect(mockBack).toHaveBeenCalledTimes(1);
     errorSpy.mockRestore();
     view.client.clear();
@@ -284,19 +306,19 @@ describe('story generation workflow', () => {
     expect(view.getByText("Mia's story is ready")).toBeTruthy();
 
     mockPathname.mockReturnValue('/story');
-    await view.rerender(
+    await view.rerender(withSafeArea(
       <QueryClientProvider client={view.client}>
         <StoryGenerationProvider><StatusHarness /></StoryGenerationProvider>
       </QueryClientProvider>,
-    );
+    ));
     expect(view.queryByText("Mia's story is ready")).toBeNull();
 
     mockPathname.mockReturnValue('/vault');
-    await view.rerender(
+    await view.rerender(withSafeArea(
       <QueryClientProvider client={view.client}>
         <StoryGenerationProvider><StatusHarness /></StoryGenerationProvider>
       </QueryClientProvider>,
-    );
+    ));
     await fireEvent.press(view.getByText('Listen'));
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/story', params: { id: 'story-1' } });
     expect(view.queryByText('Listen')).toBeNull();

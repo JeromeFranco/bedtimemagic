@@ -1,12 +1,13 @@
 import { router } from 'expo-router';
 import { Platform, ScrollView, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProfileSelector } from '@/components/profile-selector';
 import { RecentStoryCard } from '@/components/recent-story-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
+import { StatusBarScrim } from '@/components/ui/status-bar-scrim';
+import { useTopChromeInset } from '@/components/ui/use-top-chrome-inset';
 import { useSelectedChild } from '@/contexts/SelectedChildContext';
 import { useStoryGeneration } from '@/contexts/StoryGenerationContext';
 import { useStories } from '@/hooks/use-story';
@@ -16,7 +17,7 @@ import { PROTAGONISTS } from '@/types';
 export default function HomeScreen() {
   const { selectedProfile } = useSelectedChild();
   const { state, resumeWaiting } = useStoryGeneration();
-  const insets = useSafeAreaInsets();
+  const topChromeInset = useTopChromeInset({ hasNativeHeader: false });
   const { data: stories } = useStories(selectedProfile?.id);
   const recentStory = stories && stories.length > 0 ? stories[0] : null;
 
@@ -52,7 +53,7 @@ export default function HomeScreen() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[
           styles.scrollContent,
-          Platform.OS === 'android' && { paddingTop: insets.top + Spacing.xl },
+          Platform.OS === 'android' && { paddingTop: topChromeInset + Spacing.xl },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -82,6 +83,7 @@ export default function HomeScreen() {
           />
         </ThemedView>
       </ScrollView>
+      <StatusBarScrim height={topChromeInset} />
     </ThemedView>
   );
 }

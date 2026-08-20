@@ -83,6 +83,13 @@ describe('HomeScreen', () => {
     expect(mockPush).toHaveBeenCalledWith('/create');
   });
 
+  it('adds a non-interactive screen-owned status-bar scrim', async () => {
+    mockUseStories.mockReturnValue({ data: [] } as never);
+    const view = await renderHome();
+
+    expect(view.getByTestId('status-bar-scrim').props.pointerEvents).toBe('none');
+  });
+
   it('keeps recent-story replay secondary to the creation action', async () => {
     mockUseStories.mockReturnValue({ data: [STORY] } as never);
     const view = await renderHome();

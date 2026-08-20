@@ -23,6 +23,8 @@ export const Colors = {
     // Overlays & scrims
     scrim: 'rgba(0, 0, 0, 0.5)',
     overlay: 'rgba(6, 10, 26, 0.8)',
+    systemBarScrimTop: '#060A1A',
+    systemBarScrimBottom: 'rgba(6, 10, 26, 0)',
     // Special-purpose fills
     track: 'rgba(226, 224, 240, 0.15)',
     avatarTint: 'rgba(255, 255, 255, 0.1)',

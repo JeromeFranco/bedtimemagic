@@ -21,17 +21,17 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { usePlayer } from '@/contexts/PlayerContext';
-import { BorderRadius, CATEGORY_COLORS, Colors, MaxContentWidth, Spacing } from '@/theme';
+import { BorderRadius, Colors, MaxContentWidth, Spacing } from '@/theme';
 import type { ProtagonistInfo, Story } from '@/types';
 
 interface StoryPlayerProps {
   story: Story;
   protagonist: ProtagonistInfo | undefined;
   imageSource: { uri: string } | null;
-  onBack: () => void;
+  topInset: number;
 }
 
-export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPlayerProps) {
+export function StoryPlayer({ story, protagonist, imageSource, topInset }: StoryPlayerProps) {
   const { width, height } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
   const {
@@ -47,7 +47,6 @@ export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPl
     pause,
     resume,
     seekTo,
-    toggleSleepMode,
     showAffirmation,
     finishWindDown,
     completeWindDown,
@@ -153,14 +152,6 @@ export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPl
     }
   };
 
-  const handleBack = () => {
-    if (phase === 'idle') {
-      onBack();
-    } else if (!isTerminal) {
-      finishWindDown();
-    }
-  };
-
   const artworkAnimatedStyle = useAnimatedStyle(() => ({
     width: artworkDimension.get(),
     height: artworkDimension.get(),
@@ -174,31 +165,8 @@ export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPl
     <View style={styles.root}>
       <Animated.View style={[styles.backgroundDim, dimOverlayStyle]} pointerEvents="none" />
       <Animated.View style={[styles.sleepOverlay, sleepOverlayStyle]} pointerEvents="none" />
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <View style={styles.topBar}>
-          <IconButton testID="player-back-button" accessibilityLabel="Go back" onPress={handleBack}>
-            <SymbolView
-              name={{ ios: 'chevron.backward', android: 'arrow_back' }}
-              size={24}
-              tintColor={Colors.dark.textPrimary}
-            />
-          </IconButton>
-          {!isPostStory && (
-            <IconButton
-              testID="sleep-mode-button"
-              accessibilityLabel="Sleep Mode"
-              onPress={toggleSleepMode}
-            >
-              <SymbolView
-                name={{ ios: 'moon.fill', android: 'bedtime' }}
-                size={24}
-                tintColor={isSleepMode ? CATEGORY_COLORS.bedtime.primary : Colors.dark.textPrimary}
-              />
-            </IconButton>
-          )}
-        </View>
-
-        <View style={styles.content}>
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <View style={[styles.content, { paddingTop: topInset + Spacing.xs }]}>
           <View style={styles.contentColumn}>
             {showsArtwork && (
               <View style={styles.artworkWrapper}>
@@ -228,9 +196,6 @@ export function StoryPlayer({ story, protagonist, imageSource, onBack }: StoryPl
             {phase === 'idle' && (
               <>
                 <View style={styles.metadataArea}>
-                  <ThemedText type="title" style={styles.storyTitle} numberOfLines={2}>
-                    {story.title}
-                  </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary" style={styles.subtitleText} numberOfLines={1}>
                     {protagonist?.name ? `${protagonist.name} • ` : ''}{story.moral}
                   </ThemedText>
@@ -358,18 +323,11 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     backgroundColor: Colors.dark.bgDeepest,
   },
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.sm,
-  },
   content: {
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.xl,
-    paddingTop: Spacing.xs,
   },
   contentColumn: {
     flex: 1,
@@ -403,9 +361,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.xs,
     marginVertical: Spacing.xs,
-  },
-  storyTitle: {
-    textAlign: 'center',
   },
   subtitleText: {
     textAlign: 'center',

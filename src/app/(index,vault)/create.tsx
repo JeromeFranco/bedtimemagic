@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, ScrollView, StyleSheet } from 'react-native';
+import { AccessibilityInfo, Platform, ScrollView, StyleSheet } from 'react-native';
 import { router, useNavigation } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { StatusBarScrim } from '@/components/ui/status-bar-scrim';
+import { useTopChromeInset } from '@/components/ui/use-top-chrome-inset';
 import { useSelectedChild } from '@/contexts/SelectedChildContext';
 import { useStoryGeneration } from '@/contexts/StoryGenerationContext';
 import { CATEGORY_COLORS, Colors, FontWeights, Layout, Spacing } from '@/theme';
@@ -20,6 +22,7 @@ export default function CreateStoryScreen() {
   const navigation = useNavigation();
   const { selectedProfile } = useSelectedChild();
   const { startGeneration, resumeWaiting } = useStoryGeneration();
+  const topChromeInset = useTopChromeInset({ hasNativeHeader: true });
   const [selectedCategory, setSelectedCategory] = useState<ChallengeCategory | null>(null);
   const allowNextRemovalRef = useRef(false);
   const announcedCategoryRef = useRef<ChallengeCategory | null>(null);
@@ -86,7 +89,10 @@ export default function CreateStoryScreen() {
     <ThemedView style={styles.container}>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          Platform.OS === 'android' && { paddingTop: topChromeInset + Spacing.xl },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         <ThemedText type="body" themeColor="textSecondary">
@@ -145,6 +151,7 @@ export default function CreateStoryScreen() {
           </ThemedView>
         )}
       </ScrollView>
+      <StatusBarScrim height={topChromeInset} />
     </ThemedView>
   );
 }
@@ -159,7 +166,6 @@ const styles = StyleSheet.create({
     gap: Spacing['2xl'],
     maxWidth: Layout.maxContentWidth,
     paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.xl,
     paddingBottom: Spacing['3xl'],
     width: '100%',
   },

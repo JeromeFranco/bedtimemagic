@@ -50,7 +50,7 @@ const defaultProps = {
   story: MOCK_STORY,
   protagonist: MOCK_PROTAGONIST,
   imageSource: { uri: 'https://example.com/cover.png' },
-  onBack: jest.fn(),
+  topInset: 91,
 };
 
 const basePlayerMock = (overrides = {}) => ({
@@ -82,12 +82,12 @@ describe('StoryPlayer', () => {
     jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockClear();
   });
 
-  it('renders ordinary playback and retains immediate Back behavior', async () => {
+  it('renders ordinary playback without local navigation controls', async () => {
     const queries = await render(<StoryPlayer {...defaultProps} />);
-    expect(queries.getByText('The Toothbrush Adventure', { exact: false })).toBeTruthy();
+    expect(queries.queryByText('The Toothbrush Adventure', { exact: false })).toBeNull();
     expect(queries.getByTestId('play-pause-button')).toBeTruthy();
-    await fireEvent.press(queries.getByTestId('player-back-button'));
-    expect(defaultProps.onBack).toHaveBeenCalledTimes(1);
+    expect(queries.queryByTestId('player-back-button')).toBeNull();
+    expect(queries.queryByTestId('sleep-mode-button')).toBeNull();
   });
 
   it('plays, pauses, resumes, and seeks using player context', async () => {
@@ -176,25 +176,13 @@ describe('StoryPlayer', () => {
     expect(mockFinishWindDown).toHaveBeenCalledTimes(1);
   });
 
-  it('finishes instead of navigating back during every nonterminal post-story phase', async () => {
-    for (const postStoryPhase of ['fading', 'pillow_talk', 'affirmation'] as const) {
-      mockUsePlayer.mockImplementation(() => basePlayerMock({ postStoryPhase }));
-      const queries = await render(<StoryPlayer {...defaultProps} />);
-      await fireEvent.press(queries.getByTestId('player-back-button'));
-      await queries.unmount();
-    }
-    expect(mockFinishWindDown).toHaveBeenCalledTimes(3);
-    expect(defaultProps.onBack).toHaveBeenCalledTimes(0);
-  });
-
   it('intercepts input behind the terminal curtain and completes it once', async () => {
     mockUsePlayer.mockImplementation(() => basePlayerMock({ postStoryPhase: 'fade_to_black' }));
     const queries = await render(<StoryPlayer {...defaultProps} />);
     expect(queries.getByTestId('terminal-curtain').props.pointerEvents).toBe('auto');
     expect(queries.queryByText('Goodnight')).toBeNull();
     expect(mockCompleteWindDown).toHaveBeenCalledTimes(1);
-    await fireEvent.press(queries.getByTestId('player-back-button'));
-    expect(mockFinishWindDown).not.toHaveBeenCalled();
+    expect(queries.queryByTestId('player-back-button')).toBeNull();
   });
 
   it('makes artwork drift static under reduced motion while retaining terminal fade', async () => {

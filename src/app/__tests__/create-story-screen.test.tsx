@@ -1,5 +1,6 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import CreateStoryScreen from '../(index,vault)/create';
 import { router } from 'expo-router';
@@ -56,6 +57,19 @@ function mockProfile(selectedProfile = true) {
   } as never);
 }
 
+function renderCreate() {
+  return render(
+    <SafeAreaProvider
+      initialMetrics={{
+        frame: { x: 0, y: 0, width: 390, height: 844 },
+        insets: { top: 47, right: 0, bottom: 34, left: 0 },
+      }}
+    >
+      <CreateStoryScreen />
+    </SafeAreaProvider>,
+  );
+}
+
 describe('CreateStoryScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -69,7 +83,7 @@ describe('CreateStoryScreen', () => {
 
   it('shows child context, categories, and only matching triggers', async () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
-    const view = await render(<CreateStoryScreen />);
+    const view = await renderCreate();
 
     expect(view.getByText('A story for Mia')).toBeTruthy();
     expect(view.getByText('What needs a story tonight?')).toBeTruthy();
@@ -84,7 +98,7 @@ describe('CreateStoryScreen', () => {
   });
 
   it('starts the exact snapshot and replaces Create after a trigger selection', async () => {
-    const view = await render(<CreateStoryScreen />);
+    const view = await renderCreate();
 
     await fireEvent.press(view.getByTestId('category-bedtime'));
     await fireEvent.press(view.getByTestId('trigger-refusing_teeth'));
@@ -101,7 +115,7 @@ describe('CreateStoryScreen', () => {
   });
 
   it('returns trigger selection to categories for a normal native back removal', async () => {
-    const view = await render(<CreateStoryScreen />);
+    const view = await renderCreate();
     await fireEvent.press(view.getByTestId('category-bedtime'));
     const listener = navigation.addListener.mock.calls.at(-1)![1];
     const event = { preventDefault: jest.fn(), data: { action: { type: 'GO_BACK' } } };
@@ -116,7 +130,7 @@ describe('CreateStoryScreen', () => {
 
   it('allows the terminal replacement removal and resumes an existing request', async () => {
     mockStartGeneration.mockReturnValue({ status: 'already-generating' });
-    const view = await render(<CreateStoryScreen />);
+    const view = await renderCreate();
     await fireEvent.press(view.getByTestId('category-bedtime'));
     const listener = navigation.addListener.mock.calls.at(-1)![1];
 
@@ -132,7 +146,7 @@ describe('CreateStoryScreen', () => {
 
   it('does not issue a request when no child profile is selected', async () => {
     mockProfile(false);
-    const view = await render(<CreateStoryScreen />);
+    const view = await renderCreate();
 
     await fireEvent.press(view.getByTestId('category-bedtime'));
     await fireEvent.press(view.getByTestId('trigger-refusing_teeth'));

@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Alert, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useNavigation } from 'expo-router';
+import { router, Stack, useNavigation } from 'expo-router';
 
 import { BreathingCircle } from '@/components/breathing-circle';
 import { CalmingCopy } from '@/components/calming-copy';
 import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
+import { NativeHeaderIconButton } from '@/components/ui/native-header-icon-button';
+import { StatusBarScrim } from '@/components/ui/status-bar-scrim';
+import { useTopChromeInset } from '@/components/ui/use-top-chrome-inset';
 import { useStoryGeneration } from '@/contexts/StoryGenerationContext';
 import { Colors, Spacing } from '@/theme';
 
@@ -20,6 +23,7 @@ export default function GenerateScreen() {
     takeReadyStory,
     dismissStatus,
   } = useStoryGeneration();
+  const topChromeInset = useTopChromeInset({ hasNativeHeader: true });
   const hasTakenReadyStoryRef = useRef(false);
   const hasObservedLifecycleRef = useRef(state.status !== 'idle');
   const allowNextRemovalRef = useRef(false);
@@ -91,40 +95,69 @@ export default function GenerateScreen() {
     router.replace({ pathname: '/story', params: { id: story.id } });
   }, [state, takeReadyStory]);
 
+  const handleHeaderBack = () => {
+    if (state.status === 'failed') {
+      dismissStatus();
+    }
+    router.back();
+  };
+
   if (state.status === 'idle') return null;
 
   if (state.status === 'failed') {
     return (
-      <ErrorState
-        onRetry={retryGeneration}
-        onBack={() => {
-          dismissStatus();
-          router.back();
-        }}
-      />
+      <>
+        <Stack.Screen
+          options={{
+            title: 'Story generation',
+            headerLeft: () => (
+              <NativeHeaderIconButton
+                action="back"
+                accessibilityLabel="Go back"
+                onPress={handleHeaderBack}
+                testID="generate-header-back"
+              />
+            ),
+          }}
+        />
+        <ErrorState onRetry={retryGeneration} topChromeInset={topChromeInset} />
+      </>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, styles.background]}>
-      <BreathingCircle />
-      <CalmingCopy />
-      {state.status === 'generating' && (
-        <Button label="Leave" variant="ghost" onPress={() => confirmLeave(() => router.back())} />
-      )}
-    </SafeAreaView>
+    <>
+      <Stack.Screen
+        options={{
+          title: 'Story generation',
+          headerLeft: () => (
+            <NativeHeaderIconButton
+              action="back"
+              accessibilityLabel="Go back"
+              onPress={handleHeaderBack}
+              testID="generate-header-back"
+            />
+          ),
+        }}
+      />
+      <ThemedView style={[styles.container, styles.background, { paddingTop: topChromeInset }]}>
+        <BreathingCircle />
+        <CalmingCopy />
+        <StatusBarScrim height={topChromeInset} />
+      </ThemedView>
+    </>
   );
 }
 
-function ErrorState({ onRetry, onBack }: { onRetry: () => void; onBack: () => void }) {
+function ErrorState({ onRetry, topChromeInset }: { onRetry: () => void; topChromeInset: number }) {
   return (
-    <SafeAreaView style={[styles.container, styles.background]}>
+    <ThemedView style={[styles.container, styles.background, { paddingTop: topChromeInset }]}>
       <ThemedText style={styles.errorText}>
         Hmm, something went wrong.{"\n"}Let&apos;s try again.
       </ThemedText>
       <Button label="Try Again" onPress={onRetry} />
-      <Button label="Go Back" variant="ghost" onPress={onBack} />
-    </SafeAreaView>
+      <StatusBarScrim height={topChromeInset} />
+    </ThemedView>
   );
 }
 

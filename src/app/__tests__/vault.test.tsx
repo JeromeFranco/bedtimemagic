@@ -110,6 +110,12 @@ describe('VaultScreen', () => {
     expect(scrollView).toBeTruthy();
   });
 
+  it('adds a non-interactive screen-owned status-bar scrim', async () => {
+    const view = await renderVault();
+
+    expect(view.getByTestId('status-bar-scrim').props.pointerEvents).toBe('none');
+  });
+
   it('guides an empty Vault back to story creation', async () => {
     mockStories({ data: [] });
     const view = await renderVault();

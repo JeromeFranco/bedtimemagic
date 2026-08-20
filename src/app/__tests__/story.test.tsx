@@ -1,9 +1,11 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 const mockPlayStory = jest.fn();
 const mockStopStory = jest.fn();
 const mockFinishWindDown = jest.fn();
 const mockCompleteWindDown = jest.fn();
+const mockToggleSleepMode = jest.fn();
 const mockNavigation: { addListener: jest.Mock } = { addListener: jest.fn(() => jest.fn()) };
 
 jest.mock('@/contexts/PlayerContext', () => ({
@@ -15,6 +17,7 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: jest.fn(),
   useNavigation: jest.fn(),
   router: { back: jest.fn() },
+  Stack: { Screen: jest.fn(() => null) },
 }));
 
 jest.mock('@/hooks/use-story', () => ({ useStory: jest.fn() }));
@@ -34,6 +37,9 @@ import { useCoverImage } from '@/hooks/use-cover-image';
 import { usePlayer } from '@/contexts/PlayerContext';
 
 const mockUsePlayer = usePlayer as jest.Mock;
+const mockStackScreen = (jest.requireMock('expo-router') as {
+  Stack: { Screen: jest.Mock };
+}).Stack.Screen;
 
 const MOCK_STORY = {
   id: 'story-1',
@@ -64,12 +70,25 @@ const basePlayerMock = (overrides = {}) => ({
   resume: jest.fn(),
   seekTo: jest.fn(),
   stopStory: mockStopStory,
-  toggleSleepMode: jest.fn(),
+  toggleSleepMode: mockToggleSleepMode,
   showAffirmation: jest.fn(),
   finishWindDown: mockFinishWindDown,
   completeWindDown: mockCompleteWindDown,
   ...overrides,
 });
+
+function renderStory() {
+  return render(
+    <SafeAreaProvider
+      initialMetrics={{
+        frame: { x: 0, y: 0, width: 390, height: 844 },
+        insets: { top: 47, right: 0, bottom: 34, left: 0 },
+      }}
+    >
+      <StoryScreen />
+    </SafeAreaProvider>,
+  );
+}
 
 describe('StoryScreen', () => {
   beforeEach(() => {
@@ -87,27 +106,29 @@ describe('StoryScreen', () => {
 
   it('renders the integrated player surface for Pillow Talk', async () => {
     mockUsePlayer.mockImplementation(() => basePlayerMock({ postStoryPhase: 'pillow_talk' }));
-    const queries = await render(<StoryScreen />);
+    const queries = await renderStory();
     expect(queries.getByTestId('artwork-image')).toBeTruthy();
-    expect(queries.getByTestId('player-back-button')).toBeTruthy();
+    expect(queries.queryByTestId('player-back-button')).toBeNull();
     expect(queries.getByText('Pillow talk')).toBeTruthy();
     expect(queries.getByText('Show affirmation')).toBeTruthy();
   });
 
   it('keeps loading and error states', async () => {
     (useStory as jest.Mock).mockReturnValue({ data: undefined, isLoading: true, error: null });
-    const loading = await render(<StoryScreen />);
+    const loading = await renderStory();
     expect(loading.getByText('Loading story...')).toBeTruthy();
     await loading.unmount();
 
     (useStory as jest.Mock).mockReturnValue({ data: undefined, isLoading: false, error: new Error('fail') });
-    const error = await render(<StoryScreen />);
-    await fireEvent.press(error.getByText('Go Back'));
+    await renderStory();
+    const errorHeader = mockStackScreen.mock.calls.at(-1)![0].options.headerLeft();
+    const header = await render(errorHeader);
+    await fireEvent.press(header.getByTestId('story-header-back'));
     expect(router.back).toHaveBeenCalledTimes(1);
   });
 
   it('plays through the integrated player and prefetches narration', async () => {
-    const queries = await render(<StoryScreen />);
+    const queries = await renderStory();
     await fireEvent.press(queries.getByTestId('play-pause-button'));
     expect(mockPlayStory).toHaveBeenCalledWith(MOCK_STORY);
     expect(require('@/lib/audio-utils').prefetchStoryAudio).toHaveBeenCalledWith(
@@ -120,7 +141,7 @@ describe('StoryScreen', () => {
     'prevents route removal and finishes wind-down during %s',
     async (postStoryPhase) => {
       mockUsePlayer.mockImplementation(() => basePlayerMock({ postStoryPhase }));
-      await render(<StoryScreen />);
+      await renderStory();
       const listener = mockNavigation.addListener.mock.calls[0][1] as (event: {
         preventDefault: jest.Mock;
         data: { action: object };
@@ -134,15 +155,38 @@ describe('StoryScreen', () => {
 
   it('removes the post-story guard and navigates once after completion', async () => {
     mockUsePlayer.mockImplementation(() => basePlayerMock({ postStoryPhase: 'done' }));
-    await render(<StoryScreen />);
+    await renderStory();
     expect(mockNavigation.addListener).not.toHaveBeenCalled();
     expect(router.back).toHaveBeenCalledTimes(1);
   });
 
-  it('stops audio when ordinary player Back exits the route', async () => {
-    const queries = await render(<StoryScreen />);
-    await fireEvent.press(queries.getByTestId('player-back-button'));
+  it('uses native header actions for ordinary Back and idle Sleep Mode', async () => {
+    await renderStory();
+    const options = mockStackScreen.mock.calls.at(-1)![0].options;
+    expect(options.title).toBe(MOCK_STORY.title);
+    const back = await render(options.headerLeft());
+    await fireEvent.press(back.getByTestId('story-header-back'));
     expect(mockStopStory).toHaveBeenCalledTimes(1);
     expect(router.back).toHaveBeenCalledTimes(1);
+
+    const sleep = await render(options.headerRight());
+    await fireEvent.press(sleep.getByTestId('story-header-sleep'));
+    expect(mockToggleSleepMode).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses header Back to finish wind-down and removes header actions during terminal fade', async () => {
+    mockUsePlayer.mockImplementation(() => basePlayerMock({ postStoryPhase: 'pillow_talk' }));
+    await renderStory();
+    const windDownOptions = mockStackScreen.mock.calls.at(-1)![0].options;
+    const back = await render(windDownOptions.headerLeft());
+    await fireEvent.press(back.getByTestId('story-header-back'));
+    expect(mockFinishWindDown).toHaveBeenCalledTimes(1);
+    expect(windDownOptions.headerRight).toBeUndefined();
+
+    mockUsePlayer.mockImplementation(() => basePlayerMock({ postStoryPhase: 'fade_to_black' }));
+    await renderStory();
+    const terminalOptions = mockStackScreen.mock.calls.at(-1)![0].options;
+    expect(terminalOptions.headerLeft).toBeUndefined();
+    expect(terminalOptions.headerRight).toBeUndefined();
   });
 });

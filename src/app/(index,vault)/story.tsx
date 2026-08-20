@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet } from 'react-native';
-import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import { router, Stack, useLocalSearchParams, useNavigation } from 'expo-router';
 
 import { StoryPlayer } from '@/components/story/story-player';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Button } from '@/components/ui/button';
+import { NativeHeaderIconButton } from '@/components/ui/native-header-icon-button';
+import { StatusBarScrim } from '@/components/ui/status-bar-scrim';
+import { useTopChromeInset } from '@/components/ui/use-top-chrome-inset';
 import { Colors, Spacing } from '@/theme';
 import { PROTAGONISTS } from '@/types';
 import { usePlayer } from '@/contexts/PlayerContext';
@@ -18,7 +20,8 @@ export default function StoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const navigation = useNavigation();
   const { data: story, isLoading, error } = useStory(id!);
-  const { postStoryPhase, stopStory, finishWindDown } = usePlayer();
+  const { isSleepMode, postStoryPhase, stopStory, toggleSleepMode, finishWindDown } = usePlayer();
+  const topChromeInset = useTopChromeInset({ hasNativeHeader: true });
   const [localCoverPath, setLocalCoverPath] = useState<string | null>(null);
   const { coverUrl } = useCoverImage(story?.id ?? '', story?.title ?? '');
   const storyId = story?.id;
@@ -29,10 +32,40 @@ export default function StoryScreen() {
     postStoryPhase === 'affirmation' ||
     postStoryPhase === 'fade_to_black';
 
-  const handleBack = useCallback(() => {
-    stopStory();
-    router.back();
-  }, [stopStory]);
+  const isTerminalPhase = postStoryPhase === 'fade_to_black' || postStoryPhase === 'done';
+
+  const handleBack = () => {
+    if (postStoryPhase === 'idle') {
+      stopStory();
+      router.back();
+    } else if (!isTerminalPhase) {
+      finishWindDown();
+    }
+  };
+
+  const headerOptions = {
+    title: story?.title ?? 'Story',
+    headerLeft: isTerminalPhase
+      ? undefined
+      : () => (
+        <NativeHeaderIconButton
+          action="back"
+          accessibilityLabel="Go back"
+          onPress={handleBack}
+          testID="story-header-back"
+        />
+      ),
+    headerRight: postStoryPhase === 'idle'
+      ? () => (
+        <NativeHeaderIconButton
+          action="sleep"
+          accessibilityLabel={isSleepMode ? 'Sleep Mode on' : 'Sleep Mode'}
+          onPress={toggleSleepMode}
+          testID="story-header-sleep"
+        />
+      )
+      : undefined,
+  };
 
   useEffect(() => {
     if (!storyId) return;
@@ -76,8 +109,10 @@ export default function StoryScreen() {
   if (isLoading) {
     return (
       <ThemedView style={[styles.container, styles.center]}>
+        <Stack.Screen options={headerOptions} />
         <ActivityIndicator size="large" color={Colors.dark.textPrimary} />
         <ThemedText style={styles.loadingText}>Loading story...</ThemedText>
+        <StatusBarScrim height={topChromeInset} />
       </ThemedView>
     );
   }
@@ -85,8 +120,9 @@ export default function StoryScreen() {
   if (error || !story) {
     return (
       <ThemedView style={[styles.container, styles.center]}>
+        <Stack.Screen options={headerOptions} />
         <ThemedText style={styles.errorText}>{"Couldn't load this story"}</ThemedText>
-        <Button label="Go Back" variant="secondary" onPress={() => router.back()} />
+        <StatusBarScrim height={topChromeInset} />
       </ThemedView>
     );
   }
@@ -99,12 +135,16 @@ export default function StoryScreen() {
       : null;
 
   return (
-    <StoryPlayer
-      story={story}
-      protagonist={protagonist}
-      imageSource={imageSource}
-      onBack={handleBack}
-    />
+    <ThemedView style={styles.container}>
+      <Stack.Screen options={headerOptions} />
+      <StoryPlayer
+        story={story}
+        protagonist={protagonist}
+        imageSource={imageSource}
+        topInset={topChromeInset}
+      />
+      <StatusBarScrim height={topChromeInset} />
+    </ThemedView>
   );
 }
 

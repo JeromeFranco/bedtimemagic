@@ -19,6 +19,8 @@ colors:
   error: "#D47A6A"
   scrim: "rgba(0, 0, 0, 0.5)"
   overlay: "rgba(6, 10, 26, 0.8)"
+  system-bar-scrim-top: "#060A1A"
+  system-bar-scrim-bottom: "rgba(6, 10, 26, 0)"
   track: "rgba(226, 224, 240, 0.15)"
   avatar-tint: "rgba(255, 255, 255, 0.1)"
   accent-soft: "rgba(139, 92, 246, 0.2)"
@@ -190,7 +192,7 @@ Radius carries role: 12 for buttons, 16 for cards, pill (full) for chips. Cover 
 
 Don'ts:
 
-- No gradient backgrounds — the background is always solid `bg-base` or `bg-deepest`.
+- Backgrounds remain solid `bg-base` or `bg-deepest`. The fixed system-bar readability scrim is the sole permitted vertical gradient: it fades from `system-bar-scrim-top` to `system-bar-scrim-bottom` as system chrome, never page decoration.
 - No bright or saturated fills; category colors appear only as low-opacity tints.
 - No emoji in UI chrome (buttons, headers, empty states).
 - No gamification — no streaks, badges, points, levels, or progress bars. The Lesson Log tracks behavior gently, not competitively.
