@@ -1,12 +1,23 @@
-import { StyleSheet, View, Pressable, Modal } from 'react-native';
+import { router } from 'expo-router';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ProfileAvatar } from '@/components/profile-avatar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Button } from '@/components/ui/button';
+import { useProfileDraft } from '@/contexts/ProfileDraftContext';
 import { useSelectedChild } from '@/contexts/SelectedChildContext';
-import { Spacing, Colors } from '@/theme';
+import { BorderRadius, Colors, Spacing } from '@/theme';
 import type { ChildProfile } from '@/types';
 import { DEVELOPMENTAL_STAGES } from '@/types';
+import { SelectionRow } from '@/ui/selection-row';
 
 interface ProfileSheetProps {
   visible: boolean;
@@ -14,60 +25,82 @@ interface ProfileSheetProps {
 }
 
 function getStageLabel(stage: ChildProfile['developmental_stage']): string {
-  return DEVELOPMENTAL_STAGES.find((s) => s.id === stage)?.label ?? stage;
+  return DEVELOPMENTAL_STAGES.find((item) => item.id === stage)?.label ?? stage;
 }
 
 export function ProfileSheet({ visible, onClose }: ProfileSheetProps) {
   const { profiles, selectedProfile, setSelectedProfile } = useSelectedChild();
+  const { begin } = useProfileDraft();
+  const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
 
   const handleSelect = (profile: ChildProfile) => {
     setSelectedProfile(profile);
     onClose();
   };
 
+  const handleAddProfile = () => {
+    onClose();
+    begin('add');
+    router.push('/profile/details');
+  };
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.overlay}>
+        <Pressable
+          style={styles.backdrop}
+          onPress={onClose}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+        />
+        <View
+          style={[
+            styles.sheet,
+            {
+              maxHeight: height - insets.top - Spacing.xl,
+              paddingBottom: insets.bottom + Spacing.lg,
+            },
+          ]}
+        >
           <ThemedView style={styles.handle} />
           <ThemedText type="subtitle" style={styles.title}>
-            Switch Profile
+            Switch profile
           </ThemedText>
 
-          {profiles.map((profile) => (
-            <Pressable
-              key={profile.id}
-              style={[
-                styles.profileRow,
-                selectedProfile?.id === profile.id && styles.profileRowSelected,
-              ]}
-              onPress={() => handleSelect(profile)}
-            >
-              <ProfileAvatar emoji={profile.emoji} size={44} />
-              <View style={styles.profileInfo}>
-                <ThemedText type="default" style={styles.profileName}>
-                  {profile.name}
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {getStageLabel(profile.developmental_stage)}
-                </ThemedText>
-              </View>
-              {selectedProfile?.id === profile.id && (
-                <ThemedText style={styles.check}>✓</ThemedText>
-              )}
-            </Pressable>
-          ))}
+          <ScrollView
+            style={styles.profileScroll}
+            contentContainerStyle={styles.profiles}
+            accessibilityRole="radiogroup"
+            showsVerticalScrollIndicator={false}
+          >
+            {profiles.map((profile) => (
+              <SelectionRow
+                key={profile.id}
+                label={profile.name}
+                supportingText={getStageLabel(profile.developmental_stage)}
+                selected={selectedProfile?.id === profile.id}
+                onPress={() => handleSelect(profile)}
+                testID={`profile-${profile.id}`}
+              />
+            ))}
+          </ScrollView>
 
-          <Pressable style={[styles.addProfileRow, styles.addProfileRowDisabled]} disabled>
-            <ThemedText type="default" themeColor="textSecondary">
-              + Add Profile
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              Coming Soon
-            </ThemedText>
-          </Pressable>
-        </Pressable>
-      </Pressable>
+          <View style={styles.addProfile}>
+            <Button
+              label="Add Profile"
+              variant="ghost"
+              fullWidth
+              onPress={handleAddProfile}
+            />
+          </View>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -76,20 +109,23 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFill,
     backgroundColor: Colors.dark.scrim,
   },
   sheet: {
     backgroundColor: Colors.dark.bgElement,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: BorderRadius.lg,
+    borderTopRightRadius: BorderRadius.lg,
     paddingTop: Spacing.sm,
-    paddingBottom: Spacing['2xl'],
+    paddingBottom: Spacing.lg,
     paddingHorizontal: Spacing.xl,
   },
   handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
+    width: Spacing['3xl'],
+    height: Spacing.xs,
+    borderRadius: BorderRadius.pill,
     backgroundColor: Colors.dark.textMuted,
     alignSelf: 'center',
     marginBottom: Spacing.lg,
@@ -97,39 +133,16 @@ const styles = StyleSheet.create({
   title: {
     marginBottom: Spacing.lg,
   },
-  profileRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    borderRadius: Spacing.sm,
-    marginBottom: Spacing.xs,
+  profileScroll: {
+    flexShrink: 1,
   },
-  profileRowSelected: {
-    backgroundColor: Colors.dark.bgSelected,
+  profiles: {
+    gap: Spacing.sm,
   },
-  profileInfo: {
-    flex: 1,
-  },
-  profileName: {
-    fontWeight: '500',
-  },
-  check: {
-    fontSize: 18,
-    color: Colors.dark.textPrimary,
-  },
-  addProfileRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.sm,
-    marginTop: Spacing.sm,
+  addProfile: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: Colors.dark.borderSubtle,
-  },
-  addProfileRowDisabled: {
-    opacity: 0.5,
+    marginTop: Spacing.lg,
+    paddingTop: Spacing.sm,
   },
 });

@@ -108,7 +108,6 @@ export interface ChildProfile {
   name: string;
   developmental_stage: DevelopmentalStage;
   protagonist: Protagonist;
-  emoji: string;
   created_at: string;
 }
 

@@ -19,7 +19,7 @@ AI Agents MUST adhere to these principles at all times. Violations of these guar
 
 - **1. Sleep Hygiene First (Dark Mode Only):** The UI MUST default to and strictly enforce a dark-mode aesthetic. Use deep blues, purples, and low-contrast text. NEVER use pure white backgrounds or bright, stimulating colours.
 - **2. Zero Cloud Audio Storage (Local Client Caching Only):** To protect bootstrapper margins and infrastructure boundaries, the app MUST NOT store generated audio blobs in cloud storage buckets or central database rows. However, to minimise repetitive TTS API costs for children's favourite repeat stories, the client application MUST utilise a local, volatile on-device cache for the audio of the 5 stories visible in the history vault.
-- **3. COPPA, GDPR-K, & Store Compliance:** The app collects ZERO real names, exact ages, or free-form text about minors. It functions strictly as a parent utility. It must include an Adult Gate during onboarding and be listed under Health/Lifestyle/Education categories, never the Kids Category.
+- **3. COPPA, GDPR-K, & Store Compliance:** The app collects no real names, exact ages, or free-form text about minors. It functions strictly as a parent-directed utility and is listed under Health/Lifestyle/Education categories, never the Kids Category. Compliance relies on data minimization, store classification, privacy disclosures, and legal review—not an interaction that claims to verify adulthood.
 - **4. Cognitive Load Reduction:** The parent user is likely exhausted. UI flows MUST minimise typing. Rely entirely on Quick-Taps and choice chips. Keyboard input is banned outside of adult authentication and the Bedtime Nickname field.
 - **5. No "Vibe Coding" Feature Creep:** Do not build features that are not explicitly defined in this PRD. If a feature is not listed here, it belongs in V2.
 
@@ -27,8 +27,8 @@ AI Agents MUST adhere to these principles at all times. Violations of these guar
 
 ### 3.1. Anonymous Child Profiles
 
-- **Function:** Stores profile metadata: Bedtime Nickname and Behavioural/Developmental Stage.
-- **Constraint:** No real names, no dates of birth, and no exact ages are permitted. Parents can have multiple profiles with quick-switching capability.
+- **Function:** Stores Bedtime Nickname, Developmental Stage, and chosen Protagonist in Supabase under the current anonymous session. Supabase is the sole profile source of truth; local storage holds only onboarding completion and selected-profile identity.
+- **Constraint:** No real names, dates of birth, or exact ages are requested. Objective nickname validation permits 1–24 normalized Unicode letters/numbers plus spaces, apostrophes, and hyphens; it does not claim to detect real names. Parents can create and quick-switch multiple profiles.
 
 ### 3.2. The Recurring Protagonist
 
@@ -77,17 +77,14 @@ AI Agents MUST adhere to these principles at all times. Violations of these guar
 
 ### 4.1. Onboarding Flow (FTUE - First Time User Experience)
 
-**Goal:** Establish legal compliance and get the user to hearing the first story in under 90 seconds using Lazy Registration.
+**Goal:** Introduce the parent-directed utility, collect the minimum anonymous profile data, and land on Home without flashing the tab shell.
 
-1. **Adult Gate & Splash:** Dark mode animation. Prompts parent to solve a simple math barrier or enter birth year to verify adult status. Copy: _"Turn bedtime battles into life lessons."_ Button: _"Create Tonight's Story"_.
-2. **Child Profile Creation (Anonymous):**
-   - Input field: _"Bedtime Nickname"_ (with placeholder: e.g., Sparky, Rocket, or Buddy).
-   - Dropdown selector: _"Developmental Level"_ (Options: Preschool, Early Primary, Older Kids).
-   - Privacy Trust Badge: _"🔒 Privacy First: To keep your child safe, we never ask for real names or birthdates."_
-3. **Quick-Tap Challenge:** Select Tier 1 challenge chip, then select the auto-revealed Tier 2 trigger chip. Button: _"Generate Magic ✨"_.
-4. **Sensory Loading Transition:** Deep navy low-stimulus screen. Displays a slow, pulsating ambient circle serving as a calm breathing pacer (_"Breathe in slowly..."_) to absorb the initial LLM thinking time without causing visual stimulation.
-5. **Paywall & Lazy Auth:** Show Story Card (Title, Cover Art, Moral). Prompt user to _"Claim 3 Free Stories"_. Only at this exact moment trigger Supabase Auth (Email/Apple Sign-In) to save the account and the generated text. The Paywall & Lazy Auth card screen serves as the initial optimistic pre-fetch anchor. The client application must kick off the background sentence-one and sentence-two TTS fetch operations while the parent is interacting with the registration layout.
-6. **Playback:** Drop directly into the Audio Player.
+1. **First-Run Parent Welcome:** A deepest-dark, low-stimulus surface appears before tabs. Copy: _"Turn bedtime battles into life lessons."_ The primary action is _"Create Tonight's Story"_. It requests no age or birth-year data and makes no claim of adult verification.
+2. **Profile Details:** A standard Bedtime Nickname field includes privacy guidance and objective format validation. Preschool, Early Primary, and Older Kids are three visible single-choice rows, not a dropdown.
+3. **Protagonist Selection:** A second focused screen requires one text-only choice: Barnaby, Captain Nova, Pip, Luna, or Rex.
+4. **Persistence and Landing:** The profile is created under the existing anonymous Supabase session, selected, and followed by local onboarding-completion persistence scoped to that anonymous user identity. The protected onboarding stack then resolves directly to Home.
+
+Existing installations with one or more profiles skip onboarding without data deletion. Add Profile reuses the two profile screens from Home, selects the created profile, and dismisses back to Home. Email/Apple registration, anonymous-account claiming, entitlements, story allowances, and paywall behavior remain outside this onboarding phase.
 
 ### 4.2. Daily Generation Flow
 

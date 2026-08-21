@@ -38,6 +38,34 @@ export default function Layout({ segment }: { segment: string }) {
           ),
         }}
       />
+      <Stack.Screen
+        name="profile/details"
+        options={{
+          ...transparentHeaderOptions,
+          title: 'Profile details',
+          headerLeft: () => (
+            <NativeHeaderIconButton
+              action="back"
+              accessibilityLabel="Go back"
+              onPress={() => router.back()}
+            />
+          ),
+        }}
+      />
+      <Stack.Screen
+        name="profile/protagonist"
+        options={{
+          ...transparentHeaderOptions,
+          title: 'Story friend',
+          headerLeft: () => (
+            <NativeHeaderIconButton
+              action="back"
+              accessibilityLabel="Go back"
+              onPress={() => router.back()}
+            />
+          ),
+        }}
+      />
       <Stack.Screen name="generate" options={transparentHeaderOptions} />
       <Stack.Screen name="story" options={transparentHeaderOptions} />
     </Stack>

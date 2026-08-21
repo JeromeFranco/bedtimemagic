@@ -2,7 +2,7 @@ import { act, fireEvent, render } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import CreateStoryScreen from '../(index,vault)/create';
+import CreateStoryScreen from '../(app)/(index,vault)/create';
 import { router } from 'expo-router';
 import { useSelectedChild } from '@/contexts/SelectedChildContext';
 import { useStoryGeneration } from '@/contexts/StoryGenerationContext';
@@ -49,7 +49,6 @@ function mockProfile(selectedProfile = true) {
           name: 'Mia',
           developmental_stage: 'preschool',
           protagonist: 'barnaby',
-          emoji: '🌙',
           created_at: '2026-08-13T00:00:00Z',
         }
       : null,

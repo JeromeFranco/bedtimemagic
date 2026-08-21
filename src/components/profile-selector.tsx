@@ -1,8 +1,7 @@
 import { useState } from 'react';
 
-import { ProfileAvatar } from '@/components/profile-avatar';
 import { ProfileSheet } from '@/components/profile-sheet';
-import { IconButton } from '@/components/ui/icon-button';
+import { Button } from '@/components/ui/button';
 import { useSelectedChild } from '@/contexts/SelectedChildContext';
 
 export function ProfileSelector() {
@@ -13,14 +12,12 @@ export function ProfileSelector() {
 
   return (
     <>
-      <IconButton
-        variant="bare"
+      <Button
+        label="Switch profile"
+        variant="ghost"
+        size="compact"
         onPress={() => setSheetVisible(true)}
-        accessibilityLabel={`Profile: ${selectedProfile.name}`}
-      >
-        <ProfileAvatar emoji={selectedProfile.emoji} size={40} />
-      </IconButton>
-
+      />
       <ProfileSheet visible={sheetVisible} onClose={() => setSheetVisible(false)} />
     </>
   );

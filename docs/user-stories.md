@@ -16,7 +16,7 @@
 **So that** story generation can select a protagonist without requiring user onboarding.
 
 **Acceptance Criteria:**
-- [ ] 5 protagonists defined: Barnaby Bear, Captain Nova, Pip the Penguin, Luna the Owl, Captain Whiskers
+- [ ] 5 protagonists defined: Barnaby Bear, Captain Nova, Pip the Penguin, Luna the Owl, Rex the Dragon
 - [ ] Each protagonist has: id, name, species, personality description, voice/tonality notes for TTS
 - [ ] Data is available as a static seed (JSON/TypeScript constants) — not fetched from Supabase
 - [ ] Default protagonist selected automatically for seed profile
@@ -273,33 +273,40 @@
 
 > FTUE — First Time User Experience. Built after core generation works.
 
-### US-3.1: Adult Gate
+### US-3.1: First-Run Parent Welcome
 
 **As a** parent,
-**I want** an age verification gate on first launch,
-**So that** the app is COPPA/GDPR-K compliant.
+**I want** a calm first-run welcome before the app shell,
+**So that** I understand the app without an ineffective age-verification barrier.
 
 **Acceptance Criteria:**
-- [ ] Dark mode animation splash on first launch
-- [ ] Simple math barrier or birth year entry to verify adult status
-- [ ] Copy: "Turn bedtime battles into life lessons."
-- [ ] Button: "Create Tonight's Story"
-- [ ] Gate state persisted — not shown again after passing
+- [ ] The parent welcome appears before Home and tabs on a clean installation
+- [ ] The welcome uses the dark, low-stimulus design system and the copy: "Turn bedtime battles into life lessons."
+- [ ] The primary action is: "Create Tonight's Story"
+- [ ] The welcome addresses a parent or guardian without requesting age or birth-year data
+- [ ] Completion is persisted after successful profile creation
+- [ ] Existing installations with at least one profile skip onboarding without deleting profile data
+- [ ] Home and tabs never flash while authentication and profile state are loading
 
 ---
 
 ### US-3.2: Anonymous Profile Creation
 
 **As a** parent,
-**I want** to create a child profile with just a nickname and stage,
-**So that** stories are personalized without sharing PII.
+**I want** to create a minimal child profile under my anonymous session,
+**So that** stories are personalized without collecting a real name or birthdate.
 
 **Acceptance Criteria:**
 - [ ] Input field: "Bedtime Nickname" (placeholder: Sparky, Rocket, or Buddy)
-- [ ] Dropdown: "Developmental Level" — Preschool, Early Primary, Older Kids
-- [ ] Privacy badge: "🔒 Privacy First: We never ask for real names or birthdates."
-- [ ] No real names, no DOB, no exact ages — enforced by input validation
-- [ ] Profile saved locally (and to Supabase after auth)
+- [ ] Helper: "Use a nickname, not a real name."
+- [ ] Text-only notice: "We never ask for real names or birthdates."
+- [ ] Nicknames normalize surrounding/repeated whitespace, contain 1–24 Unicode code points, include a letter or number, and use only letters, numbers, spaces, apostrophes, or hyphens
+- [ ] Invalid punctuation, emoji, line breaks, and control characters are rejected; validation does not claim to detect real names
+- [ ] Three visible single-choice level rows: Preschool, Early Primary, Older Kids
+- [ ] A second screen requires one protagonist: Barnaby, Captain Nova, Pip, Luna, or Rex
+- [ ] The profile is saved in Supabase under the existing anonymous session and becomes selected
+- [ ] Successful first-run creation records onboarding completion and lands on Home
+- [ ] Add Profile reuses the same two screens without showing the welcome
 
 ---
 

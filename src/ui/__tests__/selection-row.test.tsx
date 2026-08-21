@@ -49,4 +49,19 @@ describe('selection surfaces', () => {
     ]));
     expect(Layout.chipHeight).toBe(44);
   });
+  it('exposes selected single-choice state and supporting text', async () => {
+    const view = await render(
+      <SelectionRow
+        label="Barnaby"
+        supportingText="Bear"
+        selected
+        onPress={jest.fn()}
+      />,
+    );
+
+    const row = view.getByRole('radio', { name: 'Barnaby, Bear' });
+    expect(row.props.accessibilityState).toEqual({ selected: true });
+    expect(view.getByText('Bear')).toBeTruthy();
+  });
+
 });

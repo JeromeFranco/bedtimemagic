@@ -203,6 +203,16 @@ Don'ts:
 
 Home is a calm landing surface with one full-width primary action: `Create Tonight's Story`. Story setup progressively discloses one category and then its matching trigger; choosing a trigger starts generation immediately. Category accents are reserved for the active challenge context, never page, card, or button decoration.
 
+## Onboarding and profiles
+
+Bootstrap resolves anonymous authentication, remote profiles, and onboarding completion before rendering navigation. While unresolved, show only `bg-deepest`; never flash Home or tabs. A clean user enters the protected first-run stack, while a completion record belonging to the current anonymous user or an existing Supabase profile enters the protected app stack. A lost anonymous session never transfers completion to its replacement user.
+
+The first-run welcome uses `bg-deepest`, the parent-directed tagline “Turn bedtime battles into life lessons.”, one supporting sentence, and the full-width “Create Tonight’s Story” action. Its sole motion is a 150ms ease-out opacity entrance using system reduced-motion behavior; reduced motion renders the content statically. No logo reveal, spring, elastic motion, spinner, iconography, or bright surface.
+
+Profile creation uses two focused screens. The first contains one React Native nickname field, text-only privacy guidance, and three visible developmental-level `SelectionRow` controls. The second contains five text-only protagonist rows with species as supporting text. No protagonist is preselected. Selected rows use only `bg-selected` and neutral borders; never emoji, checkmarks, chevrons, or category colors.
+
+Successful first-run creation selects the Supabase profile, records onboarding completion, and reveals Home. Add Profile reuses both screens inside the app stack and returns Home with the created profile selected. The Home header uses a compact text action labeled “Switch profile”; the sheet uses selection rows plus a text-only “Add Profile” action. Back navigation preserves the in-memory draft and never changes an existing selection before submission.
+
 When principles conflict, resolve in this order: sleep hygiene non-negotiable (cut anything that increases arousal) → accessibility floor (change the color, not the requirement) → cognitive load over density → tap-first, always → restraint over completeness → platform-native over brand-consistent.
 
 ## Voice & Tone

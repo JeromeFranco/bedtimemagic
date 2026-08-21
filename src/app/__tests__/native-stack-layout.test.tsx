@@ -1,6 +1,6 @@
 import { fireEvent, render } from '@testing-library/react-native';
 
-import Layout from '../(index,vault)/_layout';
+import Layout from '../(app)/(index,vault)/_layout';
 import { router } from 'expo-router';
 import { Colors } from '@/theme';
 

@@ -79,7 +79,12 @@ jest.mock('react-native-reanimated', () => {
     measure: () => ({ x: 0, y: 0, width: 0, height: 0, pageX: 0, pageY: 0 }),
     scrollTo: NOOP,
     BaseAnimationBuilder: { duration() { return this; }, delay() { return this; } },
-    FadeIn: { duration() { return this; }, delay() { return this; } },
+    FadeIn: {
+      duration() { return this; },
+      delay() { return this; },
+      easing() { return this; },
+      reduceMotion() { return this; },
+    },
     FadeOut: { duration() { return this; }, delay() { return this; } },
     FadeInDown: { duration() { return this; }, delay() { return this; } },
     FadeInUp: { duration() { return this; }, delay() { return this; } },

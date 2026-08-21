@@ -4,7 +4,7 @@ import { act, fireEvent, render } from '@testing-library/react-native';
 import { AccessibilityInfo, Alert, Pressable } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import GenerateScreen from '../(index,vault)/generate';
+import GenerateScreen from '../(app)/(index,vault)/generate';
 import { router, usePathname } from 'expo-router';
 import { StoryGenerationProvider, useStoryGeneration } from '@/contexts/StoryGenerationContext';
 import { generateStory } from '@/api/stories';

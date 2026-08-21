@@ -1,7 +1,7 @@
 import { fireEvent, render } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import HomeScreen from '../(index,vault)/index';
+import HomeScreen from '../(app)/(index,vault)/index';
 import { router } from 'expo-router';
 import { useSelectedChild } from '@/contexts/SelectedChildContext';
 import { useStoryGeneration } from '@/contexts/StoryGenerationContext';
@@ -59,7 +59,6 @@ describe('HomeScreen', () => {
         name: 'Mia',
         developmental_stage: 'preschool',
         protagonist: 'barnaby',
-        emoji: '🌙',
         created_at: '2026-08-13T00:00:00Z',
       },
       setSelectedProfile: jest.fn(),

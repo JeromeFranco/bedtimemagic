@@ -3,7 +3,7 @@ import { fireEvent, render } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { RefreshControlProps } from 'react-native';
 
-import VaultScreen from '../(index,vault)/vault';
+import VaultScreen from '../(app)/(index,vault)/vault';
 import { router } from 'expo-router';
 import { useStories } from '@/hooks/use-story';
 import type { Story } from '@/types';
