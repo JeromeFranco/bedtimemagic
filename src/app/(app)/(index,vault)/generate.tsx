@@ -109,7 +109,6 @@ export default function GenerateScreen() {
       <>
         <Stack.Screen
           options={{
-            title: 'Story generation',
             headerLeft: () => (
               <NativeHeaderIconButton
                 action="back"
@@ -129,7 +128,6 @@ export default function GenerateScreen() {
     <>
       <Stack.Screen
         options={{
-          title: 'Story generation',
           headerLeft: () => (
             <NativeHeaderIconButton
               action="back"

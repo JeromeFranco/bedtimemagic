@@ -196,6 +196,9 @@ export function StoryPlayer({ story, protagonist, imageSource, topInset }: Story
             {phase === 'idle' && (
               <>
                 <View style={styles.metadataArea}>
+                  <ThemedText type="title" style={styles.storyTitle} numberOfLines={2}>
+                    {story.title}
+                  </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary" style={styles.subtitleText} numberOfLines={1}>
                     {protagonist?.name ? `${protagonist.name} • ` : ''}{story.moral}
                   </ThemedText>
@@ -361,6 +364,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.xs,
     marginVertical: Spacing.xs,
+  },
+  storyTitle: {
+    textAlign: 'center',
   },
   subtitleText: {
     textAlign: 'center',

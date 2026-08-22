@@ -44,7 +44,6 @@ export default function StoryScreen() {
   };
 
   const headerOptions = {
-    title: story?.title ?? 'Story',
     headerLeft: isTerminalPhase
       ? undefined
       : () => (
